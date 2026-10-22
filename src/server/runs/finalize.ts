@@ -66,16 +66,27 @@ export function createFinalization(db: AdmissionDatabase) {
       try { return await db.transaction(async(tx): Promise<Finalization>=>{
         const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
         if (fence && (run.attemptVersion !== fence.attemptVersion || conversation.revision !== fence.revision)) throw new AdmissionError("CONFLICT");
-        const [settled] = await tx.select().from(runSettlements).where(eq(runSettlements.runId,runId));
-        if (run.status === "COMPLETED") throw new AdmissionError("CONFLICT");
-        if (!settled) {
-          await tx.insert(outputReviews).values({ runId,conversationId: conversation.id,attemptVersion: run.attemptVersion,
-            decision: code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCK" : "UNAVAILABLE",policyVersion: SAFETY_POLICY.version,createdAt: now });
-          await settleRun(tx,run,0,now);
-          await tx.update(runs).set({ status: cancelled || run.status === "CANCELLED" ? "CANCELLED" : run.deadlineAt <= now ? "TIMED_OUT" : code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCKED" : "FAILED",updatedAt: now }).where(eq(runs.id,runId));
-        }
+        await settleFailureLocked(tx,run,now,code,cancelled);
         return { kind: "DENIED",code };
       }); } catch (error) { return { kind: "DENIED",code: error instanceof AdmissionError ? error.code : "PROVIDER_UNAVAILABLE" }; }
     },
   };
+}
+
+// Caller holds owner/conversation/run locks. No external work occurs in this transaction.
+export async function settleFailureLocked(tx: AdmissionTransaction,run: typeof runs.$inferSelect,now: Date,code: PublicErrorCode,cancelled=false) {
+  if(run.status === "COMPLETED") throw new AdmissionError("CONFLICT");
+  const [settled]=await tx.select().from(runSettlements).where(eq(runSettlements.runId,run.id));
+  if(settled) {
+    if(["RECEIVED","CHECKING_INPUT","PLANNING","SEARCHING","PREPARING_EVIDENCE","GENERATING","CHECKING_OUTPUT"].includes(run.status))throw new AdmissionError("CONFLICT");
+    return;
+  }
+  const [review]=await tx.select().from(outputReviews).where(eq(outputReviews.runId,run.id));
+  if(review?.decision === "ALLOW")throw new AdmissionError("CONFLICT");
+  if(!review)await tx.insert(outputReviews).values({runId:run.id,conversationId:run.conversationId,attemptVersion:run.attemptVersion,
+    decision:code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCK" : "UNAVAILABLE",policyVersion:SAFETY_POLICY.version,createdAt:now});
+  await settleRun(tx,run,0,now);
+  const status=cancelled || run.status === "CANCELLED" ? "CANCELLED" : run.deadlineAt <= now ? "TIMED_OUT" : code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCKED" : "FAILED";
+  await tx.update(runs).set({status,updatedAt:now,attemptVersion:run.attemptVersion+1})
+    .where(and(eq(runs.id,run.id),eq(runs.status,run.status),eq(runs.attemptVersion,run.attemptVersion)));
 }
