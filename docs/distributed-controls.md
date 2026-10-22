@@ -9,7 +9,10 @@ provider configuration or run admission. Malformed, unowned, unavailable, blocke
 quota-denied and duplicate requests count. Verified subjects share counters across
 sessions/processes. Unauthenticated submissions share one bounded service bucket;
 no browser identity, forwarded IP, new cookie or request key creates an allowance.
-Only digested scope keys and minute/day metadata are stored, never request text.
+Untrusted-origin traffic uses the anonymous bucket even when cookies are present,
+so another site cannot drain a signed-in subject's request allowance. The same
+origin predicate gates body parsing. Only digested scope keys and minute/day
+metadata are stored, never request text.
 The initial abuse ceilings are 30/minute and 200/India-calendar day per verified
 subject; anonymous submission denials share 120/minute and 2,000/day per service
 namespace. They do not share signed-in user allowances. These are conservative
@@ -83,3 +86,49 @@ message is sent in-band with a terminal finish; the HTTP status stays 200.
 Admission and streaming logs additionally carry a fixed category and request ID,
 code and duration, without prompt, draft, evidence, credentials or raw driver
 errors. This is outcome classification; full stage tracing remains T20.
+
+
+## Verification — 2026-10-23
+
+- Quality checks: lint, TypeScript, 437 default tests in 45 files and a production
+  build. Unit/integration coverage includes clock rollback/queue time, nonextending
+  retry deadlines, stage claim uniqueness, exhausted search with unknown billing,
+  retained denial counters and separate rate/quota/deadline/infra/policy logs.
+- Eight opt-in development Neon cases pass through four independently held backend
+  connections, including concurrent request limits, malformed HTTP requests,
+  concurrent quota denials, expiry/reconciliation, restricted grants and deliberately
+  blocked advisory locks. The runtime cannot extend `runs.deadline_at`, raise a
+  provider cap, move counter windows or delete counter history. Five T18 Neon
+  cancellation/reconciliation cases also pass after the claim-interface change.
+- A 20-request contended limiter burst at concurrency four measured median 439 ms,
+  p95 811 ms and max 883 ms (3,206 ms total). These are development Neon measurements,
+  not production capacity or paid-model latency. The original four-admission burst
+  could exceed the existing two-second lock timeout; the verified contract returns
+  sanitized infrastructure 503 while retaining the independently committed abuse
+  count and creating no paid hold. No lock timeout was widened or error reclassified
+  as customer quota to make a test pass. Counter assertions aggregate window totals
+  so a real minute boundary does not produce a false failure.
+- Thirty-eight distinct browser cases pass across the incremental checks.
+  Desktop/mobile checks cover rate and quota denial without run/provider
+  creation, stage deadline followed by same-intent retry, and replacing a stale
+  already-running warning with the terminal fallback. Existing guarded-search,
+  source/citation, safety denial, Stop, reload and cross-tab recovery regressions
+  pass, as do eight public/accessibility cases. Browser fixtures use synthetic
+  providers in the pinned development database; no paid-provider request is made.
+- In-app browser verification used the existing local session with provider keys
+  explicitly disabled. The safe unavailable-provider state had zero runs, messages
+  or provider calls and one committed request in each abuse window. That legitimate
+  request's counters remain; no live allowance was reset. The original private
+  conversations were retained, and the browser was returned to `/workspace`.
+- Five fresh-cache samples per route passed the existing local performance budgets:
+  max LCP 712 ms, CLS 0 and JS transfer at most 193,697 bytes across the private
+  routes; public home/sign-in max LCP 104 ms. These are unthrottled local lab results,
+  not field Core Web Vitals; INP and paid-provider timings were not measured.
+
+Evidence is in ignored `.artifacts/t19-*.png`, `.artifacts/t19-neon-load.json` and
+public/private performance JSON. All disposable account/budget/counter fixtures
+are cleaned up by captured IDs/digests; the real account and its request counters
+are retained. Dependency audit has no high/critical production advisories; the
+existing moderate tooling advisory remains. Production migrations 0007–0008,
+hosted cron activation, retention automation and paid-provider verification remain
+separate release work. T12–T17 and the public/paid launch gates remain open.

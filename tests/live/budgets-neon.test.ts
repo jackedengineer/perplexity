@@ -72,6 +72,12 @@ it('runtime can increment counts but cannot move windows or delete counter histo
  const p=await f.identity();track(p.subject);await limiter().consume(p.subject);const where=eq(schema.requestRateBuckets.bucketKey,requestRateKey(p.subject,f.namespace));
  await expect(f.runtime.update(schema.requestRateBuckets).set({startsAt:new Date()}).where(where)).rejects.toMatchObject({cause:{code:'42501'}});
  await expect(f.runtime.delete(schema.requestRateBuckets).where(where)).rejects.toMatchObject({cause:{code:'42501'}});
+ await f.budgets();const admitted=await f.admission.admit(p.subject,p.request);if(admitted.kind!=='ADMITTED')throw new Error('Synthetic admission failed');
+ await expect(f.runtime.update(schema.runs).set({deadlineAt:new Date(Date.now()+90000)}).where(eq(schema.runs.id,admitted.run.id))).rejects.toMatchObject({cause:{code:'42501'}});
+ await f.owner.update(schema.runs).set({status:'CHECKING_INPUT'}).where(eq(schema.runs.id,admitted.run.id));
+ const claim=await createProviderCalls(f.runtime,p.subject,admitted.run.id).begin('INPUT_SAFETY','test/safety');
+ await expect(f.runtime.update(schema.providerCalls).set({capMicroUsd:99999n}).where(eq(schema.providerCalls.id,claim.id))).rejects.toMatchObject({cause:{code:'42501'}});
+ expect((await f.owner.select().from(schema.runs).where(eq(schema.runs.id,admitted.run.id)))[0].deadlineAt.toISOString()).toBe(admitted.run.deadlineAt);
 },60000);
 it('measures a small contended burst without adding another coordination service',async()=>{
  const p=await f.identity(),subject=track(p.subject),samples:number[]=[];const rate=createRequestLimiter(f.runtime,f.namespace,{...limits,userMinute:100,userDay:1000}),started=performance.now();
