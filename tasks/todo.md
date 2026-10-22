@@ -1,6 +1,6 @@
 # Build backlog
 
-T01–T03 and T05–T07 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T08 private answer drafting is next. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
+T01–T03 and T05–T10 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T11 public guarded delivery is next. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
 
 Commands and current verification results are in [README](../README.md) and [the foundation record](../docs/foundation-verification.md). Default integration tests use isolated PGlite PostgreSQL. Opt-in live browser tests use synthetic identities in the dedicated development Neon project, never production.
 
@@ -77,24 +77,26 @@ T07 evidence: [bounded retrieval](../docs/retrieval.md). One approved first-ques
 
 ### T08 — Generate private drafts with one answer model
 
-- [ ] Add the answer-role prompt and generation adapter accepting original question, selected passages and abort/deadline; use server source IDs and cap output tokens.
-- [ ] Keep drafts private in bounded memory and disable arbitrary tools/URLs; do not forward provider reasoning fields or raw streams.
-- [ ] Verify: adapter tests see only selected evidence; no-evidence behavior is explicit; oversize output, provider failure and cancellation cannot produce a public success.
+- [x] Add the answer-role prompt and generation adapter accepting original question, selected passages and abort/deadline; use server source IDs and cap output tokens.
+- [x] Keep drafts private in bounded memory and disable arbitrary tools/URLs; do not forward provider reasoning fields or raw streams.
+- [x] Verify: adapter tests see only selected evidence; no-evidence behavior is explicit; oversize output, provider failure and cancellation cannot produce a public success.
 - Dependencies: T07. Files: `src/server/ai/answer.ts`, `src/server/ai/prompts/answer.ts`, `src/server/runs/draft.ts`, `tests/unit/draft.test.ts`.
 
 ### T09 — Approve the complete visible response
 
-- [ ] Create the sole runtime release gate: source-ID validation, final citation mapping, safe URLs/Markdown, secret checks and semantic output classification; inspect visible source metadata too.
-- [ ] Produce a frozen approved payload or a fixed safe failure response; clarification and no-evidence responses use the same public release rules.
-- [ ] Verify: denied, unknown-citation and guard-outage cases yield zero draft bytes or unapproved metadata; a classifier `ALLOW` cannot bypass deterministic release failures.
+- [x] Create the sole runtime release gate: source-ID validation, final citation mapping, safe URLs/Markdown, secret checks and semantic output classification; inspect visible source metadata too.
+- [x] Produce a frozen approved payload or a fixed safe failure response; clarification and no-evidence responses use the same public release rules.
+- [x] Verify: denied, unknown-citation and guard-outage cases yield zero draft bytes or unapproved metadata; a classifier `ALLOW` cannot bypass deterministic release failures.
 - Dependencies: T08. Files: `src/server/safety/output.ts`, `src/server/safety/release.ts`, `src/server/ai/citations.ts`, `tests/integration/release-gate.test.ts`.
 
 ### T10 — Commit only approved responses
 
-- [ ] Implement conditional atomic finalization with approved messages, same-run citation/passages, terminal run state, usage settlement and conversation metadata.
-- [ ] Record provider attempts and partial/unknown usage without raw content logs; persist a canonical response before any answer delivery.
-- [ ] Verify: duplicate completion inserts one message; a DB failure releases no answer; FK/run-membership checks reject cross-run citations; settlement is idempotent.
+- [x] Implement conditional atomic finalization with approved messages, same-run citation/passages, terminal run state, usage settlement and conversation metadata.
+- [x] Record provider attempts and partial/unknown usage without raw content logs; persist a canonical response before any answer delivery.
+- [x] Verify: duplicate completion inserts one message; a DB failure releases no answer; FK/run-membership checks reject cross-run citations; settlement is idempotent.
 - Dependencies: T09. Files: `src/server/db/schema.ts`, `src/server/runs/finalize.ts`, `src/server/runs/provider-calls.ts`, `tests/integration/finalization.test.ts` plus generated SQL.
+
+T08–T10 evidence: [guarded answers](../docs/guarded-answers.md). Private generation, whole-response approval and atomic completion are implemented; 320 isolated tests, seven restricted-role live completion cases and desktop/mobile approved-history checks cover deterministic behavior. Actual paid model/search quality and the public delivery route remain separate release gates.
 
 ### T11 — Deliver the minimal search UI end to end
 

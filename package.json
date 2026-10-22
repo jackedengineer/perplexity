@@ -20,11 +20,12 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:verify": "node scripts/verify-db.mjs",
-    "test:e2e:neon": "LIVE_NEON_E2E=1 playwright test",
+    "test:e2e:neon": "LIVE_NEON_ADMISSION=1 LIVE_NEON_E2E=1 playwright test",
     "perf:check": "node scripts/measure-performance.mjs",
     "test:admission:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/admission-neon.test.ts",
     "test:input:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/input-gate-neon.test.ts",
-    "test:retrieval:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/retrieval-neon.test.ts"
+    "test:retrieval:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/retrieval-neon.test.ts",
+    "test:completion:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/completion-neon.test.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.12",

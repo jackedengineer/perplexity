@@ -140,3 +140,98 @@ require sufficient reserved balances. Runtime grants permit settlement columns
 and provider outcomes but still deny budget-limit, HMAC, accounting-snapshot,
 review, citation, receipt and excerpt mutation. History excludes assistant rows
 whose policy version is no longer current, as well as unapproved drafts.
+
+## Verification record — 22 October 2026
+
+The final verification uses the production Next.js build and the dedicated
+Singapore development Neon project. No paid model or search request is made.
+The browser fixtures commit through the real restricted runtime role, then read
+through the application's normal authenticated UI/API; no test-only route exists.
+
+| Layer | Evidence |
+| --- | --- |
+| Isolated database/unit suite | 320 tests across 32 files; all migrations applied to fresh PGlite databases |
+| Restricted-role Neon completion | Seven passing cases: canonical commit/receipt, four concurrent callers, output denial, RLS/grants, session revocation, mutated source metadata, cross-run citation FK |
+| Existing Neon regressions | Six admission, six input and seven retrieval cases pass with the new migration and provider accounting |
+| Real Chromium browsers | Eight public checks plus six authenticated desktop/mobile checks, including approved-answer reload and rejected-draft isolation |
+| Accessibility/runtime | Browser scenarios assert WCAG A/AA Axe checks and no page errors |
+| Database setup | Migration 0006 applied; TLS, 21 tables, three message RLS policies and narrow runtime grants verified |
+| Build/dependencies | Strict TypeScript, zero-warning lint, production build and high-severity production audit gate pass; one existing moderate advisory remains |
+
+The completion integration tests also cover injected transaction rollback,
+current input quarantine, unknown/partial costs, no-evidence credit refunds,
+revocation/expiry, stale attempts and revisions, cancellation, duplicate receipts,
+stage overages and forged approval objects. A late provider outcome may update
+its STARTED attempt after a failure receipt commits; the immutable receipt and
+remaining unknown hold stay unchanged until explicit reconciliation.
+
+The history browser regression seeds current, stale-policy and unapproved rows
+separately. Only current approved answers survive pagination/reload. The second
+browser identity receives the same 404 for an inaccessible conversation; a
+blocked generated answer appears in neither HTML nor history response bytes.
+Saved screenshots are ignored local artifacts:
+`.artifacts/approved-history-desktop.png` and
+`.artifacts/approved-history-mobile.png`.
+
+Final cleanup found zero synthetic admission/browser users and zero synthetic
+operator budget buckets. A configured-secret scan found no matches across 194
+tracked/new files or the new commit history. Environment files and screenshots
+remain ignored.
+
+Provider completion recording uses one owner-constrained conditional UPDATE.
+It avoids an unnecessary multi-query owner-lock transaction on each network
+result, while retaining the run/identity/STARTED conditions and immutable caps.
+The restricted-role Neon suite verifies this query on actual PostgreSQL.
+
+Local production browser measurements use five fresh-cache samples per route,
+1280×800 Chromium and no network/CPU throttling. They are lab observations, not
+field Core Web Vitals or a streaming/model latency benchmark:
+
+| Route | LCP range | CLS | Transferred JavaScript |
+| --- | --- | --- | --- |
+| `/` | 40–52 ms | 0 | 144,998 bytes |
+| `/sign-in` | 48–52 ms | 0 | 161,733 bytes |
+| `/workspace` | 320–336 ms | 0 | 180,011 bytes |
+| `/library` | 32–44 ms | 0 | 162,161 bytes |
+| `/search/:id` | 332–376 ms | 0 | 181,006 bytes |
+
+Conversation list/get server timing was 217–220 / 292–299 ms, including the
+remote development database. The answer/Markdown dependencies remain outside
+client bundles. INP and public answer delivery are not measured in this slice.
+
+## Operating and recovering this slice
+
+Before applying 0006 elsewhere, use a reviewed migration job with its direct
+owner URL. The web process receives only the restricted pooled URL. Keep the
+application submit path disabled until the migration, grants and TLS verification
+pass. `pnpm db:generate` should report no schema drift afterward.
+
+Deploy compatible code before enabling T11. Configure explicit evaluated model
+IDs/provider slugs and API keys in the server secret store; missing settings
+produce safe unavailability. Do not create a default paid model as a fallback.
+Run the opt-in Neon suites only against disposable development fixtures. Never
+copy development OAuth/session secrets into preview or production.
+
+For a stuck CHECKING_OUTPUT run or uncertain database response, inspect canonical
+run/review/message/receipt state with an authorized operational tool. If the
+transaction committed, use the existing message ID; never regenerate simply
+because the original response was lost. If it rolled back, no draft is public.
+The paid attempt still prevents automatic replay. Recovery/expiry of abandoned
+holds needs the explicit T18 reconciliation job before public release.
+
+For unknown Tavily monetary cost, missing OpenRouter usage or a late outcome,
+retain the monetary hold. Reconcile against vendor billing with an append-only
+adjustment and an idempotent external reference; such a job is not implemented
+here. A reported overage fails closed and requires investigation. Do not edit a
+receipt, raise an admitted cap or clear an unknown value to zero to unblock it.
+
+If rolling application code back, preserve these additive tables, receipts and
+RLS policies. Older code cannot safely generate new accounting-version-1 work
+without compatible adapters; keep public submission disabled. Never drop the
+assistant review policy or temporarily grant unrestricted message insertion.
+
+T11 remains the next product slice: compose the guarded execution route, publish
+fixed progress states, render approved Markdown/citations and reload canonical
+responses. Actual provider routing/privacy compatibility, classifier quality,
+search relevance, factual citation support and capped live spend remain separate
+release checks. The internal fixture result is not evidence of live model quality.

@@ -1,6 +1,6 @@
 # Perplex
 
-A web-research application in progress. Next.js, Neon/Drizzle, Google sign-in, private conversations, atomic run admission and the internal input safety gate are implemented. Retrieval, guarded answers, guest allowances and billing remain on the [backlog](tasks/todo.md).
+A web-research application in progress. Next.js, Neon/Drizzle, Google sign-in, private conversations, budgeted admission, input safety, bounded retrieval and internally guarded answer persistence are implemented. T11 connects the public research flow; guest allowances and billing follow on the [backlog](tasks/todo.md).
 
 ## Run locally
 
@@ -36,10 +36,12 @@ Avoid running dev and build simultaneously in the same checkout; Next.js regener
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Web OAuth client credentials |
 | `RUN_HMAC_ACTIVE_KEY_ID` | Active admission fingerprint key ID, for example `dev-v1` |
 | `RUN_HMAC_KEYS_JSON` | JSON object mapping key IDs to independent 32-byte lowercase hex secrets; retain historical keys |
-| `OPENROUTER_API_KEY` | Server-only classifier API key; no default or live key is configured by T06 |
+| `OPENROUTER_API_KEY` | Server-only answer/classifier API key; no live key or default |
 | `MODEL_SAFETY` | Explicit evaluated classifier model ID; never a browser model selection |
 | `SAFETY_OPENROUTER_PROVIDER` | Explicit provider slug supporting the model, strict output, privacy and price controls |
-| `TAVILY_API_KEY` | Server-only search key; no live search calls or paid activation in T07 |
+| `TAVILY_API_KEY` | Server-only search key; no live search calls or paid activation |
+| `MODEL_ANSWER` | Explicit evaluated answer model ID used by the AI SDK adapter |
+| `ANSWER_OPENROUTER_PROVIDER` | One explicit answer provider supporting the enforced privacy/price parameters |
 
 Neon URLs use `sslmode=verify-full`. Certificate verification is enabled; do not use `rejectUnauthorized: false`. The runtime pool has a maximum of three connections, a five-second connection timeout and ten-second statement timeout.
 
@@ -50,7 +52,7 @@ The existing development resources are:
 - OAuth origin `http://localhost:3000`; redirect `http://localhost:3000/api/auth/callback/google`.
 - Google audience is **Testing**, with the project owner as a test user. Basic OpenID/profile/email only; no offline Google API access.
 
-For another development database, first migrate with its owner URL. Then run `node scripts/provision-runtime-role.mjs` once to create a restricted runtime role and update the local pooled URL. It grants auth CRUD, profile creation, conversation metadata access, history reads and narrowly scoped admission/reserve writes. Question insertion requires a matching persisted ALLOW review through message RLS; assistant insertion remains denied. It grants no budget provisioning, limit changes, fingerprint mutation, settlement, review mutation or schema creation/truncation. It refuses to rotate an existing role. Future migrations must explicitly grant appropriate permissions on new tables. Production provisioning belongs in a separately reviewed deployment workflow.
+For another development database, first migrate with its owner URL. Then run `node scripts/provision-runtime-role.mjs` once to create a restricted runtime role and update the local pooled URL. It grants auth CRUD, profile creation, conversation metadata access, history reads and narrowly scoped admission/reserve writes. Question insertion requires a matching persisted ALLOW review through message RLS. Assistant insertion requires a matching output review and exact approved body hash. Settlement can change reserved/settled balances and insert one receipt. It grants no budget provisioning, limit changes, fingerprint mutation, audit-record mutation or schema creation/truncation. It refuses to rotate an existing role. Future migrations must explicitly grant appropriate permissions on new tables. Production provisioning belongs in a separately reviewed deployment workflow.
 
 In deployment settings, expose only `DATABASE_URL` to the web runtime. Keep the owner URL in the migration job's secret store. Use separate projects, OAuth clients and secrets for preview/production. OAuth-token encryption depends on the auth secret; plan migration/key rotation before replacing it.
 
@@ -76,7 +78,7 @@ Auth responses have `Cache-Control: no-store`, request IDs and `Server-Timing`. 
 
 The protected `/workspace`, `/library`, and `/search/:id` screens share the same database-backed identity. Every repository query scopes by the verified auth subject through an application UUID profile. Foreign and missing conversation IDs return the same unavailable response. Create retries are owner-idempotent, renames require the current revision, lists/history are bounded, and assistant drafts are excluded from history.
 
-The HTTP contract and inspected UI reference coverage are in [private-conversations.md](docs/private-conversations.md). Titles are metadata; there is no message-submission or AI endpoint yet. The runtime cannot insert message drafts. Output approval, execution and settlement must be completed before the public research path is enabled.
+The HTTP contract and inspected UI reference coverage are in [private-conversations.md](docs/private-conversations.md). Titles are metadata; there is no message-submission or AI endpoint yet. The runtime cannot insert unreviewed message drafts. T08–T10 provide internal approval and atomic settlement; T11 must connect the guarded public execution/delivery path.
 
 ## Research boundary contracts
 
@@ -86,20 +88,25 @@ T05 adds the internal `admitRequest` service: verified session → bounded JSON 
 
 T06 adds `checkAdmittedInput`: verified session → owned intent/HMAC check → one input-check claim → validated canonical context → local credential/abuse checks → isolated classifier → conditional atomic review/question commit. Denials retain metadata and fixed safe responses. Missing model configuration returns safe unavailability. The [input safety contract](docs/input-safety.md) records strict transport controls, RLS, timeouts, context limits and remaining quality evaluation. Long/stale histories fail closed until safe context selection/revalidation is implemented. No public submit route is connected yet.
 
-T07 adds `retrieveAdmittedEvidence`: verified session → one canonical approved query → outbound query guard → one bounded Tavily search → evidence inspection → fenced atomic source/passage persistence. `loadPrivateEvidence` authorizes private drafting reads independently of provider configuration. The [retrieval contract](docs/retrieval.md) records limits, retention, cost assumptions and verification. No source metadata is publicly released; T08 private drafting is next.
+T07 adds `retrieveAdmittedEvidence`: verified session → one canonical approved query → outbound query guard → one bounded Tavily search → evidence inspection → fenced atomic source/passage persistence. `loadPrivateEvidence` authorizes private drafting reads independently of provider configuration. The [retrieval contract](docs/retrieval.md) records limits, retention, cost assumptions and verification. No source metadata is publicly released; approved source rendering belongs to T11.
+
+T08–T10 add `completeAdmittedAnswer`: live session → one generation claim → bounded private AI SDK/OpenRouter draft → deterministic citation/Markdown checks → semantic output guard → conditional atomic commit. The transaction persists the canonical response, assistant text, same-run citations, terminal state and idempotent usage receipt together. It returns IDs only after commit; provider reasoning and rejected drafts never enter history. Unknown provider costs retain the remaining monetary hold rather than becoming zero. Current-policy checks also hide stale assistant history.
+
+See [guarded answers](docs/guarded-answers.md) for stage caps, immutable approval, cancellation/fencing, restricted-role verification and recovery limits. Citations establish source membership; factual support remains `NOT_CHECKED`. AI SDK 7 and its matching OpenRouter adapter run only on the server. The browser still uses the existing history surface; `/api/chat` and interactive citation rendering are T11.
 
 ## Verification
 
 ```sh
-pnpm check                  # lint, generated route types, strict TS, 220 tests
+pnpm check                  # lint, generated route types, strict TS, 320 tests
 pnpm build                  # production build; no credentials needed to build
 pnpm exec playwright install chromium
 pnpm test:e2e               # 8 public desktop/mobile checks; starts the built app
-pnpm test:e2e:neon          # 4 OPT-IN live development DB checks
+pnpm test:e2e:neon          # 6 OPT-IN live development DB browser checks
 pnpm test:admission:neon    # 6 OPT-IN live development DB races/rollback checks
 pnpm test:input:neon        # 6 OPT-IN live DB gate/RLS checks; classifier is a test double
 pnpm test:retrieval:neon    # 7 OPT-IN live DB retrieval/ownership/RLS checks; providers mocked
-pnpm db:verify              # read-only TLS/schema verification for both URLs
+pnpm test:completion:neon   # 7 OPT-IN live DB completion/RLS/concurrency checks; providers mocked
+pnpm db:verify              # read-only TLS/schema verification; 21 tables, narrow grants
 pnpm perf:check             # production server must already be running
 pnpm perf:check --private   # OPT-IN synthetic identity; 5 samples/private route
 ```
@@ -108,10 +115,10 @@ Stop `pnpm dev` before browser checks so they exercise the production build. Pub
 
 CI installs from the frozen lockfile with dependency scripts disabled, then runs lint/types/tests, production dependency audit, build and browser checks. Actions are pinned to verified commit SHAs. The GitHub remote is `jackedengineer/perplexity`; pull requests trigger the quality workflow. Live Neon tests remain explicitly opt-in and are excluded from default CI. Branch protection and deployed-preview verification remain outstanding.
 
-See [the foundation verification record](docs/foundation-verification.md), [private conversation verification](docs/private-conversations-verification.md), [admission verification](docs/run-admission.md), [input gate verification](docs/input-safety.md) and [retrieval verification](docs/retrieval.md) for evidence and limits. The complete app is not ready for public launch: live provider/model evaluation, output gates, settlement, deletion/export, CSP/deployment hardening and operational recovery remain planned work.
+See [the foundation verification record](docs/foundation-verification.md), [private conversation verification](docs/private-conversations-verification.md), [admission verification](docs/run-admission.md), [input gate verification](docs/input-safety.md), [retrieval verification](docs/retrieval.md) and [guarded answer verification](docs/guarded-answers.md) for evidence and limits. The complete app is not ready for public launch: public guarded delivery, live provider/model evaluation, cost reconciliation, deletion/export, CSP/deployment hardening and operational recovery remain planned work.
 
 ## Working agreements
 
-Use a feature branch and focused commits. Keep hand-written changes near 400–700 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. T05 and T06 are merged into main. T07 is on `codex/bounded-retrieval`.
+Use a feature branch and focused commits. Keep hand-written changes near 400–700 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. T05–T07 are merged into main. T08–T10 are on `codex/guarded-answer-persistence`.
 
-The [system design](docs/system-design.md), [session contract](docs/authentication.md) and [implementation plan](tasks/plan.md) describe the larger product. The Vercel AI SDK will be introduced with T08 answer generation; T06/T07 use small fixed-protocol provider adapters without new dependencies.
+The [system design](docs/system-design.md), [session contract](docs/authentication.md) and [implementation plan](tasks/plan.md) describe the larger product. T08 uses the Vercel AI SDK for answer generation; T06/T07 retain small fixed-protocol guard/search adapters. No paid provider smoke test has been run.

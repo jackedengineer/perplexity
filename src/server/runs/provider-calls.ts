@@ -1,5 +1,5 @@
-import { and,eq,sql } from "drizzle-orm";
-import { providerCalls } from "@/db/schema";
+import { and,eq,exists,sql } from "drizzle-orm";
+import { providerCalls,runs,appUsers } from "@/db/schema";
 import type { AdmissionDatabase } from "./usage";
 import { lockOwnedRun } from "./lock";
 import { AdmissionError } from "./errors";
@@ -25,13 +25,12 @@ export function createProviderCalls(db: AdmissionDatabase,subject: string,runId:
     },
     async finish(id: string,status: "SUCCEEDED" | "UNKNOWN" | "SKIPPED",usage?: ProviderUsage,searchCredits?: 1) {
       // A paid result may arrive after cancellation/fencing; record its cost without authorizing continuation.
-      return db.transaction(async(tx)=>{
-      await lockOwnedRun(tx,subject,runId);
-      const changed = await tx.update(providerCalls).set({ status,costMicroUsd: usage?.costMicroUsd ?? null,
+      const owned = db.select({ id: runs.id }).from(runs).innerJoin(appUsers,eq(appUsers.id,runs.userId))
+        .where(and(eq(runs.id,runId),eq(appUsers.authSubject,subject)));
+      const changed = await db.update(providerCalls).set({ status,costMicroUsd: usage?.costMicroUsd ?? null,
         inputTokens: usage?.inputTokens ?? null,outputTokens: usage?.outputTokens ?? null,actualModel: usage?.actualModel ?? null,
-        searchCredits: searchCredits ?? null,finishedAt: sql`clock_timestamp()` }).where(and(eq(providerCalls.id,id),eq(providerCalls.runId,runId),eq(providerCalls.status,"STARTED"))).returning({ id: providerCalls.id });
+        searchCredits: searchCredits ?? null,finishedAt: sql`clock_timestamp()` }).where(and(eq(providerCalls.id,id),eq(providerCalls.runId,runId),eq(providerCalls.status,"STARTED"),exists(owned))).returning({ id: providerCalls.id });
       if (changed.length !== 1) throw new AdmissionError("CONFLICT");
-      });
     },
   };
 }
