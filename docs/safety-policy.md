@@ -1,6 +1,6 @@
 # Server-side safety and release policy
 
-Status: proposed policy `v1`, 2026-10-22. Implement and evaluate this alongside the first live model integration. This is an application policy proposal, not a statement that classifiers can detect every unsafe request.
+Status: policy `v1` contracts, categories, static responses and seed fixtures implemented in T02, 2026-10-22. Runtime classification and enforcement remain T06–T11 work; evaluate them before live release. This is an application policy proposal, not a statement that classifiers can detect every unsafe request.
 
 ## Assets and trust boundaries
 
@@ -12,9 +12,9 @@ Primary abuse cases: access another user's thread, submit concurrent paid runs t
 
 ```typescript
 type GuardDecision =
-  | { decision: 'ALLOW'; categoryCodes: string[]; policyVersion: string }
-  | { decision: 'BLOCK'; categoryCodes: string[]; publicReason: string; policyVersion: string }
-  | { decision: 'UNAVAILABLE'; retryable: boolean; policyVersion: string };
+  | { decision: 'ALLOW'; categoryCodes: []; policyVersion: 'v1' }
+  | { decision: 'BLOCK'; categoryCodes: SafetyCategory[]; policyVersion: 'v1' }
+  | { decision: 'UNAVAILABLE'; retryable: boolean; policyVersion: 'v1' };
 ```
 
 Runtime validation rejects unknown verdicts, missing fields and free-form responses. Classifier text cannot change policy, tool permissions or thresholds. Public reason codes are selected by server mapping, not blindly echoed classifier prose.
@@ -24,11 +24,13 @@ Runtime validation rejects unknown verdicts, missing fields and free-form respon
 - `UNAVAILABLE`: timeout, outage or malformed verdict. Return a safe retry message, settle known usage, and do not bypass required checks.
 - Ambiguity about what the user wants belongs to the planner; ambiguity that prevents a safe policy decision is handled conservatively without inventing intent.
 
+The implementation and exact limits are documented in [boundary-contracts.md](boundary-contracts.md). BLOCK categories must be nonempty, unique and known; ALLOW categories must be empty. Missing/stale/malformed verdicts become UNAVAILABLE. Classifier-supplied public prose is rejected.
+
 Use a concise reason-code taxonomy. Public refusals should be understandable without revealing detector patterns or operational details.
 
-## 2. Proposed content policy
+## 2. Version 1 content policy
 
-Block assistance that materially enables credential theft, fraud, unauthorized intrusion, malware deployment, violence, sexual exploitation, or harmful instructions for self-injury. Block disclosure of private credentials and nonpublic personal data the requester is not entitled to access. Define exact categories and escalation rules in versioned fixtures before launch.
+Block assistance that materially enables credential theft, fraud, unauthorized intrusion, malware deployment, violence, sexual exploitation, or harmful instructions for self-injury. Block disclosure of private credentials and nonpublic personal data the requester is not entitled to access. Exact categories and fixed response precedence are now defined in the versioned contracts and seed fixtures; classifier evaluation remains required before launch.
 
 Allow ordinary explanations, prevention, defensive security, legitimate analysis and discussion of sensitive topics. Do not blanket-ban a word, political viewpoint or topic because it appears “fishy.” A request for phishing awareness and a request for credential theft need different outcomes. Help-seeking distress should receive an appropriate supportive safe response rather than a punitive generic rejection; use reviewed response templates for such routing.
 

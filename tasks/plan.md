@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: implementation started, 2026-10-22. Next.js, Neon/Drizzle and Google sign-in/session lifecycle are implemented and verified. Signed-in private conversations and ownership checks are implemented; guarded AI admission is next; [the foundation record](../docs/foundation-verification.md) lists exact completed checks and limitations.
+Status: implementation started, 2026-10-22. Next.js, Neon/Drizzle and Google sign-in/session lifecycle are implemented and verified. Signed-in private conversations and ownership checks are implemented; T02 boundary contracts and policy v1 are implemented; guarded AI admission is next; [the foundation record](../docs/foundation-verification.md) lists exact completed checks and limitations.
 
 Read [the system design](../docs/system-design.md), [authentication](../docs/authentication.md), [billing and entitlements](../docs/billing-and-entitlements.md), [the safety policy](../docs/safety-policy.md) and [the capability map](../CAPABILITY-MAP.md) before implementing. [todo.md](todo.md) is the canonical build checklist.
 

@@ -1,6 +1,6 @@
 # Capability map
 
-Status: implementation started, 2026-10-22. Next.js, Neon/Drizzle and Google sign-in are implemented. The map below describes the full target; see [the foundation record](docs/foundation-verification.md) for verified current behavior.
+Status: implementation started, 2026-10-22. Next.js, Neon/Drizzle, Google sign-in, private conversation ownership and T02 boundary contracts/policy are implemented. Runtime safety classification and provider orchestration remain planned. The map below describes the full target; see [the foundation record](docs/foundation-verification.md) for verified current behavior.
 
 | Module | Responsibility | Depends on |
 | --- | --- | --- |

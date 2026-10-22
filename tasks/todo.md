@@ -1,6 +1,6 @@
 # Build backlog
 
-T01 is implemented. T03/T04 now include signed-in private conversations and owner isolation; run admission and deployed-preview verification remain outstanding. Other tasks are unstarted. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
+T01 and T02 are implemented. T03/T04 now include signed-in private conversations and owner isolation; run admission and deployed-preview verification remain outstanding. Other tasks are unstarted. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
 
 Commands and current verification results are in [README](../README.md) and [the foundation record](../docs/foundation-verification.md). Default integration tests use isolated PGlite PostgreSQL. Opt-in live browser tests use synthetic identities in the dedicated development Neon project, never production.
 
@@ -15,10 +15,12 @@ Commands and current verification results are in [README](../README.md) and [the
 
 ### T02 — Define boundary contracts and versioned policy
 
-- [ ] Add runtime schemas for submission, plans, evidence, safety verdicts, public stage data and errors; enforce `FAST` only and server-owned model/policy settings.
-- [ ] Translate the proposed policy into explicit category codes, fixed safe responses and fixtures; defaults contain no permission to bypass unavailable guards.
-- [ ] Verify: schema tests reject browser role/model/safety overrides, malformed verdicts and oversized fields; policy fixtures distinguish harmful requests from benign near-misses.
-- Dependencies: T01. Files: `src/server/contracts/chat.ts`, `src/server/contracts/pipeline.ts`, `src/server/safety/policy.ts`, `src/server/safety/responses.ts`, `tests/unit/contracts.test.ts`.
+- [x] Add runtime schemas for submission, plans, evidence, safety verdicts, public stage data and errors; enforce `FAST` only and server-owned model/policy settings.
+- [x] Translate the proposed policy into explicit category codes, fixed safe responses and fixtures; defaults contain no permission to bypass unavailable guards.
+- [x] Verify: schema tests reject browser role/model/safety overrides, malformed verdicts and oversized fields; policy fixtures distinguish harmful requests from benign near-misses.
+- Dependencies: T01. Files: `src/server/contracts/chat.ts`, `src/server/contracts/pipeline.ts`, `src/server/contracts/progress.ts`, `src/server/contracts/errors.ts`, `src/server/safety/policy.ts`, `src/server/safety/responses.ts`, focused contract/policy tests and `tests/fixtures/safety-v1.json`.
+
+T02 verification: [boundary contracts](../docs/boundary-contracts.md). Semantic classification and guard execution are intentionally deferred to T06–T11.
 
 ### T03 — Connect Neon and migrate private conversation records
 

@@ -72,10 +72,14 @@ The protected `/workspace`, `/library`, and `/search/:id` screens share the same
 
 The HTTP contract and inspected UI reference coverage are in [private-conversations.md](docs/private-conversations.md). Titles are metadata; there is no message-submission or AI endpoint yet. The runtime cannot insert message drafts. Input/output AI guards and budget admission must be completed before connecting providers.
 
+## Research boundary contracts
+
+T02 defines strict submission/planner/evidence/progress schemas, fixed public errors and versioned safety decisions. Unknown or unavailable verdicts fail closed; a 32-case synthetic seed set distinguishes harmful requests from benign near-misses. [Contract details and verification](docs/boundary-contracts.md) explain the limits and remaining enforcement work. These modules do not provide semantic classification or expose an AI endpoint. T05 admission and T06 safety-provider integration are next.
+
 ## Verification
 
 ```sh
-pnpm check                  # lint, generated route types, strict TS, 33 tests
+pnpm check                  # lint, generated route types, strict TS, 79 tests
 pnpm build                  # production build; no credentials needed to build
 pnpm exec playwright install chromium
 pnpm test:e2e               # 8 public desktop/mobile checks; starts the built app
@@ -93,6 +97,6 @@ See [the foundation verification record](docs/foundation-verification.md) and [p
 
 ## Working agreements
 
-Use a feature branch and focused commits. Keep hand-written changes near 300–400 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. The current work is on `feat/private-conversations`.
+Use a feature branch and focused commits. Keep hand-written changes near 300–400 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. The current work is on `feat/boundary-contracts`.
 
 The [system design](docs/system-design.md), [session contract](docs/authentication.md) and [implementation plan](tasks/plan.md) describe the larger product. SDK/OpenRouter/Tavily dependencies will be introduced when their guarded pipeline slices are built.
