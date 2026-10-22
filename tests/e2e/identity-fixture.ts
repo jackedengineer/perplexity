@@ -1,0 +1,21 @@
+import { randomUUID, createHmac } from "node:crypto";
+import { Pool } from "pg";
+import type { BrowserContext } from "@playwright/test";
+
+export async function identityFixture(context: BrowserContext, name = "Curious Tester") {
+  const url = process.env.DATABASE_URL;
+  const secret = process.env.BETTER_AUTH_SECRET;
+  if (!url?.includes("neon.tech") || !secret) throw new Error("Dedicated development Neon credentials required");
+  const db = new Pool({ connectionString: url, max: 1 });
+  const id = `e2e-${randomUUID()}`;
+  const token = randomUUID();
+  try {
+    await db.query('INSERT INTO "user" (id,name,email,email_verified) VALUES ($1,$2,$3,true)', [id, name, `${id}@example.test`]);
+    await db.query(`INSERT INTO session (id,token,user_id,expires_at,created_at,updated_at)
+      VALUES ($1,$2,$3,now()+interval '5 days',now()-interval '2 days',now()-interval '2 days')`, [id, token, id]);
+    const signature = createHmac("sha256", secret).update(token).digest("base64");
+    await context.addCookies([{ name: "perplex.session_token", value: encodeURIComponent(`${token}.${signature}`),
+      domain: "localhost", path: "/", httpOnly: true, sameSite: "Lax" }]);
+    return { id, db, cleanup: async () => { try { await db.query('DELETE FROM "user" WHERE id=$1', [id]); } finally { await db.end(); } } };
+  } catch (error) { await db.query('DELETE FROM "user" WHERE id=$1', [id]); await db.end(); throw error; }
+}

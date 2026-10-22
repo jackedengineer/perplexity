@@ -21,14 +21,15 @@ test("authenticated workspace renders, renews, and signs out", async ({ context,
     await context.addCookies([{ name: "perplex.session_token", value: encodeURIComponent(`${token}.${signature}`),
       domain: "localhost", path: "/", httpOnly: true, sameSite: "Lax" }]);
     await page.goto("/workspace");
-    await expect(page.getByRole("heading", { name: "A home for your next question." })).toBeVisible();
-    await expect(page.getByText("You’re signed in")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "What do you want to know?" })).toBeVisible();
     await expect.poll(async () => (await db.query(
       "SELECT expires_at > now() + interval '6 days' AS renewed FROM session WHERE id=$1", [id],
     )).rows[0]?.renewed).toBe(true);
     expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze()).violations).toEqual([]);
     expect(errors).toEqual([]);
     await page.screenshot({ path: `.artifacts/workspace-${testInfo.project.name}.png`, fullPage: true });
+    if (await page.getByRole("button", { name: "Open navigation" }).isVisible()) await page.getByRole("button", { name: "Open navigation" }).click();
+    await page.getByRole("button", { name: "Open account menu" }).filter({ visible: true }).click();
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect(page).toHaveURL(/\/sign-in$/);
     expect((await db.query("SELECT id FROM session WHERE user_id=$1", [id])).rows).toHaveLength(0);

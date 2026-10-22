@@ -1,12 +1,39 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { config } from "dotenv";
+import { identityFixture } from "../tests/e2e/identity-fixture.ts";
 import { chromium } from "@playwright/test";
 
+config({ path: ".env.local", quiet: true });
+const privateMode = process.argv.includes("--private");
 const browser = await chromium.launch();
 const measurements = [];
+const apiMeasurements = [];
+let identity;
+let seedContext;
+let paths = ["/", "/sign-in"];
 try {
-  for (const path of ["/", "/sign-in"]) {
+  if (privateMode) {
+    seedContext = await browser.newContext({ baseURL: "http://localhost:3000" });
+    identity = await identityFixture(seedContext);
+    const created = await seedContext.request.post("/api/conversations", { headers: { Origin: "http://localhost:3000" },
+      data: { clientRequestId: randomUUID(), title: "Private performance fixture" } });
+    if (created.status() !== 201) throw new Error("Private performance fixture unavailable");
+    const id = (await created.json()).conversation.id;
+    paths = ["/workspace", "/library", `/search/${id}`];
+    for (let sample = 0; sample < 5; sample++) {
+      for (const endpoint of ["/api/conversations", `/api/conversations/${id}`]) {
+        const response = await seedContext.request.get(endpoint);
+        if (!response.ok()) throw new Error("Private API probe failed");
+        apiMeasurements.push({ operation: endpoint.endsWith(id) ? "get" : "list", sample,
+          serverTiming: response.headers()["server-timing"] });
+      }
+    }
+  }
+  for (const path of paths) {
     for (let sample = 0; sample < 5; sample++) {
       const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      if (seedContext) await context.addCookies(await seedContext.cookies());
       const page = await context.newPage();
       await page.addInitScript(() => {
         window.__lab = { lcp: 0, cls: 0 };
@@ -29,20 +56,22 @@ try {
           lcpMs: Math.round(window.__lab.lcp), cls: window.__lab.cls,
           jsTransferBytes: resources.filter((r) => r.name.includes(".js")).reduce((sum, r) => sum + r.transferSize, 0),
         };
-      }, { path, sample }));
+      }, { path: path.startsWith("/search/") ? "/search/:id" : path, sample }));
       await context.close();
     }
   }
   await mkdir(".artifacts", { recursive: true });
-  await writeFile(".artifacts/performance.json", JSON.stringify({
+  await writeFile(privateMode ? ".artifacts/private-performance.json" : ".artifacts/performance.json", JSON.stringify({
     conditions: "Local production build; Chromium 1280x800; fresh cache per navigation; no throttling; five samples per route. Not field Core Web Vitals; INP not measured.",
-    measurements,
+    measurements, apiMeasurements,
   }, null, 2));
-  for (const path of ["/", "/sign-in"]) {
+  for (const path of [...new Set(measurements.map((row) => row.path))]) {
     const rows = measurements.filter((row) => row.path === path);
-    console.log(JSON.stringify({ path, maxLcpMs: Math.max(...rows.map((r) => r.lcpMs)), maxCls: Math.max(...rows.map((r) => r.cls)), maxJsTransferBytes: Math.max(...rows.map((r) => r.jsTransferBytes)) }));
+    console.log(JSON.stringify({ path, maxTtfbMs: Math.max(...rows.map((r) => r.ttfbMs)), maxLcpMs: Math.max(...rows.map((r) => r.lcpMs)), maxCls: Math.max(...rows.map((r) => r.cls)), maxJsTransferBytes: Math.max(...rows.map((r) => r.jsTransferBytes)) }));
   }
   if (measurements.some((r) => r.lcpMs <= 0 || r.lcpMs > 2500 || r.cls > 0.1 || r.jsTransferBytes > 200_000)) {
-    throw new Error("Foundation performance budget exceeded; inspect .artifacts/performance.json");
+    throw new Error("Frontend performance budget exceeded; inspect the mode-specific .artifacts performance report");
   }
-} finally { await browser.close(); }
+} finally {
+  try { await seedContext?.close(); await identity?.cleanup(); } finally { await browser.close(); }
+}
