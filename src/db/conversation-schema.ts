@@ -19,6 +19,7 @@ export const conversations = pgTable("conversations", {
   createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
 }, (table) => [
+  uniqueIndex("conversations_id_owner_unique").on(table.id, table.userId),
   uniqueIndex("conversations_owner_creation_unique").on(table.userId, table.creationRequestId),
   index("conversations_owner_updated_idx").on(table.userId, table.updatedAt.desc(), table.id.desc()),
   check("conversations_title_nonempty", sql`length(trim(${table.title})) > 0`),

@@ -24,6 +24,12 @@ try {
   await pool.query('GRANT SELECT, INSERT ON app_users TO perplex_web');
   await pool.query('GRANT SELECT, INSERT, UPDATE ON conversations TO perplex_web');
   await pool.query('GRANT SELECT ON messages TO perplex_web');
+  await pool.query(`GRANT SELECT, INSERT ON runs, usage_reservations, admission_attempt_buckets TO perplex_web;
+    GRANT UPDATE (status, updated_at, attempt_version) ON runs TO perplex_web;
+    GRANT UPDATE (attempts) ON admission_attempt_buckets TO perplex_web;
+    GRANT SELECT ON usage_buckets, operator_usage_buckets TO perplex_web;
+    GRANT UPDATE (reserved_credits, reserved_provider_micro_usd) ON usage_buckets TO perplex_web;
+    GRANT UPDATE (reserved_provider_micro_usd) ON operator_usage_buckets TO perplex_web`);
   await pool.query("COMMIT");
   const runtimeUrl = new URL(process.env.DATABASE_URL);
   runtimeUrl.username = role;

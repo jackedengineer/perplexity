@@ -22,6 +22,13 @@
       "when": 1792663416789,
       "tag": "0002_cursor_timestamp_precision",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792670177059,
+      "tag": "0003_atomic_run_admission",
+      "breakpoints": true
     }
   ]
 }
