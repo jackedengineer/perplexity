@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { ResearchShell } from "@/components/conversations/research-shell";
 import { getConversationRepository, requireConversationIdentity } from "@/server/conversations/service";
 import "./research.css";
+import "./answers.css";
 
 export const metadata = { robots: { index: false, follow: false } };
 export default async function ResearchLayout({ children }: { children: React.ReactNode }) {

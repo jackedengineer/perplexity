@@ -1,9 +1,11 @@
+import { presentAnswer } from "@/server/answers/presentation";
+import { serializeApprovedPayload } from "@/server/ai/approved-payload";
 import { SAFETY_POLICY } from "@/server/safety/policy";
 import { createHash } from "node:crypto";
 import { and, desc, eq, ilike, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import * as schema from "@/db/schema";
-import { appUsers, conversations, messages } from "@/db/schema";
+import { appUsers, conversations, messages, outputReviews, runs } from "@/db/schema";
 import { encodeCursor, type Conversation, type CreateInput, type HistoryInput, type ListInput } from "./contracts";
 import { ConversationError } from "./errors";
 
@@ -69,12 +71,22 @@ export function createConversationRepository(db: PgDatabase<PgQueryResultHKT, ty
       const rows = await db.select({
         id: messages.id, role: messages.role, kind: messages.kind, parts: messages.parts,
         sequence: messages.sequence, schemaVersion: messages.schemaVersion, createdAt: messages.createdAt,
-      }).from(messages).innerJoin(conversations, eq(messages.conversationId, conversations.id)).where(and(
+        review: outputReviews.payload, bodyHash: outputReviews.bodyHash,payloadHash: outputReviews.payloadHash,reviewDecision: outputReviews.decision,runStatus: runs.status,
+      }).from(messages).innerJoin(conversations, eq(messages.conversationId, conversations.id))
+        .leftJoin(outputReviews,eq(outputReviews.messageId,messages.id)).leftJoin(runs,eq(runs.id,outputReviews.runId)).where(and(
         owned(authSubject), eq(messages.conversationId, id),
         or(eq(messages.role, "USER"), and(isNotNull(messages.approvedAt),eq(messages.policyVersion,SAFETY_POLICY.version))),
         input.before ? lt(messages.sequence, input.before) : undefined,
       )).orderBy(desc(messages.sequence)).limit(input.limit + 1);
-      const items = rows.slice(0, input.limit).reverse().map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
+      const items = rows.slice(0, input.limit).reverse().map(({ review,bodyHash,payloadHash,reviewDecision,runStatus,...row }) => {
+        if (!reviewDecision) return { ...row,answer: undefined,createdAt: row.createdAt.toISOString() };
+        try {
+          const canonical = serializeApprovedPayload(review);
+          if (reviewDecision !== "ALLOW" || runStatus !== "COMPLETED" || canonical.bodyHash !== bodyHash || canonical.payloadHash !== payloadHash ||
+            row.parts.length !== 1 || canonical.payload.markdown !== row.parts[0].text) throw new Error("Invalid saved answer");
+          return { ...row,answer: presentAnswer(canonical.payload),createdAt: row.createdAt.toISOString() };
+        } catch { throw new ConversationError("UNAVAILABLE"); }
+      });
       return { conversation, items, nextBefore: rows.length > input.limit ? items[0].sequence : null };
     },
   };
