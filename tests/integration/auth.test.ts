@@ -67,4 +67,42 @@ describe("database-backed authentication", () => {
     }));
     expect(response.status).toBe(403);
   });
+  it("uses PKCE and basic identity scopes with a server-owned callback", async () => {
+    const response = await auth.handler(new Request("http://localhost:3000/api/auth/sign-in/social", {
+      method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000" },
+      body: JSON.stringify({ provider: "google", callbackURL: "/workspace" }),
+    }));
+    expect(response.status).toBe(200);
+    const url = new URL((await response.json()).url);
+    expect(url.origin).toBe("https://accounts.google.com");
+    expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(url.searchParams.get("scope")?.split(" ").sort()).toEqual(["email", "openid", "profile"]);
+    expect(url.searchParams.get("redirect_uri")).toBe("http://localhost:3000/api/auth/callback/google");
+  });
+  it("rejects missing mutation origins and external post-login redirects", async () => {
+    for (const [origin, callbackURL] of [["", "/workspace"], ["http://localhost:3000", "https://evil.example"]]) {
+      const response = await auth.handler(new Request("http://localhost:3000/api/auth/sign-in/social", {
+        method: "POST", headers: { "content-type": "application/json", origin },
+        body: JSON.stringify({ provider: "google", callbackURL }),
+      }));
+      expect(response.status).toBe(403);
+    }
+  });
+  it("rejects an OAuth callback with unproven state", async () => {
+    const response = await auth.handler(new Request("http://localhost:3000/api/auth/callback/google?code=not-a-real-code&state=unknown"));
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toContain("state_mismatch");
+  });
+  it("limits repeated sign-in starts using the shared database counter", async () => {
+    const statuses: number[] = [];
+    for (let i = 0; i < 11; i++) {
+      const response = await auth.handler(new Request("http://localhost:3000/api/auth/sign-in/social", {
+        method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", "x-vercel-forwarded-for": "198.51.100.42" },
+        body: JSON.stringify({ provider: "google", callbackURL: "/workspace" }),
+      }));
+      statuses.push(response.status);
+    }
+    expect(statuses.slice(0, 10)).toEqual(Array(10).fill(200));
+    expect(statuses[10]).toBe(429);
+  });
 });

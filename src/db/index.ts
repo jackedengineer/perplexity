@@ -8,15 +8,18 @@ const globalDatabase = globalThis as typeof globalThis & { perplexPool?: Pool };
 let database: ReturnType<typeof connect> | undefined;
 
 function connect() {
-  const pool = globalDatabase.perplexPool ?? new Pool({
+  let pool = globalDatabase.perplexPool;
+  if (!pool) {
+    pool = new Pool({
     connectionString: getServerEnv().DATABASE_URL,
     max: 3,
     connectionTimeoutMillis: 5_000,
     idleTimeoutMillis: 30_000,
     statement_timeout: 10_000,
     application_name: "perplex-web",
-  });
-  pool.on("error", () => console.error(JSON.stringify({ event: "database.pool_error" })));
+    });
+    pool.on("error", () => console.error(JSON.stringify({ event: "database.pool_error" })));
+  }
   if (process.env.NODE_ENV !== "production") globalDatabase.perplexPool = pool;
   return drizzle(pool, { schema });
 }

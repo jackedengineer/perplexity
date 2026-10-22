@@ -18,10 +18,6 @@ const schema = z.object({
   BETTER_AUTH_SECRET: z.string().min(32),
   GOOGLE_CLIENT_ID: z.string().min(1),
   GOOGLE_CLIENT_SECRET: z.string().min(1),
-}).superRefine((env, ctx) => {
-  if (env.NODE_ENV === "production" && new URL(env.BETTER_AUTH_URL).protocol !== "https:") {
-    ctx.addIssue({ code: "custom", path: ["BETTER_AUTH_URL"], message: "HTTPS required" });
-  }
 });
 
 export function parseServerEnv(input: Record<string, string | undefined>) {

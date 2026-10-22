@@ -22,7 +22,10 @@ describe("server configuration", () => {
   });
   it("rejects insecure public auth origins", () => {
     expect(() => parseServerEnv({ ...valid, BETTER_AUTH_URL: "http://example.com" })).toThrow();
-    expect(() => parseServerEnv({ ...valid, NODE_ENV: "production" })).toThrow();
+    expect(() => parseServerEnv({ ...valid, NODE_ENV: "production", BETTER_AUTH_URL: "http://example.com" })).toThrow();
+  });
+  it("allows a production build to be smoke-tested over loopback HTTP", () => {
+    expect(parseServerEnv({ ...valid, NODE_ENV: "production" }).BETTER_AUTH_URL).toBe("http://localhost:3000");
   });
   it("requires verified TLS for remote database connections", () => {
     expect(() => parseServerEnv({ ...valid, DATABASE_URL: valid.DATABASE_URL.split("?")[0] })).toThrow();
