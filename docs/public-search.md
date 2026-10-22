@@ -167,3 +167,16 @@ normal local research requires explicit evaluated model/provider configuration
 and privileged budget provisioning. Citation membership is validated; factual
 support remains `NOT_CHECKED`. Contextual follow-ups, stale-run reconciliation,
 anonymous usage, billing and deployed-preview verification remain future gates.
+
+## Follow-up review and interface verification
+
+The subsequent [launch review](launch-review.md) records the three PR findings
+and regression fixes: serialize rename against active admission, recover existing
+intents without provider configuration, and hide Stop while only polling status.
+It also corrects reference typography to measured 16px/26px body text, improves
+composer/copy feedback, and fixes citation focus after automatic scrolling.
+Updated verification: 363 tests, seven live admission checks including the rename
+race, and 30 distinct desktop/mobile browser cases across the verification runs.
+The final cold search shell transfers 193,642 JavaScript bytes; desktop/mobile
+interaction samples remain within the unchanged budgets. See the review for exact
+API/SSE timings, sample conditions, warm-reload limits and public-launch blockers.

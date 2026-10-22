@@ -98,18 +98,19 @@ See [guarded answers](docs/guarded-answers.md) for stage caps, immutable approva
 ## Verification
 
 ```sh
-pnpm check                  # lint, generated route types, strict TS, 353 tests
+pnpm check                  # lint, generated route types, strict TS, 363 tests
 pnpm build                  # production build; no credentials needed to build
 pnpm exec playwright install chromium
 pnpm test:e2e               # 8 public desktop/mobile checks; starts the built app
 pnpm test:e2e:neon          # 6 OPT-IN live development DB browser checks
-pnpm test:admission:neon    # 6 OPT-IN live development DB races/rollback checks
+pnpm test:admission:neon    # 7 OPT-IN live development DB races/rollback checks
 pnpm test:input:neon        # 6 OPT-IN live DB gate/RLS checks; classifier is a test double
 pnpm test:retrieval:neon    # 7 OPT-IN live DB retrieval/ownership/RLS checks; providers mocked
-pnpm test:search:neon       # 14 OPT-IN guarded HTTP/UI checks, real Neon, provider test doubles
+pnpm test:search:neon       # 16 OPT-IN guarded HTTP/UI checks, real Neon, provider test doubles
 pnpm test:completion:neon   # 7 OPT-IN live DB completion/RLS/concurrency checks; providers mocked
 pnpm db:verify              # read-only TLS/schema verification; 21 tables, narrow grants
 pnpm perf:check             # production server must already be running
+pnpm perf:profile           # OPT-IN development Neon, desktop/mobile CDP traces and API timings
 pnpm perf:check --private   # OPT-IN synthetic identity; 5 samples/private route
 ```
 
@@ -121,6 +122,8 @@ See [the foundation verification record](docs/foundation-verification.md), [priv
 
 ## Working agreements
 
-Use a feature branch and focused commits. Keep hand-written changes near 400–700 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. T05–T10 are merged into main. T11 is on `codex/guarded-search-ui`.
+Use a feature branch and focused commits. Keep hand-written changes near 400–700 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. T05–T10 are merged into main. T11 and its review fixes are tracked in [PR #5](https://github.com/jackedengineer/perplexity/pull/5).
 
 The [system design](docs/system-design.md), [session contract](docs/authentication.md) and [implementation plan](tasks/plan.md) describe the larger product. T08 uses the Vercel AI SDK for answer generation; T06/T07 retain small fixed-protocol guard/search adapters. No paid provider smoke test has been run. Live answers require explicit provider configuration and provisioned development allowances; missing settings fail safely.
+
+The latest [interface/performance/launch review](docs/launch-review.md) records PR review fixes, lab measurements, streaming behavior and the remaining deployment requirements. Public launch remains gated on actual provider evaluation, production OAuth/database configuration and operational release gates.
