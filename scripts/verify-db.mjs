@@ -22,8 +22,12 @@ for (const key of ["DATABASE_URL", "DATABASE_URL_DIRECT"]) {
       has_column_privilege(current_user,'usage_buckets','credit_limit','UPDATE') AS budget_limit_write,
       has_column_privilege(current_user,'usage_buckets','reserved_credits','UPDATE') AS reserve_credits,
       has_column_privilege(current_user,'operator_usage_buckets','reserved_provider_micro_usd','UPDATE') AS reserve_operator,
-      has_column_privilege(current_user,'operator_usage_buckets','provider_limit_micro_usd','UPDATE') AS operator_limit_write`);
-    if (key === "DATABASE_URL" && (!permissions.rows[0].conversations || !permissions.rows[0].history || permissions.rows[0].message_write || permissions.rows[0].schema_create || permissions.rows[0].budget_create || permissions.rows[0].budget_limit_write || permissions.rows[0].operator_limit_write || !permissions.rows[0].reserve_credits || !permissions.rows[0].reserve_operator)) throw new Error("Runtime privilege check failed");
+      has_column_privilege(current_user,'operator_usage_buckets','provider_limit_micro_usd','UPDATE') AS operator_limit_write,
+      has_column_privilege(current_user,'runs','payload_hmac','UPDATE') AS fingerprint_write,
+      has_column_privilege(current_user,'usage_buckets','settled_credits','UPDATE') AS settlement_write,
+      has_table_privilege(current_user,'usage_reservations','UPDATE') AS reservation_write`);
+    const rights = permissions.rows[0];
+    if (key === "DATABASE_URL" && (!rights.conversations || !rights.history || rights.message_write || rights.schema_create || rights.budget_create || rights.budget_limit_write || rights.operator_limit_write || rights.fingerprint_write || rights.settlement_write || rights.reservation_write || !rights.reserve_credits || !rights.reserve_operator)) throw new Error("Runtime privilege check failed");
     if (!tls || result.rows[0].tables !== 13) throw new Error("Database check failed");
     console.log(JSON.stringify({ connection: key, ...result.rows[0], permissions: permissions.rows[0], verifiedTls: tls, connectAndQueryMs: Math.round(performance.now() - start) }));
     } finally { client.release(); }

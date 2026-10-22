@@ -136,3 +136,17 @@ it("caps daily attempt counts even when the minute limit permits another denial"
   expect(await limited.admit("alice", input())).toEqual({ kind: "DENIED", code: "RATE_LIMITED" });
   expect((await db.select().from(schema.admissionAttemptBuckets).where(eq(schema.admissionAttemptBuckets.kind,"DAY")))[0].attempts).toBe(1);
 });
+it.each(["user-overlap", "operator-overlap", "entitlement-mismatch"] as const)("rejects %s independently of other funding errors", async (problem) => {
+  if (problem === "user-overlap") {
+    const [bucket] = await db.select().from(schema.usageBuckets);
+    await db.insert(schema.usageBuckets).values({ ...bucket, id: randomUUID(), startsAt: new Date(bucket.startsAt.getTime()+1) });
+  } else if (problem === "operator-overlap") {
+    const [bucket] = await db.select().from(schema.operatorUsageBuckets);
+    await db.insert(schema.operatorUsageBuckets).values({ ...bucket, id: randomUUID(), startsAt: new Date(bucket.startsAt.getTime()+1) });
+  } else {
+    await db.update(schema.usageBuckets).set({ entitlementVersion: "different-grant" }).where(eq(schema.usageBuckets.kind,"DAY"));
+  }
+  expect(await admission.admit("alice", input())).toEqual({ kind: "DENIED", code: "CONFIGURATION_UNAVAILABLE" });
+  expect(await db.select().from(schema.runs)).toHaveLength(0);
+  expect((await db.select().from(schema.usageBuckets)).every((r)=>r.reservedCredits === 0)).toBe(true);
+});

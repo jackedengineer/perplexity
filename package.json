@@ -21,7 +21,8 @@
     "db:studio": "drizzle-kit studio",
     "db:verify": "node scripts/verify-db.mjs",
     "test:e2e:neon": "LIVE_NEON_E2E=1 playwright test",
-    "perf:check": "node scripts/measure-performance.mjs"
+    "perf:check": "node scripts/measure-performance.mjs",
+    "test:admission:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.12",
