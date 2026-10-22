@@ -1,6 +1,6 @@
 # Perplex
 
-A web-research application in progress. The first implemented slice is Next.js, Neon/Drizzle, and Google sign-in through Better Auth. Research, conversations, guest allowances, models and billing remain on the [backlog](tasks/todo.md).
+A web-research application in progress. Next.js, Neon/Drizzle, Google sign-in, and private conversation creation/history/search/rename are implemented. Guarded research, guest allowances, models and billing remain on the [backlog](tasks/todo.md).
 
 ## Run locally
 
@@ -44,7 +44,7 @@ The existing development resources are:
 - OAuth origin `http://localhost:3000`; redirect `http://localhost:3000/api/auth/callback/google`.
 - Google audience is **Testing**, with the project owner as a test user. Basic OpenID/profile/email only; no offline Google API access.
 
-For another development database, first migrate with its owner URL. Then run `node scripts/provision-runtime-role.mjs` once to create a restricted runtime role and update the local pooled URL. It grants CRUD on the five auth tables, not schema creation/truncation. It refuses to rotate an existing role. Future migrations must explicitly grant appropriate permissions on new tables. Production provisioning belongs in a separately reviewed deployment workflow.
+For another development database, first migrate with its owner URL. Then run `node scripts/provision-runtime-role.mjs` once to create a restricted runtime role and update the local pooled URL. It grants CRUD on the five auth tables, SELECT/INSERT on application profiles, SELECT/INSERT/UPDATE on conversations and SELECT-only history access, without schema creation/truncation. It refuses to rotate an existing role. Future migrations must explicitly grant appropriate permissions on new tables. Production provisioning belongs in a separately reviewed deployment workflow.
 
 In deployment settings, expose only `DATABASE_URL` to the web runtime. Keep the owner URL in the migration job's secret store. Use separate projects, OAuth clients and secrets for preview/production. OAuth-token encryption depends on the auth secret; plan migration/key rotation before replacing it.
 
@@ -64,28 +64,35 @@ Sessions have a seven-day rolling window, renew after 24 hours of eligible activ
 
 Mutation requests require the configured origin. Better Auth also checks OAuth state and callback URLs. Auth rate limits use Postgres: 60 requests/minute by default and 10 sign-in starts/minute per trusted IP. These are abuse controls, not plan quotas or a global spending limit. The configured `x-vercel-forwarded-for` trust boundary is intended for Vercel's overwritten header; other hosts must supply an equivalent verified boundary. Local clients must not be treated as a trusted public edge.
 
-Auth responses have `Cache-Control: no-store`, request IDs and `Server-Timing`. Logs contain event/status/duration, not query strings, cookies, emails or provider tokens. Next.js development logging excludes auth URLs. Server components keep database/auth code out of client bundles; only sign-in/session controls are client islands. Fonts are local system fonts; CSS handles short transitions and honors reduced motion.
+Auth responses have `Cache-Control: no-store`, request IDs and `Server-Timing`. Logs contain event/status/duration, not query strings, cookies, emails or provider tokens. Next.js development logging excludes auth and private conversation URLs. Server components keep database/auth code out of client bundles; interactive controls are client islands. Fonts are local system fonts; CSS handles short transitions and honors reduced motion.
+
+## Private conversations
+
+The protected `/workspace`, `/library`, and `/search/:id` screens share the same database-backed identity. Every repository query scopes by the verified auth subject through an application UUID profile. Foreign and missing conversation IDs return the same unavailable response. Create retries are owner-idempotent, renames require the current revision, lists/history are bounded, and assistant drafts are excluded from history.
+
+The HTTP contract and inspected UI reference coverage are in [private-conversations.md](docs/private-conversations.md). Titles are metadata; there is no message-submission or AI endpoint yet. The runtime cannot insert message drafts. Input/output AI guards and budget admission must be completed before connecting providers.
 
 ## Verification
 
 ```sh
-pnpm check                  # lint, generated route types, strict TS, 17 tests
+pnpm check                  # lint, generated route types, strict TS, 33 tests
 pnpm build                  # production build; no credentials needed to build
 pnpm exec playwright install chromium
 pnpm test:e2e               # 8 public desktop/mobile checks; starts the built app
-pnpm test:e2e:neon          # 2 OPT-IN live development DB checks
+pnpm test:e2e:neon          # 4 OPT-IN live development DB checks
 pnpm db:verify              # read-only TLS/schema verification for both URLs
 pnpm perf:check             # production server must already be running
+pnpm perf:check --private   # OPT-IN synthetic identity; 5 samples/private route
 ```
 
 Stop `pnpm dev` before browser checks so they exercise the production build. Public tests need no live credentials; CI supplies isolated dummy configuration. Integration tests run migrations and auth against PGlite's isolated PostgreSQL engine. The opt-in Neon browser suite creates synthetic `e2e-*` identities in the configured development database and removes them in `finally`; never point it at production. It does not read a real user's browser cookies or automate Google passwords.
 
 CI installs from the frozen lockfile with dependency scripts disabled, then runs lint/types/tests, production dependency audit, build and browser checks. Actions are pinned to verified commit SHAs. There is no Git remote yet, so hosted CI and branch protection have not been activated.
 
-See [the verification record](docs/foundation-verification.md) for measured results, limitations and dependency-audit follow-ups. The complete app is not ready for public launch: private conversation ownership, AI guardrails, quota admission, deletion/export, CSP/deployment hardening and operational recovery remain planned work.
+See [the foundation verification record](docs/foundation-verification.md) and [private conversation verification](docs/private-conversations-verification.md) for measured results, limitations and dependency-audit follow-ups. The complete app is not ready for public launch: AI guardrails, quota admission, deletion/export, CSP/deployment hardening and operational recovery remain planned work.
 
 ## Working agreements
 
-Use a feature branch and focused commits. Keep hand-written changes near 300–400 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. The current work is on `feat/foundation`.
+Use a feature branch and focused commits. Keep hand-written changes near 300–400 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. The current work is on `feat/private-conversations`.
 
 The [system design](docs/system-design.md), [session contract](docs/authentication.md) and [implementation plan](tasks/plan.md) describe the larger product. SDK/OpenRouter/Tavily dependencies will be introduced when their guarded pipeline slices are built.

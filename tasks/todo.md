@@ -1,6 +1,6 @@
 # Build backlog
 
-T01's foundation is implemented; T03/T04 have auth/database sub-slices completed as noted below. Other tasks are unstarted. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
+T01 is implemented. T03/T04 now include signed-in private conversations and owner isolation; run admission and deployed-preview verification remain outstanding. Other tasks are unstarted. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
 
 Commands and current verification results are in [README](../README.md) and [the foundation record](../docs/foundation-verification.md). Default integration tests use isolated PGlite PostgreSQL. Opt-in live browser tests use synthetic identities in the dedicated development Neon project, never production.
 
@@ -22,21 +22,23 @@ Commands and current verification results are in [README](../README.md) and [the
 
 ### T03 — Connect Neon and migrate private conversation records
 
-Completed sub-slice: restricted pooled runtime role, direct migration owner URL, generated five-table auth schema, reviewed/applied migration, verified TLS and isolated FK/uniqueness tests. Conversation records/repositories below are still unimplemented.
+Completed sub-slice: restricted pooled runtime role, direct migration owner URL, generated five-table auth schema, reviewed/applied migration, verified TLS and isolated FK/uniqueness tests. Application UUID profiles, constrained conversations/messages, owner-scoped repositories, replay-safe metadata creation, revision-checked rename, keyset pagination and approved-history filtering are implemented and tested. Runs remain with T05.
 
 - [ ] Configure a small Node `pg` pool with Drizzle, pooled application URL and distinct direct migration URL; define users/conversations/messages/runs with ownership, revisions, sequences and approved-message fields.
-- [ ] Generate/review migrations and repository methods for creating/loading owner-scoped conversations; reserve JSONB for versioned parts, not ownership/status fields.
-- [ ] Verify: migrate an empty test database, round-trip a conversation and reject invalid FK/sequence data; prove unapproved assistant rows are excluded by read repositories.
+- [x] Generate/review migrations and repository methods for creating/loading owner-scoped conversations; reserve JSONB for versioned parts, not ownership/status fields.
+- [x] Verify: migrate an empty test database, round-trip a conversation and reject invalid FK/sequence data; prove unapproved assistant rows are excluded by read repositories.
 - Dependencies: T02. Files: `src/server/db/client.ts`, `src/server/db/schema.ts`, `src/server/db/conversations.ts`, `drizzle.config.ts`, `tests/integration/conversations.test.ts` plus generated SQL.
 
 ### T04 — Implement signed-in ownership across UI and API
 
-Completed sub-slice: Google OAuth, protected workspace, seven-day/24-hour session renewal, 30-day application cutoff, logout/revocation, origin/PKCE/state tests and auth throttling. Application UUID mapping, conversation authorization and deployed-preview tests below remain outstanding.
+Completed sub-slice: Google OAuth, protected workspace, seven-day/24-hour session renewal, 30-day application cutoff, logout/revocation, origin/PKCE/state tests and auth throttling. Application UUID mapping, owner-scoped APIs/UI and desktop/mobile two-user tests are now implemented. Deployed-preview verification remains outstanding.
 
-- [ ] Integrate Better Auth's Drizzle adapter and Google sign-in, map its user to the application UUID profile and implement the documented session policy; add create/list/load conversation routes and a minimal signed-in page.
-- [ ] Derive owner IDs from the session, validate origin on mutations and use the same owner-scoped access helper for every route.
+- [x] Integrate Better Auth's Drizzle adapter and Google sign-in, map its user to the application UUID profile and implement the documented session policy; add create/list/load conversation routes and a minimal signed-in page.
+- [x] Derive owner IDs from the session, validate origin on mutations and use the same owner-scoped access helper for every route.
 - [ ] Verify: two-user integration/browser cases prove cross-user IDs return safe unavailability; signed-out mutations fail; session protections work in the deployed preview.
 - Dependencies: T03. Files: `src/server/auth/session.ts`, `src/server/auth/ownership.ts`, `src/app/api/conversations/route.ts`, `src/app/(app)/search/[conversationId]/page.tsx`, `tests/integration/ownership.test.ts` plus auth-library setup.
+
+Verification evidence: [private conversations](../docs/private-conversations-verification.md). T03’s combined schema checkbox stays open for runs; T04’s combined verification checkbox stays open for a deployed preview.
 
 ### T05 — Make run admission idempotent and budgeted
 
@@ -47,9 +49,9 @@ Completed sub-slice: Google OAuth, protected workspace, seven-day/24-hour sessio
 
 ### Checkpoint A
 
-- [ ] Signed-in conversation creation/reload and cross-user denial work.
+- [x] Signed-in conversation creation/reload and cross-user denial work.
 - [ ] Real-database concurrent admission invariants pass. AI endpoints remain disabled until input and output guards are wired.
-- [ ] Typecheck, lint, focused integration tests and build pass; update docs if setup choices differ.
+- [x] Typecheck, lint, focused integration tests and build pass; update docs if setup choices differ.
 
 ## Milestone B — one complete guarded answer
 

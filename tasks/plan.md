@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: implementation started, 2026-10-22. Next.js, Neon/Drizzle and Google sign-in/session lifecycle are implemented and verified. Private conversations and guarded AI admission are next; [the foundation record](../docs/foundation-verification.md) lists exact completed checks and limitations.
+Status: implementation started, 2026-10-22. Next.js, Neon/Drizzle and Google sign-in/session lifecycle are implemented and verified. Signed-in private conversations and ownership checks are implemented; guarded AI admission is next; [the foundation record](../docs/foundation-verification.md) lists exact completed checks and limitations.
 
 Read [the system design](../docs/system-design.md), [authentication](../docs/authentication.md), [billing and entitlements](../docs/billing-and-entitlements.md), [the safety policy](../docs/safety-policy.md) and [the capability map](../CAPABILITY-MAP.md) before implementing. [todo.md](todo.md) is the canonical build checklist.
 
@@ -131,7 +131,7 @@ Shared schemas, database migrations and release semantics are sequential depende
 - **Live evaluations:** small manually triggered spending-capped runs for actual safety/planner/answer models and Tavily; keep separate from deterministic CI.
 - **Operations:** cold/warm runs, small-concurrency load, dependency timeouts, stalled runs, usage reconciliation, preview migrations, restore and rollback.
 
-No app dependencies are installed yet. Planned commands to define at T01 are `pnpm exec tsc --noEmit`, `pnpm exec eslint .`, `pnpm exec vitest run`, `pnpm exec playwright test`, and `pnpm build`. Task-specific test paths identify files to create, not commands already verified in this repository.
+App dependencies and scripts are installed and verified. Current commands include `pnpm exec tsc --noEmit`, `pnpm exec eslint .`, `pnpm exec vitest run`, `pnpm exec playwright test`, and `pnpm build`. Task-specific test paths identify files to create, not commands already verified in this repository.
 
 ## Risks and mitigations
 

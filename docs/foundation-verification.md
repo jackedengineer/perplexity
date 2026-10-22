@@ -49,4 +49,4 @@ The 30-day cutoff is enforced by the application session helper. Better Auth's o
 
 The configured auth limiter trusts Vercel's IP header. Verify header overwrite behavior and platform request/body limits in the actual deployment. Auth throttling alone is insufficient for anonymous trial or paid AI cost admission.
 
-No conversations, cross-user conversation authorization, guest linking, model pipeline, input/output classification, paid entitlements, deletion/export flow, production CSP, deployment/restore drill or live field monitoring exists yet. Those remain explicit backlog work rather than implied by the working sign-in page.
+Private conversations and cross-user authorization are now verified in [the next-slice record](private-conversations-verification.md). Guest linking, model pipeline, input/output classification, paid entitlements, deletion/export flow, production CSP, deployment/restore drill or live field monitoring remain unimplemented. Those remain explicit backlog work rather than implied by the working sign-in page.
