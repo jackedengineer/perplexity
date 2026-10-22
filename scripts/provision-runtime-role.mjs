@@ -23,7 +23,7 @@ try {
   await pool.query('GRANT SELECT, INSERT, UPDATE, DELETE ON "user", session, account, verification, rate_limit TO perplex_web');
   await pool.query('GRANT SELECT, INSERT ON app_users TO perplex_web');
   await pool.query('GRANT SELECT, INSERT, UPDATE ON conversations TO perplex_web');
-  await pool.query('GRANT SELECT ON messages TO perplex_web');
+  await pool.query('GRANT SELECT, INSERT ON messages, input_safety_reviews TO perplex_web');
   await pool.query(`GRANT SELECT, INSERT ON runs, usage_reservations, admission_attempt_buckets TO perplex_web;
     GRANT UPDATE (status, updated_at, attempt_version) ON runs TO perplex_web;
     GRANT UPDATE (attempts) ON admission_attempt_buckets TO perplex_web;
@@ -45,7 +45,7 @@ try {
   const env = await readFile(".env.local", "utf8");
   await writeFile(".env.local.tmp", env.replace(/^DATABASE_URL=.*$/m, `DATABASE_URL=${JSON.stringify(runtimeUrl.toString())}`), { mode: 0o600 });
   await rename(".env.local.tmp", ".env.local");
-  console.log("Runtime role verified: auth CRUD, conversation metadata DML and read-only history; no permanent schema creation or table truncation. Owner URL retained for migrations.");
+  console.log("Runtime role verified: auth CRUD, conversation metadata DML and RLS-reviewed question insertion; no permanent schema creation or table truncation. Owner URL retained for migrations.");
 } catch (error) {
   await pool.query("ROLLBACK");
   console.error(JSON.stringify({ event: "runtime_role.provision_failed", code: error.code ?? "SETUP_ERROR" }));
