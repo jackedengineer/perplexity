@@ -76,3 +76,30 @@ links, encoded citations, repeated/out-of-order citations, unsafe unused metadat
 legitimate Markdown and Unicode, frozen-object mutation and stale/unknown guards.
 The cases prove deterministic boundaries and adapter behavior with test doubles;
 they do not establish multilingual classifier accuracy or factual support rates.
+
+## Provider attempt and storage records
+
+Before any paid stage, insert its unique run/stage attempt under the owner lock.
+The sum of fixed stage caps must fit the original provider reservation; neither
+model output nor caller-provided settings can enlarge it. The first profile uses
+5,000 micro-USD for each of four safety roles, 8,000 for search and 20,000 for the
+answer role, within the original 50,000 hold. These are conservative exposure
+allocations, not vendor billing guarantees. Privacy/price/account controls still
+need verification with the actual application credentials before live release.
+
+Record outcomes and nullable actual cost/tokens separately from content. A
+completed search reports Tavily credits; its monetary cost remains unknown until
+reconciled. A provider failure can still have a known partial charge. Finish cost
+recording after cancellation/fencing, but never treat that as continuation
+permission. A duplicate or uncertain attempt is not automatically repeated.
+
+New admissions carry accounting version 1; older runs remain version 0. This
+prevents a missing historical provider record from being silently interpreted as
+zero spend. Output-review/message FKs are deferred within a transaction so the
+review can authorize the assistant insert. RLS binds the exact message body hash
+and rejects extra hidden JSON parts. Citation FKs bind message, run, source and
+passage together; run settlement receipts are unique and append-only.
+
+Database tests retain default hook deadlines. PGlite boots a WASM Postgres per
+test file, so the full suite uses two workers to avoid CPU/memory contention.
+This preserves test assertions and timeouts rather than masking slow failures.

@@ -49,6 +49,14 @@ export const messages = pgTable("messages", {
     AND EXISTS (SELECT 1 FROM input_safety_reviews review WHERE review.accepted_message_id = messages.id
       AND review.conversation_id = messages.conversation_id AND review.decision = 'ALLOW'
       AND review.policy_version = messages.policy_version)` }),
+  pgPolicy("messages_reviewed_answer_insert", { for: "insert", withCheck: sql`
+    role = 'ASSISTANT' AND kind IN ('ANSWER','CLARIFICATION') AND approved_at IS NOT NULL AND policy_version IS NOT NULL
+    AND jsonb_array_length(parts) = 1 AND parts->0->>'type' = 'text'
+    AND parts->0 = jsonb_build_object('type','text','text',parts->0->>'text')
+    AND EXISTS (SELECT 1 FROM output_safety_reviews review WHERE review.message_id = messages.id
+      AND review.conversation_id = messages.conversation_id AND review.decision = 'ALLOW'
+      AND review.policy_version = messages.policy_version
+      AND review.body_hash = encode(sha256(convert_to(parts->0->>'text','UTF8')),'hex'))` }),
   uniqueIndex("messages_id_conversation_role_unique").on(table.id, table.conversationId, table.role),
   uniqueIndex("messages_conversation_sequence_unique").on(table.conversationId, table.sequence),
   check("messages_sequence_positive", sql`${table.sequence} > 0`),

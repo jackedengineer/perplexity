@@ -17,6 +17,7 @@ export const runs = pgTable("runs", {
   entitlementVersion: varchar("entitlement_version", { length: 64 }).notNull(), operatorBudgetKey: varchar("operator_budget_key", { length: 64 }).notNull(),
   answerCredits: integer("answer_credits").notNull(), providerReserveMicroUsd: bigint("provider_reserve_micro_usd", { mode: "bigint" }).notNull(),
   admittedRevision: integer("admitted_revision").notNull(), attemptVersion: integer("attempt_version").notNull().default(1),
+  accountingVersion: integer("accounting_version").notNull().default(0),
   status: runStatus("status").notNull().default("RECEIVED"), deadlineAt: instant("deadline_at").notNull(),
   createdAt: instant("created_at").notNull().defaultNow(), updatedAt: instant("updated_at").notNull().defaultNow(),
 }, (t) => [
@@ -27,6 +28,7 @@ export const runs = pgTable("runs", {
   uniqueIndex("runs_active_owner_unique").on(t.userId).where(sql`${t.status} IN ('RECEIVED','CHECKING_INPUT','PLANNING','SEARCHING','PREPARING_EVIDENCE','GENERATING','CHECKING_OUTPUT')`),
   uniqueIndex("runs_active_conversation_unique").on(t.conversationId).where(sql`${t.status} IN ('RECEIVED','CHECKING_INPUT','PLANNING','SEARCHING','PREPARING_EVIDENCE','GENERATING','CHECKING_OUTPUT')`),
   index("runs_status_deadline_idx").on(t.status, t.deadlineAt),
+  check("run_accounting_version_valid",sql`${t.accountingVersion} IN (0,1)`),
   check("runs_hmac_shape", sql`${t.payloadHmac} ~ '^[a-f0-9]{64}$' AND length(${t.payloadHmac}) = 64`),
   check("runs_snapshot_valid", sql`${t.mode} = 'FAST' AND ${t.payloadVersion} = 1 AND ${t.answerCredits} > 0 AND ${t.providerReserveMicroUsd} > 0 AND ${t.admittedRevision} > 0 AND ${t.attemptVersion} > 0`),
   check("runs_versions_nonempty", sql`length(trim(${t.hmacKeyId})) > 0 AND length(trim(${t.catalogVersion})) > 0 AND length(trim(${t.priceVersion})) > 0 AND length(trim(${t.entitlementVersion})) > 0 AND length(trim(${t.operatorBudgetKey})) > 0 AND length(trim(${t.policyVersion})) > 0 AND length(trim(${t.modelKey})) > 0`),

@@ -10,7 +10,9 @@ export const safetyInputSchema = z.strictObject({
   context: z.array(z.strictObject({ role: z.enum(["USER", "ASSISTANT"]), text: questionTextSchema })).max(6),
 }).refine(({ context })=>context.reduce((sum,turn)=>sum+turn.text.length,0) <= 8000);
 export type SafetyInput = z.infer<typeof safetyInputSchema>;
+import type { ProviderUsage } from "@/server/ai/usage";
 export interface SafetyProvider {
+  usage?(): ProviderUsage | undefined;
   readonly modelId: string;
   classify(input: SafetyInput, signal: AbortSignal): Promise<unknown>;
 }
