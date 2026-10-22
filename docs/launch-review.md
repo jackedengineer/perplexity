@@ -81,10 +81,16 @@ The installed Next.js CSS/production guides were read before changing code.
 
 ## Deployment decision
 
-Public launch is not ready. The current environment has no OpenRouter/Tavily keys,
+Public launch is not ready. At the T11 review checkpoint the environment had no OpenRouter/Tavily keys,
 explicit model/provider assignments or research HMAC keys. Google OAuth is configured
 for localhost only. Login does not provision research allowances. A successful local
 provider-double run does not establish actual model quality, safety or paid latency.
+
+The subsequent [production setup record](production-setup.md) supersedes the
+credential/database setup status: capped provider keys and isolated production
+Neon are now prepared and verified, but paid-model testing remains pending by
+the seller's choice. Production OAuth and Vercel deployment have not been completed.
+The operational launch gates below remain in force.
 
 Before public Vercel launch:
 
