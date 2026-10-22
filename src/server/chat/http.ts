@@ -14,6 +14,7 @@ export type ChatBackend = {
   load(identity: ChatIdentity,runId: string): Promise<RunState>;
 };
 type Dependencies = { identity: (request: Request)=>Promise<ChatIdentity | null>;origin: ()=>string;backend: ()=>ChatBackend;
+  consumeRequest: (subject: string|null)=>Promise<void>;
   load: ChatBackend["load"];log: (event: { event: string;requestId: string;outcome: string;durationMs: number })=>void };
 const headers = (requestId: string)=>({ "Cache-Control": "private, no-store","X-Request-Id": requestId,"X-Content-Type-Options": "nosniff" });
 function failure(code: PublicErrorCode,requestId: string,run?: Run) {
@@ -25,7 +26,9 @@ export function createChatHttp(dependencies: Dependencies) {
     async post(request: Request) {
       const requestId = crypto.randomUUID(),started = performance.now();
       try {
-        const identity = await dependencies.identity(request);if (!identity) throw new AdmissionError("UNAUTHENTICATED");
+        const identity = await dependencies.identity(request);
+        await dependencies.consumeRequest(identity?.user.id??null);
+        if (!identity) throw new AdmissionError("UNAUTHENTICATED");
         const input = await readSubmission(request,dependencies.origin()),backend = dependencies.backend();
         const admission = await backend.admit(identity.user.id,input);
         if (admission.kind === "DENIED") return failure(admission.code,requestId);

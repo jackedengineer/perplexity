@@ -57,6 +57,13 @@
       "when": 1792694688079,
       "tag": "0007_run_recovery",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792697383912,
+      "tag": "0008_request_rate_limits",
+      "breakpoints": true
     }
   ]
 }

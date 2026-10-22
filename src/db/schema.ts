@@ -5,3 +5,4 @@ export * from "./input-safety-schema";
 export * from "./retrieval-schema";
 export * from "./completion-schema";
 export * from "./recovery-schema";
+export * from "./rate-limit-schema";
