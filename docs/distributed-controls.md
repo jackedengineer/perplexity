@@ -44,3 +44,30 @@ For small-volume operation, the database owner can periodically delete rows wher
 `ends_at < clock_timestamp() - interval '7 days'`; never remove a live window to
 unblock a request. Automated retention remains T22. Test fixtures clean up only
 captured synthetic subject digests using the pinned development owner connection.
+
+## Provider claims
+
+| Stage | Time ceiling | Reserved micro-USD |
+| --- | ---: | ---: |
+| Input safety | 5 seconds | 5,000 |
+| Query safety | 5 seconds | 5,000 |
+| Search | 8 seconds | 8,000 |
+| Evidence safety | 5 seconds | 5,000 |
+| Private answer | 12 seconds | 20,000 |
+| Output safety | 5 seconds | 5,000 |
+
+The complete single-attempt profile commits at most 48,000 micro-USD of stage
+exposure within the existing 50,000 reservation. Each database claim returns its
+ID, original run deadline, DB-clock remaining time and local monotonic observation.
+Elapsed checkout/lock/round-trip time is deducted conservatively before dispatch.
+Signals are not reused to restart a stage; the unique `(run_id, stage)` record
+also prevents a fresh process/attempt fence from acquiring another paid claim.
+Provider/SDK automatic retries and fallbacks remain disabled.
+
+If cancellation/expiry is known before dispatch, a claimed but undispatched call
+can record SKIPPED with zero usage. Once dispatched, a timeout remains UNKNOWN
+unless actual usage arrives; a late result records billing without authorizing
+continuation. Original bucket windows and held costs survive disconnect/retry.
+Claims constrain application dispatch, not a provider's ability to overbill or
+ignore cancellation; over-cap reports halt continuation and require investigation.
+Database deadline expiry takes precedence over an abort when persisting TIMED_OUT.

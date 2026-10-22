@@ -69,7 +69,7 @@ export function createMessageAcceptance(db: AdmissionDatabase, keys: unknown, ga
           const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
           verifyPayload(run,request,config);
           if (run.status !== "CHECKING_INPUT" || run.attemptVersion !== claim.run.attemptVersion || conversation.revision !== run.admittedRevision) throw new AdmissionError("CONFLICT");
-          const final = signal.aborted ? interrupted(check,"CANCELLED") : run.deadlineAt <= now ? interrupted(check,"TIMEOUT") : check;
+          const final = run.deadlineAt <= now ? interrupted(check,"TIMEOUT") : signal.aborted ? interrupted(check,"CANCELLED") : check;
           const verdict = guardVerdictSchema.parse(final.verdict);
           const messageId = verdict.decision === "ALLOW" ? randomUUID() : null;
           await tx.insert(inputSafetyReviews).values({ runId,conversationId: conversation.id,attemptVersion: run.attemptVersion,

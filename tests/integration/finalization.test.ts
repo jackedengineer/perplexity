@@ -131,7 +131,7 @@ it("RLS binds the reviewed body and rejects hidden extra JSON fields",async()=>{
 it("late provider outcomes preserve the remaining hold after a failure receipt commits",async()=>{
   await prepareCompletion(db,person);
   const { createProviderCalls } = await import("@/server/runs/provider-calls");
-  const calls = createProviderCalls(db,person.subject,person.runId),id = await calls.begin("ANSWER","test/answer");
+  const calls = createProviderCalls(db,person.subject,person.runId),{id} = await calls.begin("ANSWER","test/answer");
   const finalizer = createFinalization(db);
   expect(await finalizer.fail(person.subject,person.runId,"PROVIDER_UNAVAILABLE")).toMatchObject({ kind: "DENIED" });
   const [receipt] = await db.select().from(schema.runSettlements);

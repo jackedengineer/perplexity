@@ -179,3 +179,14 @@ it("refuses evidence reads after the original run deadline",async()=>{
   await db.update(schema.runs).set({ deadlineAt: new Date(run.createdAt.getTime()+1) }).where(eq(schema.runs.id,runId));
   expect(await p.service.load(subject,runId)).toBeNull();
 });
+it('records TIMED_OUT when retrieval aborts at the database deadline',async()=>{
+ const p=pipeline(),controller=new AbortController();
+ p.search.search.mockImplementation(async()=>{
+  const [run]=await db.select().from(schema.runs);
+  await db.update(schema.runs).set({deadlineAt:new Date(run.createdAt.getTime()+1)}).where(eq(schema.runs.id,runId));
+  controller.abort();throw new Error('Synthetic deadline abort');
+ });
+ expect((await p.service.retrieve(subject,runId,controller.signal)).kind).toBe('DENIED');
+ expect((await db.select().from(schema.runs))[0].status).toBe('TIMED_OUT');
+ expect(await db.select().from(schema.sourcePassages)).toHaveLength(0);
+});

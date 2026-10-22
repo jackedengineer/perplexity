@@ -66,8 +66,9 @@ export function createFinalization(db: AdmissionDatabase) {
       try { return await db.transaction(async(tx): Promise<Finalization>=>{
         const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
         if (fence && (run.attemptVersion !== fence.attemptVersion || conversation.revision !== fence.revision)) throw new AdmissionError("CONFLICT");
-        await settleFailureLocked(tx,run,now,code,cancelled);
-        return { kind: "DENIED",code };
+        const outcome=run.deadlineAt<=now?'DEADLINE_EXCEEDED':code;
+        await settleFailureLocked(tx,run,now,outcome,cancelled);
+        return { kind: "DENIED",code:outcome };
       }); } catch (error) { return { kind: "DENIED",code: error instanceof AdmissionError ? error.code : "PROVIDER_UNAVAILABLE" }; }
     },
   };

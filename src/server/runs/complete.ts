@@ -14,6 +14,7 @@ import type { AnswerProvider } from "@/server/ai/answer";
 import type { SafetyProvider } from "@/server/safety/provider";
 import { SAFETY_POLICY } from "@/server/safety/policy";
 import { questionTextSchema } from "@/server/contracts/chat";
+import {providerDeadline,type ProviderClaim} from './budgets';
 export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { answer?: AnswerProvider;output: SafetyProvider }) {
   const finalization = createFinalization(db);
   return { async complete(subject: string,sessionId: string,runId: string,signal: AbortSignal,onStage?: (stage: PublicStage)=>void): Promise<Finalization> {
@@ -40,18 +41,21 @@ export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { ans
       if (!evidence) throw new AdmissionError("PROVIDER_UNAVAILABLE");
       const calls = createProviderCalls(db,subject,runId);
       // The unique ANSWER record is also the one-time private generation claim.
-      let callId: string;
-      try { callId = await calls.begin("ANSWER",dependencies.answer?.modelId ?? "none"); }
+      let claim:ProviderClaim;
+      try { claim = await calls.begin("ANSWER",dependencies.answer?.modelId ?? "none",signal); }
       catch (error) { return { kind: "DENIED",code: error instanceof AdmissionError ? error.code : "RUN_IN_PROGRESS" }; }
+      const callId=claim.id,budget=providerDeadline(claim,signal);
       ownedAttempt = { attemptVersion: loaded.run.attemptVersion,revision: loaded.run.admittedRevision };
       let draft;
       try {
-        draft = await generatePrivateDraft({ question: loaded.question,evidence },dependencies.answer,{ signal,deadlineAt: loaded.run.deadlineAt });
+        if(budget.signal.aborted){await calls.finish(callId,'SKIPPED',{costMicroUsd:0n,inputTokens:0,outputTokens:0,actualModel:null});throw new AdmissionError('DEADLINE_EXCEEDED');}
+        draft = await generatePrivateDraft({ question: loaded.question,evidence },dependencies.answer,{ signal:budget.signal,deadlineAt:claim.deadlineAt });
         await calls.finish(callId,draft.kind === "NO_EVIDENCE" ? "SKIPPED" : "SUCCEEDED",draft.usage);
+        if(budget.signal.aborted)throw new AdmissionError('DEADLINE_EXCEEDED');
       } catch {
         try { await calls.finish(callId,"UNKNOWN",dependencies.answer?.usage?.()); } catch { /* Keep unknown attempt held. */ }
-        throw new AdmissionError("PROVIDER_UNAVAILABLE");
-      }
+        throw new AdmissionError(budget.signal.aborted?'DEADLINE_EXCEEDED':"PROVIDER_UNAVAILABLE");
+      }finally{budget.stop();}
       await db.transaction(async(tx)=>{
         const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
         if (run.status !== "GENERATING" || run.attemptVersion !== loaded.run.attemptVersion || conversation.revision !== loaded.run.admittedRevision || signal.aborted || run.deadlineAt <= now) throw new AdmissionError("CONFLICT");

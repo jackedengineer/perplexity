@@ -99,7 +99,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
           try { await db.transaction(async(tx)=>{
             const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
             if (run.attemptVersion !== fence.attemptVersion || run.status !== stage || conversation.revision !== fence.admittedRevision) return;
-            const status = signal.aborted ? "CANCELLED" : run.deadlineAt <= now ? "TIMED_OUT" : code === "INPUT_BLOCKED" || code === "OUTPUT_BLOCKED" ? "BLOCKED" : "FAILED";
+            const status = run.deadlineAt <= now ? "TIMED_OUT" : signal.aborted ? "CANCELLED" : code === "INPUT_BLOCKED" || code === "OUTPUT_BLOCKED" ? "BLOCKED" : "FAILED";
             await tx.update(runRetrievals).set({ status: status === "BLOCKED" ? "BLOCKED" : "UNAVAILABLE",queryVerdict,evidenceVerdict,searchCredits }).where(eq(runRetrievals.runId,runId));
             await tx.update(runs).set({ status,updatedAt: now }).where(eq(runs.id,runId));
           }); } catch { /* Keep an unknown outcome held; never retry provider work. */ }

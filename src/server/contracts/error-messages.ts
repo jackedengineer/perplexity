@@ -7,6 +7,7 @@ export const PUBLIC_ERRORS = {
   RUN_IN_PROGRESS: [409, "This request is already running. Check its current status."],
   RUN_ALREADY_FINISHED: [409, "This request already finished. Load its saved result."],
   REQUEST_TIMEOUT: [408, "The request body took too long to arrive. Please try again."],
+  DEADLINE_EXCEEDED: [408, "Research exceeded its time limit. Please start a new search."],
   TOO_LARGE: [413, "The request is too large."],
   UNSUPPORTED_MEDIA_TYPE: [415, "Use application/json for this request."],
   INVALID_INPUT: [422, "Check the request fields and try again."],
