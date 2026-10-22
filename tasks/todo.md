@@ -194,10 +194,12 @@ T19 evidence: [distributed controls](../docs/distributed-controls.md). Migration
 
 ### T20 — Instrument cost, latency and safety decisions
 
-- [ ] Add stage spans and operational metrics with request/run IDs, versions, outcome, tokens/credits and estimated/known/unknown cost; raw content logging defaults off.
-- [ ] Add an authenticated operator view or documented query set for failure rate, p95 stage latency, source failures, safety false-refusal feedback and stuck reservations.
-- [ ] Verify: a captured trace explains a slow/failing run without containing prompt, draft, secrets or evidence text; cost totals include safety calls and rejected output.
+- [x] Add stage spans and operational metrics with request/run IDs, versions, outcome, tokens/credits and estimated/known/unknown cost; raw content logging defaults off.
+- [x] Add an authenticated operator view or documented query set for failure rate, p95 stage latency, source failures, safety false-refusal feedback and stuck reservations.
+- [x] Verify: a captured trace explains a slow/failing run without containing prompt, draft, secrets or evidence text; cost totals include safety calls and rejected output.
 - Dependencies: T19. Files: `src/server/telemetry/trace.ts`, `src/server/telemetry/metrics.ts`, `src/server/runs/execute.ts`, `tests/integration/telemetry.test.ts`, `docs/operations.md`.
+
+Verification: [research operations](../docs/operations.md). False-refusal coverage is explicitly unavailable until T17 feedback/human labeling. JSON tracing and read-only Postgres reports are verified; exporter/retention/alert activation, paid testing and production deployment remain separate gates.
 
 ### T21 — Evaluate answer quality and safety coverage
 

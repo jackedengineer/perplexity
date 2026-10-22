@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: T01–T03, T05–T11 and the requested T18–T19 operational slices are implemented and verified locally. T18–T19 reuse T11 boundaries ahead of T12–T17; those product features remain open. T04 retains its deployed-preview check. The next product slice is T12 intent-preserving planning, then T13 contextual follow-ups. Live provider evaluation and deployment/operational release gates remain open; [todo.md](todo.md) is the canonical checklist.
+Status: T01–T03, T05–T11 and the requested T18–T20 operational slices are implemented and verified locally. T18–T20 reuse T11 boundaries ahead of T12–T17; those product features remain open. T20 adds content-minimized tracing and operator reports; false-refusal coverage awaits feedback/human labeling. T04 retains its deployed-preview check. The next product slice is T12 intent-preserving planning, then T13 contextual follow-ups; the next operational slice is T21 evaluation. Live provider evaluation and deployment/operational release gates remain open; [todo.md](todo.md) is the canonical checklist.
 
 Read [the system design](../docs/system-design.md), [authentication](../docs/authentication.md), [billing and entitlements](../docs/billing-and-entitlements.md), [the safety policy](../docs/safety-policy.md) and [the capability map](../CAPABILITY-MAP.md) before implementing. [todo.md](todo.md) is the canonical build checklist.
 

@@ -149,3 +149,52 @@ destination is configured, test a synthetic failure, deadline and stale hold
 through it before declaring alerts operational. Hosted cron, paid timing/quality
 checks and public launch remain separate gates. Reverting instrumentation does
 not remove or alter provider claims, settlements, adjustments or reservations.
+
+## Verification — 2026-10-23
+
+- Lint, TypeScript, 466 tests in 48 files and production build pass. Coverage includes
+  privacy/context isolation, sync/async sink outages, broken OpenTelemetry adapters,
+  rejected-output billing, reconciliation joins and legacy uncertainty.
+- `pnpm test:telemetry:neon` passes a full guarded execution under the restricted
+  development role and all seven SQL reports in a READ ONLY transaction. Its run
+  span took 17,467 ms with synthetic providers: retrieval 6,638 ms and persistence
+  2,115 ms. These include development database/network work, not paid-model timing.
+- Eight guarded desktop/mobile cases pass for approved citations, reload/replay,
+  input/output refusals and search failure; four approved/refused cases pass again
+  on the final build. Eight public/accessibility, sign-in error and 404 cases pass.
+  The in-app browser independently verified safe unavailability with paid keys
+  disabled and a clean console, then returned to the workspace. Both existing real
+  conversations still have zero persisted runs/messages; request counters remain.
+- `pnpm test:telemetry:evidence` validates strict fields, unique spans, parent/end
+  pairing, correlation and per-call/run usage equality across 12 synthetic runs.
+  Rejected outputs include safety/draft costs. The first eight-case capture recorded
+  progress in 4,723–5,428 ms across six accepted-input runs; initial approved payloads
+  took 18,468 / 18,982 ms and replay 1,121 / 1,163 ms. No private research text or
+  upstream diagnostics appear. An induced search outage has a complete seven-stage
+  failing trace and explicit unknown search cost.
+- Public performance checks and 18 private samples pass existing budgets: max
+  private LCP 972 ms, CLS 0, JavaScript transfer 193,719 bytes. Profiles use three
+  cold-cache samples/route/profile, desktop and mobile CDP CPU 4x without network
+  shaping; some synthetic browser traffic ran concurrently. Twenty metadata API
+  probes (five/operation) had median/max ms of list 231/240, conversation 300/306,
+  history 309/318 and missing run 236/284. These are local lab samples, not field
+  INP, capacity claims or paid-model benchmarks.
+- Fourteen configured credential values are absent from source, Git history and
+  client chunks; test-provider/server-telemetry markers are absent from client
+  chunks. Audit has no high/critical production advisories; the existing moderate
+  tooling advisory remains. Disposable identities/budgets and orphaned counter
+  keys are zero after cleanup.
+
+Reproduce the captured evidence with the synthetic provider fixtures:
+
+```sh
+pnpm test:search:neon --grep 'a public question|public input-block|public output-block|public search-failure' > .artifacts/t20-browser.log 2>&1
+pnpm test:search:neon --grep 'a public question|public output-block' > .artifacts/t20-final-browser.log 2>&1
+pnpm test:telemetry:evidence
+```
+
+Ignored evidence includes `t20-failed-trace.jsonl`, `t20-neon-trace.jsonl`, browser
+logs/screenshots and DevTools profiles. T20 changes no schema or production
+configuration: development has 24 tables; production remains at 21. Production
+migrations 0007–0008, hosted recovery, exporter/retention/notification setup, T17
+feedback and paid testing remain explicit release/dependency gates.
