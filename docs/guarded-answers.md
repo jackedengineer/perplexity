@@ -103,3 +103,40 @@ passage together; run settlement receipts are unique and append-only.
 Database tests retain default hook deadlines. PGlite boots a WASM Postgres per
 test file, so the full suite uses two workers to avoid CPU/memory contention.
 This preserves test assertions and timeouts rather than masking slow failures.
+
+## Atomic completion and settlement
+
+Claim ANSWER once before generation. Move to CHECKING_OUTPUT only after the
+private draft finishes under the same run attempt/revision/deadline. A caller
+that loses this claim returns existing status; it cannot cancel the winning
+attempt. A stale failure handler cannot settle or terminate a newer fence.
+
+The final transaction locks the live DB session and owned run, rechecks session
+expiry/revocation and the 30-day absolute cutoff, and verifies current input
+approval, retrieval expiry, output/answer attempts and exact citation metadata.
+Session expiry is checked again in the final conditional run update. No cached
+session alone authorizes committing an answer after logout.
+
+Insert output review, exact approved assistant text, same-run citations, unique
+settlement receipt, sequence update and COMPLETED state together. Return only
+canonical run/message IDs after commit; a rollback returns no response bytes.
+A matching completed retry loads the existing message without calling models or
+settling usage again. Database uncertainty is recovered from canonical state,
+not by automatically regenerating a paid draft.
+
+Customer answer credits settle once for an approved substantive ANSWER. Fixed
+no-evidence responses, clarifications and failures release those credits. Known
+provider micro-USD moves from reserved to settled independently of customer
+credits. If any attempt/cost is unknown or belongs to legacy accounting, retain
+the entire remaining monetary hold. When all costs are known, release only the
+unused difference. Reported costs over a stage cap or original reservation block
+completion and require reconciliation; never hide them as zero or overspend a
+bucket. Unknown-held receipts are immutable audit records; later reconciliation
+must use explicit adjustments rather than silently changing their history.
+
+All four original DAY/PERIOD user/operator buckets settle from the admitted
+reservation IDs, even across a period boundary. Lock buckets in stable order and
+require sufficient reserved balances. Runtime grants permit settlement columns
+and provider outcomes but still deny budget-limit, HMAC, accounting-snapshot,
+review, citation, receipt and excerpt mutation. History excludes assistant rows
+whose policy version is no longer current, as well as unapproved drafts.

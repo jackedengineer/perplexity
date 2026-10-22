@@ -16,8 +16,8 @@ export function createProviderCalls(db: AdmissionDatabase,subject: string,runId:
         const { run,now } = await lockOwnedRun(tx,subject,runId);
         if (run.accountingVersion !== 1) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
         if (run.status !== phases[stage] || run.deadlineAt <= now) throw new AdmissionError("CONFLICT");
-        const [{ total }] = await tx.select({ total: sql<string>`coalesce(sum(${providerCalls.capMicroUsd}),0)::text` }).from(providerCalls).where(eq(providerCalls.runId,runId));
-        if (BigInt(total)+STAGE_CAPS[stage] > run.providerReserveMicroUsd) throw new AdmissionError("BUDGET_EXCEEDED");
+        const [{ total,overages }] = await tx.select({ overages: sql<number>`count(*) filter (where ${providerCalls.costMicroUsd} > ${providerCalls.capMicroUsd})::integer`,total: sql<string>`coalesce(sum(${providerCalls.capMicroUsd}),0)::text` }).from(providerCalls).where(eq(providerCalls.runId,runId));
+        if (overages > 0 || BigInt(total)+STAGE_CAPS[stage] > run.providerReserveMicroUsd) throw new AdmissionError("BUDGET_EXCEEDED");
         const [call] = await tx.insert(providerCalls).values({ runId,stage,requestedModel,attemptVersion: run.attemptVersion,
           capMicroUsd: STAGE_CAPS[stage],status: "STARTED",startedAt: now }).returning({ id: providerCalls.id });
         return call.id;

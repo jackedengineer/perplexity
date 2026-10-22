@@ -1,3 +1,4 @@
+import { SAFETY_POLICY } from "@/server/safety/policy";
 import { createHash } from "node:crypto";
 import { and, desc, eq, ilike, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
@@ -70,7 +71,7 @@ export function createConversationRepository(db: PgDatabase<PgQueryResultHKT, ty
         sequence: messages.sequence, schemaVersion: messages.schemaVersion, createdAt: messages.createdAt,
       }).from(messages).innerJoin(conversations, eq(messages.conversationId, conversations.id)).where(and(
         owned(authSubject), eq(messages.conversationId, id),
-        or(eq(messages.role, "USER"), isNotNull(messages.approvedAt)),
+        or(eq(messages.role, "USER"), and(isNotNull(messages.approvedAt),eq(messages.policyVersion,SAFETY_POLICY.version))),
         input.before ? lt(messages.sequence, input.before) : undefined,
       )).orderBy(desc(messages.sequence)).limit(input.limit + 1);
       const items = rows.slice(0, input.limit).reverse().map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));

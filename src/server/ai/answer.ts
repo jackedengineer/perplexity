@@ -9,11 +9,12 @@ import { AnswerError, boundedModelFetch, boundedWork, type ExecutionOptions } fr
 import { providerUsage, type ProviderUsage } from "./usage";
 export type DraftInput = { question: string;evidence: EvidencePackage };
 export type PrivateDraft = { text: string;usage: ProviderUsage };
-export interface AnswerProvider { generate(input: DraftInput,options: ExecutionOptions): Promise<PrivateDraft>; usage?(): ProviderUsage | undefined }
+export interface AnswerProvider { readonly modelId?: string;generate(input: DraftInput,options: ExecutionOptions): Promise<PrivateDraft>; usage?(): ProviderUsage | undefined }
 export function createAnswerProvider(config: SafetyModelConfig,request: typeof fetch = fetch): AnswerProvider {
   let usage: ProviderUsage | undefined;
   const router = createOpenRouter({ apiKey: config.apiKey,compatibility: "strict",fetch: boundedModelFetch(request) });
   return {
+    modelId: config.modelId,
     usage: ()=>usage,
     async generate(input,options) {
       usage = undefined;

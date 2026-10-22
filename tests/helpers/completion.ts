@@ -37,3 +37,9 @@ export async function prepareCompletion(db: AdmissionDatabase,person: { subject:
   if (retrieved.kind !== "READY" && retrieved.kind !== "NO_EVIDENCE") throw new Error("Synthetic retrieval failed");
   return { calls,retrieval };
 }
+
+export async function completionSession(db: AdmissionDatabase,subject: string) {
+  const sessionId = randomUUID(),token = randomUUID();
+  await db.insert(schema.session).values({ id: sessionId,token,userId: subject,expiresAt: new Date(Date.now()+86400000),createdAt: new Date(),updatedAt: new Date() });
+  return { sessionId,token };
+}
