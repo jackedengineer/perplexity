@@ -20,7 +20,7 @@ it("records each completed provider stage once and leaves search monetary usage 
   expect(calls.find(c=>c.stage === "SEARCH")).toMatchObject({ searchCredits: 1,costMicroUsd: null });
   expect(calls.filter(c=>c.stage !== "SEARCH").every(c=>c.costMicroUsd === 100n)).toBe(true);
   const ledger = createProviderCalls(db,person.subject,person.runId);
-  const id = await ledger.begin("ANSWER","test/answer");
+  const {id} = await ledger.begin("ANSWER","test/answer");
   await expect(ledger.begin("ANSWER","test/answer")).rejects.toThrow();
   await ledger.finish(id,"SUCCEEDED",knownUsage);await expect(ledger.finish(id,"SUCCEEDED",knownUsage)).rejects.toThrow();
 });
@@ -29,11 +29,11 @@ it("enforces ownership, phase and fixed stage caps before external work",async()
   await expect(foreign.begin("INPUT_SAFETY","test/safety")).rejects.toThrow();
   await expect(ledger.begin("ANSWER","test/answer")).rejects.toThrow();
   await expect(db.insert(schema.providerCalls).values({ runId: person.runId,stage: "UNKNOWN",attemptVersion: 1,requestedModel: "test/model",capMicroUsd: -1n,status: "STARTED",startedAt: new Date() })).rejects.toMatchObject({ cause: { code: "23514" } });
-  await prepareCompletion(db,person);const id = await ledger.begin("ANSWER","test/answer");
+  await prepareCompletion(db,person);const {id} = await ledger.begin("ANSWER","test/answer");
   await expect(foreign.finish(id,"SUCCEEDED",knownUsage)).rejects.toThrow();
 });
 it("records paid outcomes after a fence changes without authorizing continuation",async()=>{
-  await prepareCompletion(db,person);const ledger = createProviderCalls(db,person.subject,person.runId),id = await ledger.begin("ANSWER","test/answer");
+  await prepareCompletion(db,person);const ledger = createProviderCalls(db,person.subject,person.runId),{id} = await ledger.begin("ANSWER","test/answer");
   await db.update(schema.runs).set({ attemptVersion: 2,status: "CANCELLED" }).where(eq(schema.runs.id,person.runId));
   await ledger.finish(id,"UNKNOWN",knownUsage);
   expect((await db.select().from(schema.providerCalls).where(eq(schema.providerCalls.id,id)))[0]).toMatchObject({ status: "UNKNOWN",costMicroUsd: 100n });
@@ -69,4 +69,35 @@ it("old accounting snapshots do not silently start new paid work",async()=>{
   const calls = createProviderCalls(db,person.subject,person.runId);
   await expect(calls.begin("INPUT_SAFETY","test/safety")).rejects.toThrow();
   expect(await db.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,person.runId))).toHaveLength(0);
+});
+it('claims only the remaining database deadline, rejects repeats explicitly and never extends it',async()=>{
+ await db.update(schema.runs).set({status:'CHECKING_INPUT',deadlineAt:new Date(Date.now()+1500)}).where(eq(schema.runs.id,person.runId));
+ const calls=createProviderCalls(db,person.subject,person.runId),claim=await calls.begin('INPUT_SAFETY','test/safety');
+ expect(claim.remainingMs).toBeGreaterThan(0);expect(claim.remainingMs).toBeLessThanOrEqual(1500);
+ expect(claim.deadlineAt.getTime()).toBeLessThanOrEqual(Date.now()+1500);
+ await expect(calls.begin('INPUT_SAFETY','test/safety')).rejects.toMatchObject({code:'RUN_IN_PROGRESS'});
+});
+it('an expired stage cannot dispatch search even when a caller supplies a new timeout',async()=>{
+ const {recordSearchProvider}=await import('@/server/runs/provider-calls');let searches=0;
+ await db.update(schema.runs).set({status:'SEARCHING',createdAt:new Date(Date.now()-120000),deadlineAt:new Date(Date.now()-1000)}).where(eq(schema.runs.id,person.runId));
+ const provider=recordSearchProvider(createProviderCalls(db,person.subject,person.runId),{search:async()=>{searches++;return {results:[],credits:1};}});
+ await expect(provider.search('Synthetic',{signal:new AbortController().signal,deadlineAt:new Date(Date.now()+45000)})).rejects.toMatchObject({code:'DEADLINE_EXCEEDED'});
+ expect(searches).toBe(0);expect(await db.select().from(schema.providerCalls)).toHaveLength(0);
+});
+it('a fresh caller timeout cannot extend search, and its unknown charge stays held after expiry',async()=>{
+ const {recordSearchProvider}=await import('@/server/runs/provider-calls');
+ const {createFinalization}=await import('@/server/runs/finalize');
+ const {createUsageReconciliation}=await import('@/server/runs/reconcile');
+ await db.update(schema.runs).set({status:'SEARCHING',deadlineAt:new Date(Date.now()+1000)}).where(eq(schema.runs.id,person.runId));
+ let aborted=false;
+ const provider=recordSearchProvider(createProviderCalls(db,person.subject,person.runId),{search:async(_query,options)=>new Promise((_resolve,reject)=>{
+  options.signal.addEventListener('abort',()=>{aborted=true;reject(new Error('Synthetic timeout'));},{once:true});
+ })});
+ await expect(provider.search('Synthetic',{signal:new AbortController().signal,deadlineAt:new Date(Date.now()+45000)})).rejects.toMatchObject({code:'DEADLINE_EXCEEDED'});
+ expect(aborted).toBe(true);
+ const [{id:callId}]=await db.select().from(schema.providerCalls);
+ expect((await db.select().from(schema.providerCalls))[0]).toMatchObject({id:callId,status:'UNKNOWN',costMicroUsd:null});
+ await createFinalization(db).fail(person.subject,person.runId,'DEADLINE_EXCEEDED');
+ expect((await db.select().from(schema.runSettlements))[0].heldProviderMicroUsd).toBe(50000n);
+ expect(await createUsageReconciliation(db).reconcile(person.subject,person.runId)).toBe('UNRESOLVED');
 });

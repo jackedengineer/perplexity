@@ -15,8 +15,10 @@ import { AdmissionError } from "@/server/runs/errors";
 import { createRunExecution } from "@/server/runs/execute";
 import { createAnswerDelivery } from "./delivery";
 import { createChatHttp } from "./http";
+import { createRequestLimiter } from "@/server/runs/rate-limit";
 export const chatHttp = createChatHttp({
   identity: getCurrentSession,origin: ()=>getServerEnv().BETTER_AUTH_URL,
+  consumeRequest: subject=>createRequestLimiter(getDb(),parseAdmissionPolicyEnvironment(process.env).operatorBudgetKey).consume(subject),
   load: (identity,runId)=>createAnswerDelivery(getDb()).load(identity,runId),
   backend() {
     const db = getDb(),keys = parseAdmissionEnvironment(process.env);

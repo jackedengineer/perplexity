@@ -59,7 +59,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
         const options = { signal,deadlineAt: prepared.run.deadlineAt };
         const queryCheck = await queryGate.evaluate({ text: prepared.query,context: [] },options);
         queryVerdict = queryCheck.verdict.decision;
-        if (queryVerdict !== "ALLOW") throw new RetrievalError(queryVerdict === "BLOCK" ? "INPUT_BLOCKED" : "SAFETY_UNAVAILABLE");
+        if (queryVerdict !== "ALLOW") throw new RetrievalError(queryVerdict === "BLOCK" ? "INPUT_BLOCKED" : queryCheck.reason === "TIMEOUT" ? "DEADLINE_EXCEEDED" : "SAFETY_UNAVAILABLE");
         // Recheck fences before external paid search. No provider runs inside this transaction.
         await db.transaction(tx=>checkpoint(tx,subject,runId,prepared.run,stage,signal));
         const response = await search.search(prepared.query,options); searchCredits = response.credits;
@@ -71,7 +71,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
         const evidence = buildEvidence(runId,response.results,new Date());
         if (evidence.sources.length) {
           const checked = await evidenceGate.evaluate(evidence,options); evidenceVerdict = checked.verdict.decision;
-          if (evidenceVerdict !== "ALLOW") throw new RetrievalError(evidenceVerdict === "BLOCK" ? "OUTPUT_BLOCKED" : "SAFETY_UNAVAILABLE");
+          if (evidenceVerdict !== "ALLOW") throw new RetrievalError(evidenceVerdict === "BLOCK" ? "OUTPUT_BLOCKED" : "reason" in checked && checked.reason === "TIMEOUT" ? "DEADLINE_EXCEEDED" : "SAFETY_UNAVAILABLE");
         }
         return await db.transaction(async(tx): Promise<RetrievalResult>=>{
           const { now } = await checkpoint(tx,subject,runId,prepared.run,stage,signal);
@@ -99,7 +99,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
           try { await db.transaction(async(tx)=>{
             const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
             if (run.attemptVersion !== fence.attemptVersion || run.status !== stage || conversation.revision !== fence.admittedRevision) return;
-            const status = signal.aborted ? "CANCELLED" : run.deadlineAt <= now ? "TIMED_OUT" : code === "INPUT_BLOCKED" || code === "OUTPUT_BLOCKED" ? "BLOCKED" : "FAILED";
+            const status = run.deadlineAt <= now || code === "DEADLINE_EXCEEDED" ? "TIMED_OUT" : signal.aborted ? "CANCELLED" : code === "INPUT_BLOCKED" || code === "OUTPUT_BLOCKED" ? "BLOCKED" : "FAILED";
             await tx.update(runRetrievals).set({ status: status === "BLOCKED" ? "BLOCKED" : "UNAVAILABLE",queryVerdict,evidenceVerdict,searchCredits }).where(eq(runRetrievals.runId,runId));
             await tx.update(runs).set({ status,updatedAt: now }).where(eq(runs.id,runId));
           }); } catch { /* Keep an unknown outcome held; never retry provider work. */ }

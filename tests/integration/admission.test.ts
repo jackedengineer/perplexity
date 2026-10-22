@@ -127,7 +127,10 @@ it("keeps an expired active intent held and fails closed when its historical key
   const request = input();
   await admission.admit("alice", request);
   await db.update(schema.runs).set({ createdAt: new Date(Date.now()-120_000), deadlineAt: new Date(Date.now()-60_000) });
-  expect(await admission.admit("alice", request)).toMatchObject({ kind: "RUN_IN_PROGRESS" });
+  const [before]=await db.select().from(schema.runs);
+  const retry=await admission.admit("alice", request);
+  expect(retry).toMatchObject({ kind: "RUN_IN_PROGRESS",run:{deadlineAt:before.deadlineAt.toISOString()} });
+  expect((await db.select().from(schema.runs))[0].deadlineAt).toEqual(before.deadlineAt);
   const rotated = createRunAdmission(db, { activeKeyId: "test-v2", keys: { "test-v2": "b".repeat(64) } }, policy);
   await expect(rotated.admit("alice", request)).rejects.toMatchObject({ code: "CONFIGURATION_UNAVAILABLE" });
   expect((await db.select().from(schema.usageBuckets)).map((r)=>r.reservedCredits)).toEqual([5,5]);

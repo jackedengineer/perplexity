@@ -82,8 +82,9 @@ may invoke it within that hour. No hosted job is active until deployment.
 
 Migration `0007_run_recovery.sql` is additive. It adds no owner credentials to
 runtime. Apply it before deploying T18, then run the explicit-target verifier
-(expected schema: 23 tables). Development has been migrated; production remains
-at the prior 21-table checkpoint. Roll back application code without dropping
+(T18 schema: 23 tables; the current verifier expects the latest migrations).
+Development also includes [T19 counters](distributed-controls.md), bringing it to
+24 tables; production remains at the prior 21-table checkpoint. Roll back application code without dropping
 receipts, adjustments or held reservations. A later forward-compatible deploy
 can resume recovery from these durable records.
 
@@ -114,7 +115,8 @@ can resume recovery from these durable records.
   guarantees or paid-model timings. Audit has no high/critical production advisories;
   one existing moderate development-tool transitive advisory remains.
 
-Development has 23 verified tables with encrypted role-separated connections.
+The T18 checkpoint verified 23 tables with encrypted role-separated connections;
+[T19](distributed-controls.md) brings the current development schema to 24.
 Production has not received migration 0007 or a T18 deploy. The scheduled route
 has been tested for authorization and failure behavior, but hosted execution is
 pending deployment/CRON_SECRET configuration. Unknown usage is intentionally not

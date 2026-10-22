@@ -1,6 +1,6 @@
 # Build backlog
 
-T01–T03 and T05–T11 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T18 recovery is implemented out of order on request, reusing T11 ownership/status boundaries; T12–T17 remain open. T12 intent-preserving planning is next in the original sequence. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
+T01–T03 and T05–T11 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T18 recovery and T19 distributed controls are implemented out of order on request, reusing T11 ownership/status boundaries; T12–T17 remain open. T12 intent-preserving planning is next in the original sequence. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
 
 Commands and current verification results are in [README](../README.md) and [the foundation record](../docs/foundation-verification.md). Default integration tests use isolated PGlite PostgreSQL. Opt-in live browser tests use synthetic identities in the dedicated development Neon project, never production.
 
@@ -185,10 +185,12 @@ T18 evidence: [recovery and reconciliation](../docs/run-recovery.md). Developmen
 
 ### T19 — Prove distributed usage and deadline controls
 
-- [ ] Enforce one absolute deadline and per-stage cost/attempt limits; implement shared per-user and abuse throttles using atomic Postgres counters initially.
-- [ ] Ensure denial traffic consumes abuse allocation and client disconnect does not reset spending controls; tune under measured load before adding Redis.
-- [ ] Verify: concurrent quota tests, deadline exhaustion across retries and unknown-cost reconciliation. Show rate/quota/infra/policy outcomes separately.
-- Dependencies: T18. Files: `src/server/runs/budgets.ts`, `src/server/runs/usage.ts`, `src/server/runs/rate-limit.ts`, `src/server/db/schema.ts`, `tests/integration/budgets.test.ts` plus generated SQL.
+- [x] Enforce one absolute deadline and per-stage cost/attempt limits; implement shared per-user and abuse throttles using atomic Postgres counters initially.
+- [x] Ensure denial traffic consumes abuse allocation and client disconnect does not reset spending controls; tune under measured load before adding Redis.
+- [x] Verify: concurrent quota tests, deadline exhaustion across retries and unknown-cost reconciliation. Show rate/quota/infra/policy outcomes separately.
+- Dependencies: T18. Files: `src/server/runs/budgets.ts`, `src/server/runs/usage.ts`, `src/server/runs/rate-limit.ts`, `src/db/rate-limit-schema.ts`, `tests/integration/request-rate-limit.test.ts`, `tests/live/budgets-neon.test.ts` plus generated SQL.
+
+T19 evidence: [distributed controls](../docs/distributed-controls.md). Migration 0008 and restricted grants are verified only in development. Provider testing uses synthetic fixtures; paid verification and production rollout remain pending.
 
 ### T20 — Instrument cost, latency and safety decisions
 

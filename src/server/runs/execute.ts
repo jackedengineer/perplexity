@@ -49,8 +49,8 @@ export function createRunExecution(db: AdmissionDatabase,keys: unknown,providers
     } catch (error) {
       const code: PublicErrorCode = error instanceof AdmissionError ? error.code : "PROVIDER_UNAVAILABLE";
       // Called only by the admission winner. Stale callbacks cannot settle a newer attempt.
-      await finalization.fail(subject,run.id,code,{ attemptVersion: 1,revision: run.revision },signal.aborted);
-      return { kind: "DENIED",code } as const;
+      const settled=await finalization.fail(subject,run.id,code,{ attemptVersion: 1,revision: run.revision },signal.aborted);
+      return { kind: "DENIED",code:settled.kind==='DENIED'&&settled.code==='DEADLINE_EXCEEDED'?settled.code:code } as const;
     } finally {monitor.stop();}
   } };
 }

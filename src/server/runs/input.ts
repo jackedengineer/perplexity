@@ -1,9 +1,12 @@
 import { MAX_SUBMISSION_BYTES, submissionSchema } from "@/server/contracts/chat";
 import { AdmissionError } from "./errors";
 
+export function isTrustedSubmissionOrigin(request:Request,trustedOrigin:string) {
+  return request.method==='POST'&&request.headers.get('origin')===new URL(trustedOrigin).origin;
+}
 // Invoke after session validation, before admission. A slow body cannot hold a database lock.
 export async function readSubmission(request: Request, trustedOrigin: string) {
-  if (request.method !== "POST" || request.headers.get("origin") !== new URL(trustedOrigin).origin) throw new AdmissionError("INVALID_ORIGIN");
+  if (!isTrustedSubmissionOrigin(request,trustedOrigin)) throw new AdmissionError("INVALID_ORIGIN");
   if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") throw new AdmissionError("UNSUPPORTED_MEDIA_TYPE");
   const length = request.headers.get("content-length");
   if (length !== null && (!/^\d+$/u.test(length) || Number(length) > MAX_SUBMISSION_BYTES)) throw new AdmissionError("TOO_LARGE");

@@ -14,13 +14,13 @@ const approvalInput = z.strictObject({ runId: z.uuid(),attemptVersion: z.int().p
 export type ApprovedResponse = Readonly<{ runId: string;attemptVersion: number;revision: number;policyVersion: "v1";
   kind: "ANSWER" | "CLARIFICATION" | "NO_EVIDENCE";markdown: string;sources: readonly Readonly<VisibleSource>[] }>;
 export type ReleaseResult = { kind: "APPROVED";response: ApprovedResponse }
-  | { kind: "DENIED";code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE";response: SafetyResponse };
+  | { kind: "DENIED";code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE" | "DEADLINE_EXCEEDED";response: SafetyResponse };
 const approved = new WeakSet<object>();
 export function isApprovedResponse(value: unknown): value is ApprovedResponse { return typeof value === "object" && value !== null && approved.has(value); }
 export function createReleaseGate(provider: SafetyProvider | undefined) {
   const gate = createInputGate(provider);
   return { async approve(value: unknown,options: ExecutionOptions): Promise<ReleaseResult> {
-    const deny = (code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE",response: SafetyResponse = SAFETY_RESPONSES.UNAVAILABLE): ReleaseResult=>({ kind: "DENIED",code,response });
+    const deny = (code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE" | "DEADLINE_EXCEEDED",response: SafetyResponse = SAFETY_RESPONSES.UNAVAILABLE): ReleaseResult=>({ kind: "DENIED",code,response });
     try {
       const parsed = approvalInput.safeParse(value);
       if (!parsed.success) return deny("OUTPUT_BLOCKED");
@@ -33,7 +33,7 @@ export function createReleaseGate(provider: SafetyProvider | undefined) {
         ...sources.map(source=>({ role: "ASSISTANT",text: JSON.stringify(source) })),
       ] },options);
       const decision = resolveSafetyDecision(verdict.verdict);
-      if (decision.decision !== "ALLOW") return deny(decision.decision === "BLOCK" ? "OUTPUT_BLOCKED" : "SAFETY_UNAVAILABLE",decision.response);
+      if (decision.decision !== "ALLOW") return deny(decision.decision === "BLOCK" ? "OUTPUT_BLOCKED" : verdict.reason === "TIMEOUT" ? "DEADLINE_EXCEEDED" : "SAFETY_UNAVAILABLE",decision.response);
       if (options.signal.aborted || Date.now() >= options.deadlineAt.getTime()) return deny("SAFETY_UNAVAILABLE");
       for (const source of sources) { Object.freeze(source.passageIds);Object.freeze(source.contentHashes);Object.freeze(source); }
       const candidate = { runId: input.runId,attemptVersion: input.attemptVersion,revision: input.revision,

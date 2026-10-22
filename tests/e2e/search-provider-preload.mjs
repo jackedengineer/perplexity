@@ -18,7 +18,7 @@ globalThis.fetch=async(input,init)=>{
   if((url.includes("openrouter.ai")||url.includes("api.tavily.com"))&&url!=="https://openrouter.ai/api/v1/chat/completions"&&url!=="https://api.tavily.com/search")throw new Error("Fixture forbids unmatched provider request");
   if(url!=="https://openrouter.ai/api/v1/chat/completions"&&url!=="https://api.tavily.com/search")return originalFetch(input,init);
   const body=JSON.parse(String(init?.body??"{}")),raw=JSON.stringify(body);
-  const scenario=raw.includes("t18-cancel")?"t18-cancel":raw.includes("t11-input-block")?"input-block":raw.includes("t11-output-block")?"output-block":raw.includes("t11-invalid-citation")?"invalid-citation":raw.includes("t11-search-failure")?"search-failure":raw.includes("t11-no-evidence")?"no-evidence":"allowed";
+  const scenario=raw.includes("t19-safety-deadline")?"t19-safety-deadline":raw.includes("t19-deadline")?"t19-deadline":raw.includes("t18-cancel")?"t18-cancel":raw.includes("t11-input-block")?"input-block":raw.includes("t11-output-block")?"output-block":raw.includes("t11-invalid-citation")?"invalid-citation":raw.includes("t11-search-failure")?"search-failure":raw.includes("t11-no-evidence")?"no-evidence":"allowed";
   if(url.includes("tavily")){
     record("search",scenario);
     if(scenario==="search-failure")return Response.json({error:"PRIVATE_UPSTREAM_MUST_NOT_LEAK"},{status:503});
@@ -32,8 +32,8 @@ globalThis.fetch=async(input,init)=>{
   const system=typeof content==="string"?content:Array.isArray(content)?content.map(part=>part.text??"").join("\n"):"";
   const output=system.startsWith("Inspect the COMPLETE visible response");
   const stage=body.model==="test/answer"?"answer":output?"output":"guard";record(stage,scenario);
-  if(stage==="answer"&&scenario==="t18-cancel")await new Promise((resolve,reject)=>{
-    const timer=setTimeout(resolve,9000);
+  if(scenario==="t19-safety-deadline"||stage==="answer"&&(scenario==="t18-cancel"||scenario==="t19-deadline"))await new Promise((resolve,reject)=>{
+    const timer=setTimeout(resolve,scenario==="t19-safety-deadline"?6000:scenario==="t19-deadline"?15000:9000);
     const abort=()=>{record("answer-abort",scenario);clearTimeout(timer);reject(new Error("Synthetic provider aborted"));};
     if(init?.signal?.aborted)abort();else init?.signal?.addEventListener("abort",abort,{once:true});
   });

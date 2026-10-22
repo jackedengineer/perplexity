@@ -19,3 +19,18 @@ test("status recovery offers durable cancellation for an owned server run",async
     await expect(page.getByRole("main").getByRole("alert")).toContainText("Research stopped.");
   }finally{await page.goto("/workspace");await identity.cleanup();}
 });
+test('terminal failure replaces an earlier already-running warning',async({page,context})=>{
+  const identity=await identityFixture(context),runId=crypto.randomUUID();let conversationId='',posts=0,reads=0;
+  try{
+    await page.route('**/api/chat',async route=>{
+      posts++;conversationId=route.request().postDataJSON().conversationId;
+      await route.fulfill({status:409,headers:{'x-run-id':runId},contentType:'application/json',body:JSON.stringify({requestId:crypto.randomUUID(),error:{code:'RUN_IN_PROGRESS',message:'This request is already running. Check its current status.'}})});
+    });
+    await page.route(`**/api/runs/${runId}`,route=>{reads++;return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({runId,conversationId,revision:1,state:'UNAVAILABLE'})});});
+    await page.goto('/workspace');await page.getByRole('textbox',{name:'Ask a question'}).fill('Recover a completed failure');await page.getByRole('button',{name:'Submit question'}).click();
+    await expect(page.getByRole('main').getByRole('alert')).toContainText('Research is temporarily unavailable.');
+    await expect(page.getByRole('main').getByRole('alert')).not.toContainText('already running');
+    await page.getByRole('button',{name:'Check same request'}).click();await expect.poll(()=>reads).toBe(2);expect(posts).toBe(1);
+    await expect(page.locator('.answer-prose')).toHaveCount(0);
+  }finally{await page.goto('/workspace');await identity.cleanup();}
+});

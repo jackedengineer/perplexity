@@ -46,13 +46,13 @@ it('cancellation wins against a paused answer, then concurrent reconciliation de
  expect((await f.owner.select().from(schema.messages).where(eq(schema.messages.conversationId,p.conversation.id))).map(m=>m.role)).toEqual(['USER']);
 },90000);
 it('runtime cannot manufacture provider evidence or mutate adjustment history',async()=>{
- const p=await seed();await f.owner.update(schema.runs).set({status:'CHECKING_INPUT'}).where(eq(schema.runs.id,p.runId));const callId=await createProviderCalls(f.runtime,p.subject,p.runId).begin('INPUT_SAFETY','test/safety');
+ const p=await seed();await f.owner.update(schema.runs).set({status:'CHECKING_INPUT'}).where(eq(schema.runs.id,p.runId));const {id:callId}=await createProviderCalls(f.runtime,p.subject,p.runId).begin('INPUT_SAFETY','test/safety');
  await createRunRecovery(f.runtime).cancel(identity(p),p.runId);
  await expect(f.runtime.insert(schema.providerUsageResolutions).values({callId,runId:p.runId,costMicroUsd:0n,kind:'VERIFIED_NOT_BILLED',evidenceHash:'d'.repeat(64)})).rejects.toMatchObject({cause:{code:'42501'}});
  await expect(f.runtime.delete(schema.runReconciliations).where(eq(schema.runReconciliations.runId,p.runId))).rejects.toMatchObject({cause:{code:'42501'}});
 },60000);
 it('the privileged CLI records an identical synthetic receipt idempotently and rejects a changed one',async()=>{
- const p=await seed();await f.owner.update(schema.runs).set({status:'CHECKING_INPUT'}).where(eq(schema.runs.id,p.runId));const callId=await createProviderCalls(f.runtime,p.subject,p.runId).begin('INPUT_SAFETY','test/safety');await createRunRecovery(f.runtime).cancel(identity(p),p.runId);
+ const p=await seed();await f.owner.update(schema.runs).set({status:'CHECKING_INPUT'}).where(eq(schema.runs.id,p.runId));const {id:callId}=await createProviderCalls(f.runtime,p.subject,p.runId).begin('INPUT_SAFETY','test/safety');await createRunRecovery(f.runtime).cancel(identity(p),p.runId);
  const file=`.artifacts/t18-synthetic-receipt-${randomUUID()}.json`,receipt={callId,runId:p.runId,costMicroUsd:'300',kind:'PROVIDER_RECEIPT',evidenceHash:'e'.repeat(64)};
  const command=()=>promisify(execFile)(process.execPath,['scripts/record-usage-resolution.mjs','--receipt',file,'--verified-receipt'],{env:{...process.env,PERPLEX_DB_ENV_FILE:'.env.local',PERPLEX_DB_EXPECTED_HOST:new URL(process.env.DATABASE_URL_DIRECT!).hostname}});
  try{await writeFile(file,JSON.stringify(receipt),{mode:0o600});await command();await command();await writeFile(file,JSON.stringify({...receipt,costMicroUsd:'301'}));await expect(command()).rejects.toThrow();expect(await createUsageReconciliation(f.runtime).sweep(undefined,f.namespace)).toEqual({scanned:1,reconciled:1,failed:0});expect(await createUsageReconciliation(f.runtime).reconcile(p.subject,p.runId)).toBe('UNCHANGED');}

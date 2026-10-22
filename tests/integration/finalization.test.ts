@@ -131,7 +131,7 @@ it("RLS binds the reviewed body and rejects hidden extra JSON fields",async()=>{
 it("late provider outcomes preserve the remaining hold after a failure receipt commits",async()=>{
   await prepareCompletion(db,person);
   const { createProviderCalls } = await import("@/server/runs/provider-calls");
-  const calls = createProviderCalls(db,person.subject,person.runId),id = await calls.begin("ANSWER","test/answer");
+  const calls = createProviderCalls(db,person.subject,person.runId),{id} = await calls.begin("ANSWER","test/answer");
   const finalizer = createFinalization(db);
   expect(await finalizer.fail(person.subject,person.runId,"PROVIDER_UNAVAILABLE")).toMatchObject({ kind: "DENIED" });
   const [receipt] = await db.select().from(schema.runSettlements);
@@ -157,4 +157,11 @@ it("history fails safely when canonical payload and approved message diverge",as
   const { createConversationRepository } = await import("@/server/conversations/repository");
   await db.update(schema.messages).set({ parts: [{ type: "text",text: "CORRUPTED PRIVATE TEXT" }] }).where(eq(schema.messages.role,"ASSISTANT"));
   await expect(createConversationRepository(db).history(person.subject,person.conversation.id,{ limit: 20 })).rejects.toMatchObject({ code: "UNAVAILABLE" });
+});
+it.each(['INPUT_BLOCKED','OUTPUT_BLOCKED'] as const)('retains %s when final settlement crosses the deadline',async code=>{
+ await db.update(schema.runs).set({status:'CHECKING_OUTPUT',createdAt:new Date(Date.now()-120000),deadlineAt:new Date(Date.now()-1000)}).where(eq(schema.runs.id,person.runId));
+ expect(await createFinalization(db).fail(person.subject,person.runId,code)).toEqual({kind:'DENIED',code});
+ expect((await db.select().from(schema.runs))[0].status).toBe('BLOCKED');
+ expect((await db.select().from(schema.outputReviews))[0].decision).toBe('BLOCK');
+ expect((await db.select().from(schema.runSettlements))[0].creditsCharged).toBe(0);
 });

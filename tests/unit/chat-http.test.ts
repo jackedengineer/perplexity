@@ -11,7 +11,7 @@ function fixture() {
   const answer: CommittedAnswer = { runId: run.id,conversationId: run.conversationId,revision: 1,messageId: randomUUID(),text: "Light bends [S1].",createdAt: new Date().toISOString(),
     answer: { kind: "ANSWER",document: [{ type: "paragraph",children: [{ type: "text",text: "Light bends " },{ type: "citation",number: 1 }] }],sources: [{ sourceId: "S1",number: 1,url: "https://weather.gov/rainbow",title: "Rainbow evidence",domain: "weather.gov",supportStatus: "NOT_CHECKED" }] } };
   const backend = { admit: vi.fn().mockResolvedValue({ kind: "ADMITTED",run }),execute: vi.fn().mockResolvedValue({ kind: "COMPLETED" }),load: vi.fn().mockResolvedValue({runId: run.id,conversationId: run.conversationId,revision: 1,state: "COMPLETED",answer}) };
-  const dependencies = { identity: vi.fn().mockResolvedValue(subject),origin: ()=>"http://localhost:3000",backend: ()=>backend,load: backend.load,log: vi.fn() };
+  const dependencies = { identity: vi.fn().mockResolvedValue(subject),origin: ()=>"http://localhost:3000",backend: ()=>backend,load: backend.load,consumeRequest:vi.fn().mockResolvedValue(undefined),log: vi.fn() };
   const http = createChatHttp(dependencies);
   const request = (body: unknown = question,headers: Record<string,string> = {})=>new Request("http://localhost:3000/api/chat",{method: "POST",headers:{origin: "http://localhost:3000","content-type": "application/json",...headers},body: JSON.stringify(body)});
   return {question,run,answer,backend,dependencies,http,request};
@@ -46,6 +46,7 @@ it("duplicate running intents return a recoverable run ID without starting provi
   const f=fixture();f.backend.admit.mockResolvedValue({kind:"RUN_IN_PROGRESS",run:f.run});
   const response=await f.http.post(f.request());expect(response.status).toBe(409);expect(response.headers.get("x-run-id")).toBe(f.run.id);
   expect(f.backend.execute).not.toHaveBeenCalled();
+  expect(f.dependencies.log).toHaveBeenCalledWith(expect.objectContaining({event:'chat.admission',outcome:'RUN_IN_PROGRESS',category:'state'}));
 });
 it("completed retries load canonical state and never execute providers",async()=>{
   const f=fixture();f.backend.admit.mockResolvedValue({kind:"RUN_ALREADY_FINISHED",run:f.run});
@@ -78,4 +79,38 @@ it("operator namespaces are server-only configuration and cannot alter stage/pri
   const selected=parseAdmissionPolicyEnvironment({RUN_OPERATOR_BUDGET_KEY:"test-isolated"});
   expect(selected).toMatchObject({operatorBudgetKey:"test-isolated",answerCredits:5,providerReserveMicroUsd:50000n,deadlineMs:45000});
   expect(()=>parseAdmissionPolicyEnvironment({RUN_OPERATOR_BUDGET_KEY:"unsafe / namespace"})).toThrow();
+});
+
+it("counts malformed and unauthenticated requests before body parsing or backend configuration",async()=>{
+ const f=fixture();
+ expect((await f.http.post(f.request({untrusted:"PRIVATE_REQUEST"}))).status).toBe(422);
+ expect(f.dependencies.consumeRequest).toHaveBeenCalledWith(subject.user.id);
+ f.dependencies.identity.mockResolvedValue(null);
+ expect((await f.http.post(f.request())).status).toBe(401);
+ expect(f.dependencies.consumeRequest).toHaveBeenLastCalledWith(null);
+ expect(f.backend.admit).not.toHaveBeenCalled();
+});
+it('charges cross-origin denials to anonymous abuse allocation rather than a signed-in victim',async()=>{
+ const f=fixture();const response=await f.http.post(f.request(f.question,{origin:'https://untrusted.example'}));
+ expect(response.status).toBe(403);expect(f.dependencies.consumeRequest).toHaveBeenCalledWith(null);
+ expect(f.dependencies.consumeRequest).not.toHaveBeenCalledWith(subject.user.id);expect(f.backend.admit).not.toHaveBeenCalled();
+});
+it("rate denial and counter infrastructure failure cannot reach admission",async()=>{
+ const f=fixture();f.dependencies.consumeRequest.mockRejectedValue(new AdmissionError("RATE_LIMITED"));
+ const limited=await f.http.post(f.request());expect(limited.status).toBe(429);expect((await limited.json()).error.code).toBe("RATE_LIMITED");
+ f.dependencies.consumeRequest.mockRejectedValue(new Error("PRIVATE SQL PARAMETERS"));
+ const unavailable=await f.http.post(f.request());expect(unavailable.status).toBe(503);expect(await unavailable.text()).not.toContain("PRIVATE");
+ expect(f.backend.admit).not.toHaveBeenCalled();
+});
+it.each([['RATE_LIMITED','rate'],['BUDGET_EXCEEDED','quota']] as const)('records %s admission denial separately from other outcomes',async(code,category)=>{
+ const f=fixture();f.backend.admit.mockResolvedValue({kind:'DENIED',code});
+ const response=await f.http.post(f.request());expect(response.status).toBe(429);
+ expect(f.dependencies.log).toHaveBeenLastCalledWith(expect.objectContaining({event:'chat.admission',outcome:code,category}));
+ expect(f.backend.execute).not.toHaveBeenCalled();
+});
+it.each([['OUTPUT_BLOCKED','policy'],['PROVIDER_UNAVAILABLE','infrastructure'],['DEADLINE_EXCEEDED','deadline']] as const)('distinguishes %s after streaming starts',async(code,category)=>{
+ const f=fixture();f.backend.execute.mockRejectedValue(new AdmissionError(code));
+ const response=await f.http.post(f.request());await response.text();
+ expect(f.dependencies.log).toHaveBeenLastCalledWith(expect.objectContaining({event:'chat.execution',outcome:code,category}));
+ expect(f.backend.load).not.toHaveBeenCalled();
 });
