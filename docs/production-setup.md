@@ -97,8 +97,14 @@ in the existing Cloud project. Proposed HTTPS origin:
 `https://perplexity-jackedengineer.vercel.app`; proposed callback:
 `https://perplexity-jackedengineer.vercel.app/api/auth/callback/google`.
 Confirm the assigned hostname before creating the client. The local-development
-client remains unchanged. Production audience/branding, callback, secure cookies,
-session revocation and cross-user isolation still require hosted verification.
+client remains unchanged. The existing Google project is **External / Testing**
+with one test user. Its Publish app button is disabled and directs the operator to
+complete Branding. The branding page still uses `Perplex Development`; home page,
+privacy-policy URL, terms URL and authorised domains are empty. None was changed
+or invented during setup. Resolve production branding/audience in the intended
+Cloud project before treating sign-in as available to the public. Callback,
+secure cookies, session revocation and cross-user isolation still require hosted
+verification.
 
 Resume in this order:
 
