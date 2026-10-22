@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PublicStage } from "@/server/contracts/progress";
 import { and,eq } from "drizzle-orm";
 import { inputSafetyReviews,messages,outputReviews,runs } from "@/db/schema";
 import type { AdmissionDatabase } from "./usage";
@@ -15,7 +16,7 @@ import { SAFETY_POLICY } from "@/server/safety/policy";
 import { questionTextSchema } from "@/server/contracts/chat";
 export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { answer?: AnswerProvider;output: SafetyProvider }) {
   const finalization = createFinalization(db);
-  return { async complete(subject: string,sessionId: string,runId: string,signal: AbortSignal): Promise<Finalization> {
+  return { async complete(subject: string,sessionId: string,runId: string,signal: AbortSignal,onStage?: (stage: PublicStage)=>void): Promise<Finalization> {
     if (!z.uuid().safeParse(runId).success) return { kind: "DENIED",code: "NOT_FOUND" };
     let ownedAttempt: { attemptVersion: number;revision: number } | undefined;
     try {
@@ -56,14 +57,16 @@ export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { ans
         if (run.status !== "GENERATING" || run.attemptVersion !== loaded.run.attemptVersion || conversation.revision !== loaded.run.admittedRevision || signal.aborted || run.deadlineAt <= now) throw new AdmissionError("CONFLICT");
         await tx.update(runs).set({ status: "CHECKING_OUTPUT",updatedAt: now }).where(eq(runs.id,runId));
       });
+      onStage?.("CHECKING_ANSWER");
       const result = await createReleaseGate(recordSafetyProvider(calls,"OUTPUT_SAFETY",dependencies.output)).approve({ runId,attemptVersion: loaded.run.attemptVersion,
         revision: loaded.run.admittedRevision,kind: draft.kind,question: loaded.question,markdown: draft.text,evidence },{ signal,deadlineAt: loaded.run.deadlineAt });
-      if (result.kind === "DENIED") return finalization.fail(subject,runId,result.code,ownedAttempt);
+      if (result.kind === "DENIED") return finalization.fail(subject,runId,result.code,ownedAttempt,signal.aborted);
+      onStage?.("SAVING_ANSWER");
       return await finalization.commit(subject,sessionId,result.response,signal);
     } catch (error) {
       const code = error instanceof AdmissionError ? error.code : "PROVIDER_UNAVAILABLE";
       if (!ownedAttempt || code === "NOT_FOUND" || code === "RUN_IN_PROGRESS") return { kind: "DENIED",code };
-      return finalization.fail(subject,runId,code,ownedAttempt);
+      return finalization.fail(subject,runId,code,ownedAttempt,signal.aborted);
     }
   } };
 }

@@ -19,7 +19,7 @@ Scope: create, list, load and rename private conversation metadata; bounded appr
 | `GET /api/conversations` | validated `cursor`, `limit`, optional literal title search `q` | owner-only bounded items and next cursor |
 | `GET /api/conversations/:id` | UUID | metadata plus most recent approved message page |
 | `GET /api/conversations/:id/messages` | validated sequence cursor and limit | owner-only approved history |
-| `PATCH /api/conversations/:id` | strict `{title, expectedRevision}` | updated metadata or 409 stale revision |
+| `PATCH /api/conversations/:id` | strict `{title, expectedRevision}` | updated metadata or 409 stale revision/active research |
 
 Mutations require an exact trusted Origin and JSON content type. A streaming byte cap precedes JSON parsing. Error bodies have fixed codes/messages and request IDs: 400 malformed, 401 signed out, 403 origin, 404 unavailable, 409 conflict, 413 oversize, 415 media type, 422 validation, 503 database/auth failure. Logs omit titles, history, cookies and query strings.
 

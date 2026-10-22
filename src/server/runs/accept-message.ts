@@ -80,7 +80,8 @@ export function createMessageAcceptance(db: AdmissionDatabase, keys: unknown, ga
             await tx.insert(messages).values({ id: messageId,conversationId: conversation.id,role: "USER",kind: "QUESTION",
               parts: [{ type: "text",text: request.message.text }],sequence: conversation.nextSequence,
               policyVersion: verdict.policyVersion,approvedAt: now,createdAt: now });
-            await tx.update(conversations).set({ nextSequence: conversation.nextSequence+1,updatedAt: now }).where(eq(conversations.id,conversation.id));
+            await tx.update(conversations).set({ nextSequence: conversation.nextSequence+1,updatedAt: now,
+              ...(conversation.nextSequence === 1 && conversation.title === "New search" ? { title: Array.from(request.message.text.trim().replace(/\s+/gu," ")).slice(0,80).join("") } : {}) }).where(eq(conversations.id,conversation.id));
           }
           const status = verdict.decision === "ALLOW" ? "PLANNING" : verdict.decision === "BLOCK" ? "BLOCKED"
             : final.reason === "CANCELLED" ? "CANCELLED" : final.reason === "TIMEOUT" ? "TIMED_OUT" : "FAILED";

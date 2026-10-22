@@ -144,3 +144,17 @@ it("late provider outcomes preserve the remaining hold after a failure receipt c
   await finalizer.fail(person.subject,person.runId,"PROVIDER_UNAVAILABLE");
   expect(await db.select().from(schema.runSettlements)).toEqual([receipt]);
 });
+it("history exposes approved presentation and excludes private provenance fields",async()=>{
+  await prepareCompletion(db,person);expect((await complete()).kind).toBe("COMMITTED");
+  const { createConversationRepository } = await import("@/server/conversations/repository");
+  const repository = createConversationRepository(db),history = await repository.history(person.subject,person.conversation.id,{ limit: 20 });
+  expect(history.items[1].answer?.sources).toMatchObject([{ number: 1,url: "https://example.org/rainbows",domain: "example.org",supportStatus: "NOT_CHECKED" }]);
+  expect(JSON.stringify(history)).not.toMatch(/contentHash|passageId|capMicroUsd|payloadHash|actualModel/);
+  await expect(repository.history("other-user",person.conversation.id,{ limit: 20 })).rejects.toMatchObject({ code: "NOT_FOUND" });
+});
+it("history fails safely when canonical payload and approved message diverge",async()=>{
+  await prepareCompletion(db,person);expect((await complete()).kind).toBe("COMMITTED");
+  const { createConversationRepository } = await import("@/server/conversations/repository");
+  await db.update(schema.messages).set({ parts: [{ type: "text",text: "CORRUPTED PRIVATE TEXT" }] }).where(eq(schema.messages.role,"ASSISTANT"));
+  await expect(createConversationRepository(db).history(person.subject,person.conversation.id,{ limit: 20 })).rejects.toMatchObject({ code: "UNAVAILABLE" });
+});

@@ -61,7 +61,7 @@ export function createFinalization(db: AdmissionDatabase) {
         return { kind: "COMMITTED",runId: run.id,messageId };
       }); } catch (error) { return { kind: "DENIED",code: error instanceof AdmissionError ? error.code : "PROVIDER_UNAVAILABLE" }; }
     },
-    async fail(subject: string,runId: string,code: PublicErrorCode,fence?: { attemptVersion: number;revision: number }): Promise<Finalization> {
+    async fail(subject: string,runId: string,code: PublicErrorCode,fence?: { attemptVersion: number;revision: number },cancelled = false): Promise<Finalization> {
       if (!z.uuid().safeParse(runId).success) return { kind: "DENIED",code: "NOT_FOUND" };
       try { return await db.transaction(async(tx): Promise<Finalization>=>{
         const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
@@ -72,7 +72,7 @@ export function createFinalization(db: AdmissionDatabase) {
           await tx.insert(outputReviews).values({ runId,conversationId: conversation.id,attemptVersion: run.attemptVersion,
             decision: code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCK" : "UNAVAILABLE",policyVersion: SAFETY_POLICY.version,createdAt: now });
           await settleRun(tx,run,0,now);
-          await tx.update(runs).set({ status: run.status === "CANCELLED" ? "CANCELLED" : run.deadlineAt <= now ? "TIMED_OUT" : code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCKED" : "FAILED",updatedAt: now }).where(eq(runs.id,runId));
+          await tx.update(runs).set({ status: cancelled || run.status === "CANCELLED" ? "CANCELLED" : run.deadlineAt <= now ? "TIMED_OUT" : code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCKED" : "FAILED",updatedAt: now }).where(eq(runs.id,runId));
         }
         return { kind: "DENIED",code };
       }); } catch (error) { return { kind: "DENIED",code: error instanceof AdmissionError ? error.code : "PROVIDER_UNAVAILABLE" }; }

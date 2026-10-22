@@ -5,6 +5,9 @@ import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, beforeEach, expect, it } from "vitest";
 import * as schema from "@/db/schema";
 import { createConversationRepository } from "@/server/conversations/repository";
+import { eq } from "drizzle-orm";
+import { seedCompletion } from "../helpers/completion";
+import { createFinalization } from "@/server/runs/finalize";
 
 const pg = new PGlite();
 const db = drizzle(pg, { schema });
@@ -47,6 +50,16 @@ it("renames with optimistic concurrency while preserving creation replay", async
   expect(updated.revision).toBe(1);
   await expect(repository.rename("alice", conversation.id, { title: "Stale", expectedRevision: 0 })).rejects.toMatchObject({ code: "CONFLICT" });
   expect((await repository.create("alice", payload)).conversation.title).toBe("Renamed");
+});
+it.each(schema.ACTIVE_RUN_STATUSES)("refuses a rename during %s without invalidating settlement", async status => {
+  const person=await seedCompletion(db);
+  await db.update(schema.runs).set({status}).where(eq(schema.runs.id,person.runId));
+  await expect(repository.rename(person.subject,person.conversation.id,{title:"A competing tab",expectedRevision:1})).rejects.toMatchObject({code:"RUN_IN_PROGRESS"});
+  expect(await repository.get(person.subject,person.conversation.id)).toMatchObject({title:"Synthetic completion",revision:1});
+  await createFinalization(db).fail(person.subject,person.runId,"PROVIDER_UNAVAILABLE",{attemptVersion:1,revision:1});
+  expect(await db.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,person.runId))).toHaveLength(1);
+  expect((await db.select().from(schema.usageBuckets).where(eq(schema.usageBuckets.userId,person.profile.id))).map(row=>row.reservedCredits)).toEqual([0,0]);
+  expect(await repository.rename(person.subject,person.conversation.id,{title:"After settlement",expectedRevision:1})).toMatchObject({revision:2,title:"After settlement"});
 });
 it("paginates equal timestamps without leaking owners or interpreting wildcards", async () => {
   for (const title of ["Alpha", "Beta", "100% complete", "under_score"]) await repository.create("alice", input(title));

@@ -1,6 +1,7 @@
 const errors = {
   NOT_FOUND: [404, "This conversation is unavailable."],
   CONFLICT: [409, "This conversation changed. Reload and try again."],
+  RUN_IN_PROGRESS: [409, "Finish the active research request before renaming this conversation."],
   IDEMPOTENCY_MISMATCH: [422, "This creation key was already used for a different conversation."],
   UNAUTHENTICATED: [401, "Sign in to continue."],
   INVALID_ORIGIN: [403, "Untrusted request origin."],

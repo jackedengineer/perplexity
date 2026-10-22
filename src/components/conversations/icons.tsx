@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 const paths = {
+  copy: "M9 9h12v12H9zM15 9V3H3v12h6",external: "M14 3h7v7M21 3 10 14M10 3H3v18h18v-7",
   plus: "M12 5v14M5 12h14", search: "m20 20-4-4M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0",
   panel: "M9 3v18M4 3h16v18H4z", chevron: "m9 5 7 7-7 7", down: "m6 9 6 6 6-6",
   clock: "M12 7v5l3 2M21 12a9 9 0 1 1-3-6.7M21 3v6h-6", folder: "M3 7h7l2-3h9v15H3z",

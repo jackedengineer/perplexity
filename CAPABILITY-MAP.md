@@ -1,6 +1,6 @@
 # Capability map
 
-Status: implementation started, 2026-10-22. Next.js, Neon/Drizzle, Google sign-in, private conversation ownership and T02 boundary contracts/policy are implemented. Runtime safety classification and provider orchestration remain planned. The map below describes the full target; see [the foundation record](docs/foundation-verification.md) for verified current behavior.
+Status: T01–T03 and T05–T11 are implemented: identity/private ownership, boundary contracts, budgeted admission, guarded retrieval, private drafting, approval/persistence and browser delivery. Planning, contextual follow-ups, live model evaluation, operations and monetization remain planned. The map below describes the full target; [the backlog](tasks/todo.md) records the current boundaries.
 
 | Module | Responsibility | Depends on |
 | --- | --- | --- |

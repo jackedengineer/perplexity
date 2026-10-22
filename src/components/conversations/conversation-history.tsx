@@ -1,14 +1,21 @@
 "use client";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ApprovedAnswer,SourcesPanel } from "./approved-answer";
+import type { PublicAnswer } from "@/server/answers/view";
 import { historyPageView, type HistoryPage } from "@/server/conversations/views";
 
-export function ConversationHistory({ conversationId, initial }: { conversationId: string; initial: HistoryPage }) {
+export function ConversationHistory({ conversationId, initial,sourcesOpen: controlledOpen,onSourcesOpenChange }: { conversationId: string; initial: HistoryPage;sourcesOpen?: boolean;onSourcesOpenChange?: (value:boolean)=>void }) {
   const router = useRouter();
   const [history, setHistory] = useState(initial);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(0);
+  const [localOpen,setLocalOpen] = useState(false);
+  const sourcesOpen=controlledOpen??localOpen;
+  const setSourcesOpen=onSourcesOpenChange??setLocalOpen;
+  const [selected,setSelected] = useState<PublicAnswer | null>(null);
+  const currentAnswer = selected ?? history.items.findLast(message=>message.answer)?.answer ?? null;
   const root = useRef<HTMLDivElement>(null);
   const restore = useRef<{ viewport: HTMLElement; height: number; top: number; focus: boolean } | null>(null);
   useLayoutEffect(() => {
@@ -42,8 +49,9 @@ export function ConversationHistory({ conversationId, initial }: { conversationI
   return <div ref={root} className="history-stack">
     {history.nextBefore && <button className="research-button load-older" disabled={pending} onClick={() => void older()}>{pending ? "Loading earlier messages…" : "Load earlier messages"}</button>}
     <div className="history-feedback" aria-live="polite">{failed ? <p role="alert">Earlier messages couldn’t load. Please try again.</p> : <span className="sr-only">{loaded ? `${loaded} earlier messages loaded.` : ""}</span>}</div>
-    {history.items.map((message) => <article className="history-message" tabIndex={-1} key={message.id}>
-      <h2>{message.role === "USER" ? "You" : "Answer"}</h2>{message.parts.map((part, index) => <p key={index}>{part.text}</p>)}
+    {history.items.map((message) => <article className={`history-message ${message.role === "USER" ? "question-message" : "answer-message"}`} tabIndex={-1} key={message.id} aria-label={message.role === "USER" ? "Your question" : "Approved answer"}>
+      {message.answer ? <ApprovedAnswer answer={message.answer} text={message.parts.map(part=>part.text).join("\n")} onSources={()=>{setSelected(message.answer!);setSourcesOpen(true);}} /> : <>{message.role === "ASSISTANT" && <h2>Answer</h2>}{message.parts.map((part,index)=><p key={index}>{part.text}</p>)}</>}
     </article>)}
+    <SourcesPanel answer={currentAnswer} open={sourcesOpen} onToggle={()=>setSourcesOpen(!sourcesOpen)} />
   </div>;
 }

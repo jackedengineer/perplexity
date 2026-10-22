@@ -1,9 +1,11 @@
+import { presentAnswer } from "@/server/answers/presentation";
+import { serializeApprovedPayload } from "@/server/ai/approved-payload";
 import { SAFETY_POLICY } from "@/server/safety/policy";
 import { createHash } from "node:crypto";
 import { and, desc, eq, ilike, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import * as schema from "@/db/schema";
-import { appUsers, conversations, messages } from "@/db/schema";
+import { ACTIVE_RUN_STATUSES, appUsers, conversations, messages, outputReviews, runs } from "@/db/schema";
 import { encodeCursor, type Conversation, type CreateInput, type HistoryInput, type ListInput } from "./contracts";
 import { ConversationError } from "./errors";
 
@@ -57,24 +59,40 @@ export function createConversationRepository(db: PgDatabase<PgQueryResultHKT, ty
       return { items, nextCursor: rows.length > input.limit && last ? encodeCursor({ updatedAt: last.updatedAt, id: last.id }) : null };
     },
     async rename(authSubject: string, id: string, input: { title: string; expectedRevision: number }) {
-      const [row] = await db.update(conversations).set({
-        title: input.title, revision: sql`${conversations.revision} + 1`, updatedAt: new Date(),
-      }).where(and(owned(authSubject), eq(conversations.id, id), eq(conversations.revision, input.expectedRevision))).returning(fields);
-      if (row) return serialize(row);
-      await get(authSubject, id); // Foreign and nonexistent IDs have the same public response.
-      throw new ConversationError("CONFLICT");
+      return db.transaction(async tx=>{
+        await tx.execute(sql`SET LOCAL lock_timeout = '2s'`);
+        // Admission/completion lock this same row. Read active runs only after acquiring it,
+        // so an admission that committed while we waited cannot invalidate its own fence.
+        const [current]=await tx.select(fields).from(conversations).where(and(owned(authSubject),eq(conversations.id,id))).for("update");
+        if(!current)throw new ConversationError("NOT_FOUND");
+        const active=await tx.select({id:runs.id}).from(runs).where(and(eq(runs.conversationId,id),inArray(runs.status,[...ACTIVE_RUN_STATUSES]))).limit(1);
+        if(active.length)throw new ConversationError("RUN_IN_PROGRESS");
+        if(current.revision!==input.expectedRevision)throw new ConversationError("CONFLICT");
+        const [row]=await tx.update(conversations).set({title:input.title,revision:current.revision+1,updatedAt:new Date()}).where(eq(conversations.id,id)).returning(fields);
+        return serialize(row);
+      });
     },
     async history(authSubject: string, id: string, input: HistoryInput) {
       const conversation = await get(authSubject, id);
       const rows = await db.select({
         id: messages.id, role: messages.role, kind: messages.kind, parts: messages.parts,
         sequence: messages.sequence, schemaVersion: messages.schemaVersion, createdAt: messages.createdAt,
-      }).from(messages).innerJoin(conversations, eq(messages.conversationId, conversations.id)).where(and(
+        review: outputReviews.payload, bodyHash: outputReviews.bodyHash,payloadHash: outputReviews.payloadHash,reviewDecision: outputReviews.decision,runStatus: runs.status,
+      }).from(messages).innerJoin(conversations, eq(messages.conversationId, conversations.id))
+        .leftJoin(outputReviews,eq(outputReviews.messageId,messages.id)).leftJoin(runs,eq(runs.id,outputReviews.runId)).where(and(
         owned(authSubject), eq(messages.conversationId, id),
         or(eq(messages.role, "USER"), and(isNotNull(messages.approvedAt),eq(messages.policyVersion,SAFETY_POLICY.version))),
         input.before ? lt(messages.sequence, input.before) : undefined,
       )).orderBy(desc(messages.sequence)).limit(input.limit + 1);
-      const items = rows.slice(0, input.limit).reverse().map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
+      const items = rows.slice(0, input.limit).reverse().map(({ review,bodyHash,payloadHash,reviewDecision,runStatus,...row }) => {
+        if (!reviewDecision) return { ...row,answer: undefined,createdAt: row.createdAt.toISOString() };
+        try {
+          const canonical = serializeApprovedPayload(review);
+          if (reviewDecision !== "ALLOW" || runStatus !== "COMPLETED" || canonical.bodyHash !== bodyHash || canonical.payloadHash !== payloadHash ||
+            row.parts.length !== 1 || canonical.payload.markdown !== row.parts[0].text) throw new Error("Invalid saved answer");
+          return { ...row,answer: presentAnswer(canonical.payload),createdAt: row.createdAt.toISOString() };
+        } catch { throw new ConversationError("UNAVAILABLE"); }
+      });
       return { conversation, items, nextBefore: rows.length > input.limit ? items[0].sequence : null };
     },
   };

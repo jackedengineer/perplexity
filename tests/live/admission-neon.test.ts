@@ -90,3 +90,27 @@ it("terminal replay survives configuration rotation without changing its origina
   expect(users.map((r)=>r.reservedCredits)).toEqual([5,5]);
   expect(await f.owner.select().from(schema.usageReservations).where(inArray(schema.usageReservations.periodBucketId,users.map((r)=>r.id)))).toHaveLength(1);
 });
+
+it("rename and admission serialize on the conversation without stranding a hold",async()=>{
+  const {createConversationRepository}=await import("@/server/conversations/repository");
+  const {createFinalization}=await import("@/server/runs/finalize");
+  const person=await f.identity();await f.budgets();
+  const repository=createConversationRepository(f.runtime);
+  const [admitted,renamed]=await Promise.allSettled([
+    f.admission.admit(person.subject,person.request),
+    repository.rename(person.subject,person.conversation.id,{title:"Competing metadata update",expectedRevision:0}),
+  ]);
+  expect(admitted.status).toBe("fulfilled");
+  if(admitted.status!=="fulfilled")throw new Error("Admission race failed");
+  if(admitted.value.kind==="ADMITTED"){
+    expect(renamed).toMatchObject({status:"rejected",reason:{code:"RUN_IN_PROGRESS"}});
+    await createFinalization(f.runtime).fail(person.subject,admitted.value.run.id,"PROVIDER_UNAVAILABLE",{attemptVersion:1,revision:1});
+    expect(await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,admitted.value.run.id))).toHaveLength(1);
+  }else{
+    expect(admitted.value).toEqual({kind:"DENIED",code:"CONFLICT"});
+    expect(renamed.status).toBe("fulfilled");
+  }
+  const buckets=await f.owner.select().from(schema.usageBuckets).where(eq(schema.usageBuckets.userId,person.profile.id));
+  expect(buckets.map(row=>row.reservedCredits)).toEqual([0,0]);
+  expect(buckets.map(row=>row.reservedProviderMicroUsd)).toEqual([0n,0n]);
+});

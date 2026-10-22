@@ -1,6 +1,6 @@
 # Perplex
 
-A web-research application in progress. Next.js, Neon/Drizzle, Google sign-in, private conversations, budgeted admission, input safety, bounded retrieval and internally guarded answer persistence are implemented. T11 connects the public research flow; guest allowances and billing follow on the [backlog](tasks/todo.md).
+A web-research application in progress. Next.js, Neon/Drizzle, Google sign-in, private conversations, budgeted admission, input safety, bounded retrieval, guarded answer persistence, and signed-in browser submission/citations are implemented. Intent planning, contextual follow-ups, guest allowances and billing follow on the [backlog](tasks/todo.md).
 
 ## Run locally
 
@@ -36,6 +36,7 @@ Avoid running dev and build simultaneously in the same checkout; Next.js regener
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Web OAuth client credentials |
 | `RUN_HMAC_ACTIVE_KEY_ID` | Active admission fingerprint key ID, for example `dev-v1` |
 | `RUN_HMAC_KEYS_JSON` | JSON object mapping key IDs to independent 32-byte lowercase hex secrets; retain historical keys |
+| `RUN_OPERATOR_BUDGET_KEY` | Optional server deployment spend namespace; defaults to `research`, requires privileged bucket provisioning |
 | `OPENROUTER_API_KEY` | Server-only answer/classifier API key; no live key or default |
 | `MODEL_SAFETY` | Explicit evaluated classifier model ID; never a browser model selection |
 | `SAFETY_OPENROUTER_PROVIDER` | Explicit provider slug supporting the model, strict output, privacy and price controls |
@@ -78,36 +79,38 @@ Auth responses have `Cache-Control: no-store`, request IDs and `Server-Timing`. 
 
 The protected `/workspace`, `/library`, and `/search/:id` screens share the same database-backed identity. Every repository query scopes by the verified auth subject through an application UUID profile. Foreign and missing conversation IDs return the same unavailable response. Create retries are owner-idempotent, renames require the current revision, lists/history are bounded, and assistant drafts are excluded from history.
 
-The HTTP contract and inspected UI reference coverage are in [private-conversations.md](docs/private-conversations.md). Titles are metadata; there is no message-submission or AI endpoint yet. The runtime cannot insert unreviewed message drafts. T08–T10 provide internal approval and atomic settlement; T11 must connect the guarded public execution/delivery path.
+The HTTP contract and inspected UI reference coverage are in [private-conversations.md](docs/private-conversations.md). The workspace now accepts questions through `/api/chat`. Original questions remain in memory until input approval; only accepted text may replace the generic “New search” title. The runtime cannot insert unreviewed message drafts. Canonical responses appear after output approval and atomic settlement.
 
 ## Research boundary contracts
 
 T02 defines strict submission/planner/evidence/progress schemas, fixed public errors and versioned safety decisions. Unknown or unavailable verdicts fail closed; a 32-case synthetic seed set distinguishes harmful requests from benign near-misses. [Contract details and verification](docs/boundary-contracts.md) explain the seed set and contract boundaries.
 
-T05 adds the internal `admitRequest` service: verified session → bounded JSON body → owner lock and intent check → attempt counters → atomic four-bucket reservation/run/revision update. HMAC retries use the original versioned snapshot and never reserve twice. Customer answer credits and integer micro-USD provider exposure are independent. Budgets must be provisioned by a privileged process; login never creates grants. The [admission contract and evidence](docs/run-admission.md) describe configuration, denial/replay behavior and the remaining settlement/recovery work. HMAC environment settings are lazy and optional while the public submit path is disabled; missing settings fail closed if the internal service is invoked.
+T05 adds the internal `admitRequest` service: verified session → bounded JSON body → owner lock and intent check → attempt counters → atomic four-bucket reservation/run/revision update. HMAC retries use the original versioned snapshot and never reserve twice. Customer answer credits and integer micro-USD provider exposure are independent. Budgets must be provisioned by a privileged process; login never creates grants. The [admission contract and evidence](docs/run-admission.md) describe configuration, denial/replay behavior and the remaining settlement/recovery work. HMAC environment settings are validated lazily; missing settings fail closed before public admission.
 
-T06 adds `checkAdmittedInput`: verified session → owned intent/HMAC check → one input-check claim → validated canonical context → local credential/abuse checks → isolated classifier → conditional atomic review/question commit. Denials retain metadata and fixed safe responses. Missing model configuration returns safe unavailability. The [input safety contract](docs/input-safety.md) records strict transport controls, RLS, timeouts, context limits and remaining quality evaluation. Long/stale histories fail closed until safe context selection/revalidation is implemented. No public submit route is connected yet.
+T06 adds `checkAdmittedInput`: verified session → owned intent/HMAC check → one input-check claim → validated canonical context → local credential/abuse checks → isolated classifier → conditional atomic review/question commit. Denials retain metadata and fixed safe responses. Missing model configuration returns safe unavailability. The [input safety contract](docs/input-safety.md) records strict transport controls, RLS, timeouts, context limits and remaining quality evaluation. Long/stale histories fail closed until safe context selection/revalidation is implemented. T11 connects this gate before retrieval or drafting.
 
-T07 adds `retrieveAdmittedEvidence`: verified session → one canonical approved query → outbound query guard → one bounded Tavily search → evidence inspection → fenced atomic source/passage persistence. `loadPrivateEvidence` authorizes private drafting reads independently of provider configuration. The [retrieval contract](docs/retrieval.md) records limits, retention, cost assumptions and verification. No source metadata is publicly released; approved source rendering belongs to T11.
+T07 adds `retrieveAdmittedEvidence`: verified session → one canonical approved query → outbound query guard → one bounded Tavily search → evidence inspection → fenced atomic source/passage persistence. `loadPrivateEvidence` authorizes private drafting reads independently of provider configuration. The [retrieval contract](docs/retrieval.md) records limits, retention, cost assumptions and verification. Raw retrieval stays private; T11 releases only the approved cited source registry.
 
 T08–T10 add `completeAdmittedAnswer`: live session → one generation claim → bounded private AI SDK/OpenRouter draft → deterministic citation/Markdown checks → semantic output guard → conditional atomic commit. The transaction persists the canonical response, assistant text, same-run citations, terminal state and idempotent usage receipt together. It returns IDs only after commit; provider reasoning and rejected drafts never enter history. Unknown provider costs retain the remaining monetary hold rather than becoming zero. Current-policy checks also hide stale assistant history.
 
-See [guarded answers](docs/guarded-answers.md) for stage caps, immutable approval, cancellation/fencing, restricted-role verification and recovery limits. Citations establish source membership; factual support remains `NOT_CHECKED`. AI SDK 7 and its matching OpenRouter adapter run only on the server. The browser still uses the existing history surface; `/api/chat` and interactive citation rendering are T11.
+See [guarded answers](docs/guarded-answers.md) for stage caps, immutable approval, cancellation/fencing, restricted-role verification and recovery limits. Citations establish source membership; factual support remains `NOT_CHECKED`. AI SDK 7 and its matching OpenRouter adapter run only on the server. T11 connects `/api/chat`, fixed progress states, approved Markdown/citations and canonical reload. The browser sends only one newest-question intent through the installed AI SDK transport. Reading saved history defers the active chat SDK, keeping the existing JavaScript budget intact. See [public search verification](docs/public-search.md) for HTTP/recovery behavior, reference comparisons, mobile source dialogs and limits.
 
 ## Verification
 
 ```sh
-pnpm check                  # lint, generated route types, strict TS, 320 tests
+pnpm check                  # lint, generated route types, strict TS, 363 tests
 pnpm build                  # production build; no credentials needed to build
 pnpm exec playwright install chromium
 pnpm test:e2e               # 8 public desktop/mobile checks; starts the built app
 pnpm test:e2e:neon          # 6 OPT-IN live development DB browser checks
-pnpm test:admission:neon    # 6 OPT-IN live development DB races/rollback checks
+pnpm test:admission:neon    # 7 OPT-IN live development DB races/rollback checks
 pnpm test:input:neon        # 6 OPT-IN live DB gate/RLS checks; classifier is a test double
 pnpm test:retrieval:neon    # 7 OPT-IN live DB retrieval/ownership/RLS checks; providers mocked
+pnpm test:search:neon       # 16 OPT-IN guarded HTTP/UI checks, real Neon, provider test doubles
 pnpm test:completion:neon   # 7 OPT-IN live DB completion/RLS/concurrency checks; providers mocked
 pnpm db:verify              # read-only TLS/schema verification; 21 tables, narrow grants
 pnpm perf:check             # production server must already be running
+pnpm perf:profile           # OPT-IN development Neon, desktop/mobile CDP traces and API timings
 pnpm perf:check --private   # OPT-IN synthetic identity; 5 samples/private route
 ```
 
@@ -115,10 +118,12 @@ Stop `pnpm dev` before browser checks so they exercise the production build. Pub
 
 CI installs from the frozen lockfile with dependency scripts disabled, then runs lint/types/tests, production dependency audit, build and browser checks. Actions are pinned to verified commit SHAs. The GitHub remote is `jackedengineer/perplexity`; pull requests trigger the quality workflow. Live Neon tests remain explicitly opt-in and are excluded from default CI. Branch protection and deployed-preview verification remain outstanding.
 
-See [the foundation verification record](docs/foundation-verification.md), [private conversation verification](docs/private-conversations-verification.md), [admission verification](docs/run-admission.md), [input gate verification](docs/input-safety.md), [retrieval verification](docs/retrieval.md) and [guarded answer verification](docs/guarded-answers.md) for evidence and limits. The complete app is not ready for public launch: public guarded delivery, live provider/model evaluation, cost reconciliation, deletion/export, CSP/deployment hardening and operational recovery remain planned work.
+See [the foundation verification record](docs/foundation-verification.md), [private conversation verification](docs/private-conversations-verification.md), [admission verification](docs/run-admission.md), [input gate verification](docs/input-safety.md), [retrieval verification](docs/retrieval.md) and [guarded answer verification](docs/guarded-answers.md) for evidence and limits. The complete app is not ready for public launch: live provider/model evaluation, cost reconciliation, deletion/export, CSP/deployment hardening and operational recovery remain planned work.
 
 ## Working agreements
 
-Use a feature branch and focused commits. Keep hand-written changes near 400–700 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. T05–T07 are merged into main. T08–T10 are on `codex/guarded-answer-persistence`.
+Use a feature branch and focused commits. Keep hand-written changes near 400–700 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. T05–T10 are merged into main. T11 and its review fixes are tracked in [PR #5](https://github.com/jackedengineer/perplexity/pull/5).
 
-The [system design](docs/system-design.md), [session contract](docs/authentication.md) and [implementation plan](tasks/plan.md) describe the larger product. T08 uses the Vercel AI SDK for answer generation; T06/T07 retain small fixed-protocol guard/search adapters. No paid provider smoke test has been run.
+The [system design](docs/system-design.md), [session contract](docs/authentication.md) and [implementation plan](tasks/plan.md) describe the larger product. T08 uses the Vercel AI SDK for answer generation; T06/T07 retain small fixed-protocol guard/search adapters. No paid provider smoke test has been run. Live answers require explicit provider configuration and provisioned development allowances; missing settings fail safely.
+
+The latest [interface/performance/launch review](docs/launch-review.md) records PR review fixes, lab measurements, streaming behavior and the remaining deployment requirements. Public launch remains gated on actual provider evaluation, production OAuth/database configuration and operational release gates.

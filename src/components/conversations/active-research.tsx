@@ -1,0 +1,11 @@
+"use client";
+import { useEffect,useRef } from "react";
+import type { Conversation,HistoryPage } from "@/server/conversations/views";
+import type { PendingQuestion } from "./question-intent";
+import { useResearch } from "./use-research";
+import { ThreadView } from "./thread-view";
+export default function ActiveResearch({conversation,initial,question}: {conversation:Conversation;initial:HistoryPage;question:PendingQuestion}) {
+  const research=useResearch(conversation.id,conversation.revision),{submit}=research,launched=useRef(false);
+  useEffect(()=>{let disposed=false;queueMicrotask(()=>{if(!disposed&&!launched.current){launched.current=true;void submit(question.text,question.clientRequestId);}});return()=>{disposed=true;};},[question,submit]);
+  return <ThreadView conversation={conversation} initial={initial} research={research} submit={text=>void submit(text)}/>;
+}

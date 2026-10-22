@@ -17,7 +17,7 @@ const denied = (code: PublicErrorCode): AdmissionResult => ({ kind: "DENIED", co
 const isActive = (status: Run["status"]) => ACTIVE_RUN_STATUSES.some((value)=>value === status);
 
 // Internal API: authSubject comes only from the verified application session, never from a body.
-export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, policyInput: unknown = FREE_ADMISSION_POLICY) {
+export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, policyInput: unknown = FREE_ADMISSION_POLICY,assertNewRunAvailable?:()=>void) {
   const config = parseAdmissionConfig(configInput);
   const parsedPolicy = admissionPolicySchema.safeParse(policyInput);
   if (!parsedPolicy.success) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
@@ -40,6 +40,10 @@ export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, 
           if (!matchesFingerprint(request,existing,{ hmac: existing.payloadHmac, keyId: existing.hmacKeyId, version: existing.payloadVersion },config)) return denied("IDEMPOTENCY_MISMATCH");
           return { kind: isActive(existing.status) ? "RUN_IN_PROGRESS" : "RUN_ALREADY_FINISHED", run: reference(existing) };
         }
+        // Synchronous configuration checks only; replay/recovery never needs a provider.
+        // Keep this before counters/reservations and never perform network I/O under the lock.
+        try { assertNewRunAvailable?.(); }
+        catch(error) { if(error instanceof AdmissionError)return denied(error.code);throw error; }
         const [{ now }] = await tx.select({ now: sql<string>`clock_timestamp()::text`.mapWith((value) => new Date(value)) }).from(appUsers).where(eq(appUsers.id,owner.id));
         if (!await consumeAttempts(tx,owner.id,now,policy)) return denied("RATE_LIMITED");
         // Expected denials roll back this savepoint, retaining only the consumed attempt counters.
