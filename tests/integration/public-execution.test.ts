@@ -59,3 +59,10 @@ it("revoked sessions cannot recover an already committed answer",async()=>{
   expect((await run(providers())).result.kind).toBe("COMPLETED");await db.delete(schema.session).where(eq(schema.session.id,identity.sessionId));
   await expect(createAnswerDelivery(db).load(identity,person.runId)).rejects.toMatchObject({code:"NOT_FOUND"});
 });
+it("a stopped admitted request becomes CANCELLED and never starts provider work",async()=>{
+  const controller=new AbortController();controller.abort();const p=providers();
+  expect((await run(p,controller.signal)).result.kind).toBe("DENIED");
+  expect((await db.select().from(schema.runs))[0].status).toBe("CANCELLED");
+  expect(p.search.search).not.toHaveBeenCalled();expect(p.answer.generate).not.toHaveBeenCalled();
+  expect((await db.select().from(schema.runSettlements))[0].creditsCharged).toBe(0);
+});

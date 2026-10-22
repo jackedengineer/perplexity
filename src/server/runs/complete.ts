@@ -60,13 +60,13 @@ export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { ans
       onStage?.("CHECKING_ANSWER");
       const result = await createReleaseGate(recordSafetyProvider(calls,"OUTPUT_SAFETY",dependencies.output)).approve({ runId,attemptVersion: loaded.run.attemptVersion,
         revision: loaded.run.admittedRevision,kind: draft.kind,question: loaded.question,markdown: draft.text,evidence },{ signal,deadlineAt: loaded.run.deadlineAt });
-      if (result.kind === "DENIED") return finalization.fail(subject,runId,result.code,ownedAttempt);
+      if (result.kind === "DENIED") return finalization.fail(subject,runId,result.code,ownedAttempt,signal.aborted);
       onStage?.("SAVING_ANSWER");
       return await finalization.commit(subject,sessionId,result.response,signal);
     } catch (error) {
       const code = error instanceof AdmissionError ? error.code : "PROVIDER_UNAVAILABLE";
       if (!ownedAttempt || code === "NOT_FOUND" || code === "RUN_IN_PROGRESS") return { kind: "DENIED",code };
-      return finalization.fail(subject,runId,code,ownedAttempt);
+      return finalization.fail(subject,runId,code,ownedAttempt,signal.aborted);
     }
   } };
 }
