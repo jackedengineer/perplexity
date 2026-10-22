@@ -89,6 +89,11 @@ it("counts malformed and unauthenticated requests before body parsing or backend
  expect(f.dependencies.consumeRequest).toHaveBeenLastCalledWith(null);
  expect(f.backend.admit).not.toHaveBeenCalled();
 });
+it('charges cross-origin denials to anonymous abuse allocation rather than a signed-in victim',async()=>{
+ const f=fixture();const response=await f.http.post(f.request(f.question,{origin:'https://untrusted.example'}));
+ expect(response.status).toBe(403);expect(f.dependencies.consumeRequest).toHaveBeenCalledWith(null);
+ expect(f.dependencies.consumeRequest).not.toHaveBeenCalledWith(subject.user.id);expect(f.backend.admit).not.toHaveBeenCalled();
+});
 it("rate denial and counter infrastructure failure cannot reach admission",async()=>{
  const f=fixture();f.dependencies.consumeRequest.mockRejectedValue(new AdmissionError("RATE_LIMITED"));
  const limited=await f.http.post(f.request());expect(limited.status).toBe(429);expect((await limited.json()).error.code).toBe("RATE_LIMITED");

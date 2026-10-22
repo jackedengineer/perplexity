@@ -1,7 +1,7 @@
 import { createUIMessageStream,createUIMessageStreamResponse } from "ai";
 import type { SubmitQuery } from "@/server/contracts/chat";
 import { createPublicError,type PublicErrorCode } from "@/server/contracts/errors";
-import { readSubmission } from "@/server/runs/input";
+import { isTrustedSubmissionOrigin,readSubmission } from "@/server/runs/input";
 import { AdmissionError } from "@/server/runs/errors";
 import type { AdmissionResult } from "@/server/runs/admit";
 import type { PublicStage } from "@/server/contracts/progress";
@@ -34,9 +34,10 @@ export function createChatHttp(dependencies: Dependencies) {
       const requestId = crypto.randomUUID(),started = performance.now();
       try {
         const identity = await dependencies.identity(request);
-        await dependencies.consumeRequest(identity?.user.id??null);
+        const origin=dependencies.origin();
+        await dependencies.consumeRequest(isTrustedSubmissionOrigin(request,origin)?identity?.user.id??null:null);
         if (!identity) throw new AdmissionError("UNAUTHENTICATED");
-        const input = await readSubmission(request,dependencies.origin()),backend = dependencies.backend();
+        const input = await readSubmission(request,origin),backend = dependencies.backend();
         const admission = await backend.admit(identity.user.id,input);
         if (admission.kind === "DENIED") {
           dependencies.log({event:'chat.admission',requestId,outcome:admission.code,category:categories[admission.code],durationMs:Math.round(performance.now()-started)});
