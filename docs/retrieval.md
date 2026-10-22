@@ -103,3 +103,95 @@ held reservations. Never zero budgets or relax message RLS to recover a run.
 [Tavily Search API](https://docs.tavily.com/documentation/api-reference/endpoint/search)
 defines the basic search cost, explicit request controls and usage response.
 The implementation uses the documented HTTPS protocol without adding an SDK.
+
+## State and retry contract
+
+| Condition | Result |
+| --- | --- |
+| Missing verified session | UNAUTHENTICATED before DB/provider construction |
+| Missing model/provider/search settings | CONFIGURATION_UNAVAILABLE; no paid work |
+| Foreign/missing run | NOT_FOUND without source metadata |
+| Run still checking input | Existing in-progress status; no search |
+| PLANNING with valid approved first question | Insert STARTED receipt and claim SEARCHING |
+| Duplicate claim | Existing active/terminal status; never a second search |
+| Outbound-query denial/unavailability | Fixed denial; zero Tavily/evidence calls |
+| Valid search response | Recheck fence, transition PREPARING_EVIDENCE |
+| No usable sources | Persist NO_EVIDENCE receipt; no evidence model call |
+| Evidence denial/unavailability | Fixed denial, metadata only; no stored sources |
+| Approved bounded package | Atomic READY receipt, sources, passages and GENERATING |
+| Late fence/revision/ownership change | No package commit or automatic retry |
+| Provider timeout/unknown response | Unavailable; held usage remains unknown |
+| Expired record/run deadline on private read | No evidence returned for drafting |
+
+Only the session-checked service in `src/server/search/service.ts` is an
+application entry point. The injectable factory supports isolated tests; its
+subject and dependencies are trusted server arguments, never browser fields.
+The read entry point needs no live provider configuration, since it loads an
+already inspected package. It still checks session, ownership, state, attempt,
+revision, policy, record expiry and the original run deadline.
+
+A source is identified by a stable run-scoped S1–S5 key. PostgreSQL uniqueness
+rejects duplicate source keys/URLs within a run. A composite FK rejects a passage
+linked to a source from another run. PostgreSQL recomputes each SHA-256 digest
+from UTF-8 passage text, independently of TypeScript validation.
+
+The RLS policies authorize source/passage INSERT only under a READY retrieval
+receipt with both guard decisions ALLOW. The runtime can update only fixed
+retrieval outcome/verdict/usage columns. It cannot update/delete excerpts,
+extend evidence expiry or modify policy/attempt/model metadata. As with T06,
+this shared role is a trusted application credential, not protection against
+arbitrary SQL execution with a compromised runtime credential. Application
+ownership checks remain mandatory; raw source tables have no public API.
+
+## Verification — 2026-10-22
+
+- `pnpm check`: lint, strict types and 220 unit/integration cases pass.
+- `pnpm build`: optimized build passes; no new public research/source routes.
+- Frozen synthetic Tavily JSON fixtures verify protocol parsing, generated-answer
+  removal, duplicate/invalid URL handling and exact selected text. Fixtures model
+  the documented response shape; they are not recordings of live relevance.
+- Transport regressions cover invalid/overridden inputs, non-JSON/oversized/error
+  bodies, exhausted deadlines, in-flight cancellation, late responses and
+  non-cooperative requests/streams. No automatic retry is used.
+- Gate regressions cover stale/malformed verdicts, unsafe titles/URLs/content,
+  complete-result inspection before truncation, metadata-inclusive byte limits,
+  surrogate-pair preservation and distinct evidence-role system instructions.
+- Isolated Postgres tests cover canonical-query provenance, prior approval,
+  version/revision checks, budget allocation, one-time claims, metadata-only
+  denial, no-evidence behavior, hash/FK constraints, restricted RLS writes,
+  whole-package rollback and late attempt/revision/deadline/cancellation changes.
+- `pnpm test:retrieval:neon`: seven restricted-role tests pass, including four
+  simultaneous claims, same-run persistence, cross-owner reads, query/evidence
+  rejection, immutable excerpts and late attempt fencing. Providers are doubles.
+- `pnpm test:admission:neon` / `pnpm test:input:neon`: six cases each pass after
+  the additive migration and shared lock-helper extraction.
+- `pnpm db:migrate` / `pnpm db:verify`: migration 0005 applied to dedicated
+  development Neon; 17 tables, verified TLS and four evidence RLS policies.
+  Narrow runtime privileges pass. `pnpm db:generate` reports no schema drift.
+- `pnpm test:e2e` / `pnpm test:e2e:neon`: eight public and four authenticated
+  desktop/mobile checks pass on the production build after the migration.
+- Public/private performance scripts pass: measured maximum LCP 336 ms,
+  CLS zero, with unchanged route JavaScript transfer sizes. This is a local
+  synthetic workload, not a deployed latency guarantee.
+- Configured-secret scan: zero matches across 164 tracked/candidate files and
+  524 history objects before the final commit. Synthetic admission identities
+  and isolated operator-budget cleanup checks both report zero remaining rows.
+- The production dependency audit passes the high-severity gate. No dependency
+  was added; the previously documented moderate advisory remains.
+
+## Remaining release gates
+
+The browser regression suite exercises existing conversation/session UI, not a
+live retrieval interface. T11 will compose the guarded pipeline and verify its
+actual HTTP bytes. There is no test-only retrieval endpoint or guard bypass.
+
+Before any live rollout, evaluate actual Tavily relevance, Hindi/multilingual
+queries, source diversity/freshness and the configured evidence classifier's
+false-positive/negative rates. Run a spending-capped smoke test with the actual
+privacy/spend controls assigned to the application credentials. None of these
+quality claims can be inferred from provider doubles.
+
+T08 consumes the private package; T09 must validate final source metadata,
+citations, links and answer safety; T10 must account for all provider attempts
+and settle usage. T13 adds intent-preserving planning and safe follow-up context.
+No public launch or production deployment is certified by this slice.

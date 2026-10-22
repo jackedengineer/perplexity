@@ -39,6 +39,7 @@ Avoid running dev and build simultaneously in the same checkout; Next.js regener
 | `OPENROUTER_API_KEY` | Server-only classifier API key; no default or live key is configured by T06 |
 | `MODEL_SAFETY` | Explicit evaluated classifier model ID; never a browser model selection |
 | `SAFETY_OPENROUTER_PROVIDER` | Explicit provider slug supporting the model, strict output, privacy and price controls |
+| `TAVILY_API_KEY` | Server-only search key; no live search calls or paid activation in T07 |
 
 Neon URLs use `sslmode=verify-full`. Certificate verification is enabled; do not use `rejectUnauthorized: false`. The runtime pool has a maximum of three connections, a five-second connection timeout and ten-second statement timeout.
 
@@ -83,18 +84,21 @@ T02 defines strict submission/planner/evidence/progress schemas, fixed public er
 
 T05 adds the internal `admitRequest` service: verified session → bounded JSON body → owner lock and intent check → attempt counters → atomic four-bucket reservation/run/revision update. HMAC retries use the original versioned snapshot and never reserve twice. Customer answer credits and integer micro-USD provider exposure are independent. Budgets must be provisioned by a privileged process; login never creates grants. The [admission contract and evidence](docs/run-admission.md) describe configuration, denial/replay behavior and the remaining settlement/recovery work. HMAC environment settings are lazy and optional while the public submit path is disabled; missing settings fail closed if the internal service is invoked.
 
-T06 adds `checkAdmittedInput`: verified session → owned intent/HMAC check → one input-check claim → validated canonical context → local credential/abuse checks → isolated classifier → conditional atomic review/question commit. Denials retain metadata and fixed safe responses. Missing model configuration returns safe unavailability. The [input safety contract](docs/input-safety.md) records strict transport controls, RLS, timeouts, context limits and remaining quality evaluation. Long/stale histories fail closed until safe context selection/revalidation is implemented. T07 bounded Tavily retrieval is next; no public submit route is connected yet.
+T06 adds `checkAdmittedInput`: verified session → owned intent/HMAC check → one input-check claim → validated canonical context → local credential/abuse checks → isolated classifier → conditional atomic review/question commit. Denials retain metadata and fixed safe responses. Missing model configuration returns safe unavailability. The [input safety contract](docs/input-safety.md) records strict transport controls, RLS, timeouts, context limits and remaining quality evaluation. Long/stale histories fail closed until safe context selection/revalidation is implemented. No public submit route is connected yet.
+
+T07 adds `retrieveAdmittedEvidence`: verified session → one canonical approved query → outbound query guard → one bounded Tavily search → evidence inspection → fenced atomic source/passage persistence. `loadPrivateEvidence` authorizes private drafting reads independently of provider configuration. The [retrieval contract](docs/retrieval.md) records limits, retention, cost assumptions and verification. No source metadata is publicly released; T08 private drafting is next.
 
 ## Verification
 
 ```sh
-pnpm check                  # lint, generated route types, strict TS, 147 tests
+pnpm check                  # lint, generated route types, strict TS, 220 tests
 pnpm build                  # production build; no credentials needed to build
 pnpm exec playwright install chromium
 pnpm test:e2e               # 8 public desktop/mobile checks; starts the built app
 pnpm test:e2e:neon          # 4 OPT-IN live development DB checks
 pnpm test:admission:neon    # 6 OPT-IN live development DB races/rollback checks
 pnpm test:input:neon        # 6 OPT-IN live DB gate/RLS checks; classifier is a test double
+pnpm test:retrieval:neon    # 7 OPT-IN live DB retrieval/ownership/RLS checks; providers mocked
 pnpm db:verify              # read-only TLS/schema verification for both URLs
 pnpm perf:check             # production server must already be running
 pnpm perf:check --private   # OPT-IN synthetic identity; 5 samples/private route
@@ -104,10 +108,10 @@ Stop `pnpm dev` before browser checks so they exercise the production build. Pub
 
 CI installs from the frozen lockfile with dependency scripts disabled, then runs lint/types/tests, production dependency audit, build and browser checks. Actions are pinned to verified commit SHAs. The GitHub remote is `jackedengineer/perplexity`; pull requests trigger the quality workflow. Live Neon tests remain explicitly opt-in and are excluded from default CI. Branch protection and deployed-preview verification remain outstanding.
 
-See [the foundation verification record](docs/foundation-verification.md), [private conversation verification](docs/private-conversations-verification.md), [admission verification](docs/run-admission.md) and [input gate verification](docs/input-safety.md) for evidence and limits. The complete app is not ready for public launch: live model evaluation, retrieval/output gates, settlement, deletion/export, CSP/deployment hardening and operational recovery remain planned work.
+See [the foundation verification record](docs/foundation-verification.md), [private conversation verification](docs/private-conversations-verification.md), [admission verification](docs/run-admission.md), [input gate verification](docs/input-safety.md) and [retrieval verification](docs/retrieval.md) for evidence and limits. The complete app is not ready for public launch: live provider/model evaluation, output gates, settlement, deletion/export, CSP/deployment hardening and operational recovery remain planned work.
 
 ## Working agreements
 
-Use a feature branch and focused commits. Keep hand-written changes near 400–700 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. T06 is on `codex/input-safety`, based on T05's `feat/run-admission`.
+Use a feature branch and focused commits. Keep hand-written changes near 400–700 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. T05 and T06 are merged into main. T07 is on `codex/bounded-retrieval`.
 
-The [system design](docs/system-design.md), [session contract](docs/authentication.md) and [implementation plan](tasks/plan.md) describe the larger product. SDK/OpenRouter/Tavily dependencies will be introduced when their guarded pipeline slices are built.
+The [system design](docs/system-design.md), [session contract](docs/authentication.md) and [implementation plan](tasks/plan.md) describe the larger product. The Vercel AI SDK will be introduced with T08 answer generation; T06/T07 use small fixed-protocol provider adapters without new dependencies.

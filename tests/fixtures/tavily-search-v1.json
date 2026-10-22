@@ -1,0 +1,14 @@
+{
+  "fixture_origin": "Synthetic frozen response based on the documented Tavily Search JSON envelope; no live relevance claim.",
+  "query": "Why do rainbows form?",
+  "answer": "UNTRUSTED GENERATED ANSWER MUST BE DISCARDED",
+  "images": [],
+  "results": [
+    { "title": "Rainbow science", "url": "https://example.org/rainbows?utm_source=fixture", "content": "Water refracts sunlight.", "score": 0.9, "raw_content": null, "published_date": "Thu, 22 Oct 2026 00:00:00 GMT" },
+    { "title": "Duplicate science", "url": "https://example.org/rainbows#section", "content": "A duplicate result must not create a new source.", "score": 0.8, "raw_content": null },
+    { "title": "Malformed source", "url": "javascript:alert(1)", "content": "This result must be excluded.", "score": 0.7, "raw_content": null }
+  ],
+  "response_time": "0.25",
+  "usage": { "credits": 1 },
+  "request_id": "synthetic-request-id"
+}

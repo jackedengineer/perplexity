@@ -68,3 +68,24 @@ it("requires a usable key and never calls the provider for an expired deadline",
   await expect(createTavilySearch("test",request).search("hello",{ ...options(),deadlineAt: new Date(0) })).rejects.toThrow("Retrieval unavailable");
   expect(request).not.toHaveBeenCalled();
 });
+it("validates a frozen protocol response before conservative deduplication and selection",async()=>{
+  const { default: frozen } = await import("../fixtures/tavily-search-v1.json");
+  const { buildEvidence } = await import("@/server/search/evidence");
+  const { randomUUID } = await import("node:crypto");
+  const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json(frozen));
+  const response = await createTavilySearch("test",request).search("Why do rainbows form?",options());
+  const evidence = buildEvidence(randomUUID(),response.results,new Date());
+  expect(response.results).toHaveLength(3); expect(evidence.sources).toHaveLength(1);
+  expect(evidence.sources[0].url).toBe("https://example.org/rainbows");
+  expect(evidence.passages[0].text).toBe("Water refracts sunlight.");
+  expect(JSON.stringify([response,evidence])).not.toContain("UNTRUSTED GENERATED ANSWER");
+});
+it("cancels a response that arrives after its caller was already aborted",async()=>{
+  const controller = new AbortController(); let release!: (response: Response)=>void; let cancelled = false;
+  const request = vi.fn<typeof fetch>(()=>new Promise(resolve=>{ release = resolve; }));
+  const pending = createTavilySearch("test",request).search("hello",{ ...options(),signal: controller.signal });
+  await vi.waitFor(()=>expect(release).toBeTypeOf("function")); controller.abort();
+  await expect(pending).rejects.toThrow("Retrieval unavailable");
+  release(new Response(new ReadableStream({ cancel() { cancelled = true; } }),{ headers: { "content-type": "application/json" } }));
+  await vi.waitFor(()=>expect(cancelled).toBe(true));
+});

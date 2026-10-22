@@ -26,11 +26,12 @@ async function checkpoint(tx: AdmissionTransaction,subject: string,runId: string
   if (signal.aborted || run.deadlineAt <= now) throw new RetrievalError();
   return locked;
 }
-export function createRetrieval(db: AdmissionDatabase,dependencies: Dependencies) {
-  const { search,queryGate,evidenceGate } = dependencies;
+export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencies) {
   return {
     async retrieve(subject: string,runId: string,signal: AbortSignal): Promise<RetrievalResult> {
       if (!z.uuid().safeParse(runId).success) return denied("NOT_FOUND");
+      if (!dependencies) return denied("CONFIGURATION_UNAVAILABLE");
+      const { search,queryGate,evidenceGate } = dependencies;
       let claim: Fence | undefined,stage = "SEARCHING";
       let queryVerdict: string | null = null,evidenceVerdict: string | null = null,searchCredits: number | null = null;
       try {
@@ -111,7 +112,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies: Dependencies
       try { return await db.transaction(async(tx)=>{
         const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
         const [record] = await tx.select().from(runRetrievals).where(eq(runRetrievals.runId,runId));
-        if (!record || !["READY","NO_EVIDENCE"].includes(record.status) || record.expiresAt <= now || run.status !== "GENERATING" ||
+        if (!record || !["READY","NO_EVIDENCE"].includes(record.status) || record.expiresAt <= now || run.deadlineAt <= now || run.status !== "GENERATING" ||
           record.attemptVersion !== run.attemptVersion || record.policyVersion !== SAFETY_POLICY.version || run.policyVersion !== record.policyVersion || conversation.revision !== run.admittedRevision) return null;
         const sources = await tx.select().from(runSources).where(eq(runSources.runId,runId)).orderBy(runSources.rank).limit(6);
         const passages = await tx.select().from(sourcePassages).where(eq(sourcePassages.runId,runId)).limit(6);
