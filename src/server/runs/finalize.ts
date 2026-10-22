@@ -87,7 +87,7 @@ export async function settleFailureLocked(tx: AdmissionTransaction,run: typeof r
   if(!review)await tx.insert(outputReviews).values({runId:run.id,conversationId:run.conversationId,attemptVersion:run.attemptVersion,
     decision:code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCK" : "UNAVAILABLE",policyVersion:SAFETY_POLICY.version,createdAt:now});
   await settleRun(tx,run,0,now);
-  const status=!active ? run.status : cancelled || run.status === "CANCELLED" ? "CANCELLED" : run.deadlineAt <= now ? "TIMED_OUT" : code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCKED" : "FAILED";
+  const status=!active ? run.status : run.deadlineAt <= now ? "TIMED_OUT" : cancelled ? "CANCELLED" : code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCKED" : "FAILED";
   await tx.update(runs).set({status,updatedAt:now,attemptVersion:run.attemptVersion+(active?1:0)})
     .where(and(eq(runs.id,run.id),eq(runs.status,run.status),eq(runs.attemptVersion,run.attemptVersion)));
 }

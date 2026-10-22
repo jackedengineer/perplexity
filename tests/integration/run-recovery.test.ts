@@ -89,3 +89,17 @@ it('repairing a terminal missing receipt preserves its original refusal state',a
  await db.update(schema.runs).set({status:'BLOCKED'}).where(eq(schema.runs.id,person.runId));
  await createRunRecovery(db).sweep();expect((await db.select().from(schema.runs))[0].status).toBe('BLOCKED');
 });
+it('reload discovery exposes only an owned active run with a live session',async()=>{
+ const service=createRunRecovery(db),identity={user:{id:person.subject},sessionId};
+ expect(await service.activeForConversation(identity,person.conversation.id)).toBe(person.runId);
+ expect(await service.activeForConversation({...identity,user:{id:'foreign'}},person.conversation.id)).toBeUndefined();
+ await db.delete(schema.session).where(eq(schema.session.id,sessionId));
+ expect(await service.activeForConversation(identity,person.conversation.id)).toBeUndefined();
+});
+
+it('an abort at the absolute database deadline is timed out rather than misreported as user cancellation',async()=>{
+ await db.update(schema.runs).set({createdAt:new Date(Date.now()-120000),deadlineAt:new Date(Date.now()-60000)}).where(eq(schema.runs.id,person.runId));
+ await createFinalization(db).fail(person.subject,person.runId,'PROVIDER_UNAVAILABLE',undefined,true);
+ expect((await db.select().from(schema.runs))[0]).toMatchObject({status:'TIMED_OUT',attemptVersion:2});
+ expect(await db.select().from(schema.runSettlements)).toHaveLength(1);
+});

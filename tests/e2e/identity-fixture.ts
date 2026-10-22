@@ -5,7 +5,7 @@ import type { BrowserContext } from "@playwright/test";
 export async function identityFixture(context: BrowserContext, name = "Curious Tester") {
   const url = process.env.DATABASE_URL;
   const secret = process.env.BETTER_AUTH_SECRET;
-  if (!url?.includes("neon.tech") || !secret) throw new Error("Dedicated development Neon credentials required");
+  if (!url || new URL(url).hostname !== "ep-sweet-night-az8bacv2-pooler.c-3.ap-southeast-1.aws.neon.tech" || !secret) throw new Error("Dedicated development Neon credentials required");
   const db = new Pool({ connectionString: url, max: 1 });
   const id = `e2e-${randomUUID()}`;
   const token = randomUUID();

@@ -10,7 +10,7 @@ export function createNeonFixture() {
   // Explicit opt-in and isolated namespaces; never run this suite against production.
   const ownerUrl = new URL(process.env.DATABASE_URL_DIRECT ?? "http://missing");
   const runtimeUrl = new URL(process.env.DATABASE_URL ?? "http://missing");
-  if (process.env.LIVE_NEON_ADMISSION !== "1" || !ownerUrl.hostname.endsWith(".neon.tech") ||
+  if (process.env.LIVE_NEON_ADMISSION !== "1" || ownerUrl.hostname !== "ep-sweet-night-az8bacv2.c-3.ap-southeast-1.aws.neon.tech" ||
       ownerUrl.pathname !== "/perplex" || !ownerUrl.username.endsWith("_owner") || runtimeUrl.username !== "perplex_web" ||
       ownerUrl.searchParams.get("sslmode") !== "verify-full" || runtimeUrl.searchParams.get("sslmode") !== "verify-full" ||
       runtimeUrl.hostname.replace("-pooler", "") !== ownerUrl.hostname || runtimeUrl.pathname !== ownerUrl.pathname) {

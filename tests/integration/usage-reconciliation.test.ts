@@ -62,6 +62,7 @@ it('contradictory late billing after verified release is reported rather than si
  await proof(0n);await reconcile();
  await db.update(schema.providerCalls).set({status:'SUCCEEDED',costMicroUsd:100n,finishedAt:new Date()}).where(eq(schema.providerCalls.id,callId));
  await expect(reconcile()).rejects.toThrow();
+ expect(await createUsageReconciliation(db).sweep()).toEqual({scanned:1,reconciled:0,failed:1});
  expect(await db.select().from(schema.runReconciliations)).toHaveLength(1);
 });
 it('a failed adjustment rolls every bucket change back',async()=>{

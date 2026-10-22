@@ -16,11 +16,11 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
   if(saved&&!initial.items.some(message=>message.id===saved.messageId)){
     const now=saved.createdAt;
     history={...initial,items:[...initial.items,
-      ...(!initial.items.some(message=>message.role==="USER")?[{id:saved.runId,role:"USER" as const,kind:"QUESTION" as const,parts:[{type:"text" as const,text:research.question}],sequence:1,schemaVersion:1 as const,createdAt:now}]:[]),
+      ...(research.question&&!initial.items.some(message=>message.role==="USER")?[{id:saved.runId,role:"USER" as const,kind:"QUESTION" as const,parts:[{type:"text" as const,text:research.question}],sequence:1,schemaVersion:1 as const,createdAt:now}]:[]),
       {id:saved.messageId,role:"ASSISTANT",kind:saved.answer.kind==="CLARIFICATION"?"CLARIFICATION":"ANSWER",parts:[{type:"text",text:saved.text}],sequence:2,schemaVersion:1,createdAt:now,answer:saved.answer}]};
   }
   const hasAnswer=history.items.some(message=>message.role==="ASSISTANT"),hasQuestion=history.items.some(message=>message.role==="USER");
-  return <main id="main" className={`thread-page ${hasAnswer||research.question?"active-thread":""}`}>
+  return <main id="main" className={`thread-page ${hasAnswer||hasQuestion||research.question||research.pending?"active-thread":""}`}>
     <header className="research-topbar answer-topbar"><span className="thread-tab"><ResearchMark/>Answer</span>
       {history.items.some(message=>message.answer?.sources.length)&&<button className="answer-tab-button" aria-pressed={sourcesOpen} onClick={()=>setSourcesOpen(!sourcesOpen)}><Icon name="link" size={16}/>Sources</button>}
       <span className="toolbar-spacer"/><ConversationActions conversation={conversation} renameUnavailable={research.pending}/><span className="private-pill" role="img" aria-label="Private conversation" title="Private conversation"><Icon name="lock" size={13}/><span className="private-label">Private</span></span>
@@ -34,11 +34,11 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
         <button className="research-button" disabled={research.pending} onClick={()=>void research.retry()}>Check same request</button>
         <Link className="research-button" href="/workspace">New search</Link>
       </div></div>}
-      {!history.items.length&&!research.question&&<div className="thread-empty"><Icon name="search" size={24}/><h2>What would you like to explore?</h2><p>Ask a question to search the web and get an answer with sources.</p></div>}
+      {!history.items.length&&!research.question&&!research.pending&&!research.error&&<div className="thread-empty"><Icon name="search" size={24}/><h2>What would you like to explore?</h2><p>Ask a question to search the web and get an answer with sources.</p></div>}
     </section>
     <div className="thread-bottom">
       {research.pending?<QuestionComposer text="" onText={()=>{}} onSubmit={()=>{}} pending onStop={research.stop} placeholder={research.label}/>
-        :hasAnswer||research.question||hasQuestion?<StartQuestion compact/>
+        :hasAnswer||research.question||hasQuestion||research.error?<StartQuestion compact/>
         :<QuestionComposer text={text} onText={setText} onSubmit={()=>void submit(text)} pending={false}/>}
     </div>
   </main>;

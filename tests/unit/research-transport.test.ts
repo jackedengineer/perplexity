@@ -18,3 +18,12 @@ it("keeps recovery metadata and sanitizes unexpected HTTP bodies",async()=>{
   await expect(controller.transport.sendMessages({chatId:randomUUID(),trigger:"submit-message",messageId:undefined,abortSignal:undefined,messages:[]})).rejects.toThrow("Research is temporarily unavailable");
   expect(unauthenticated).toHaveBeenCalledOnce();expect(controller.getRunId()).toBe(runId);
 });
+it('bootstraps recovery without an original prompt and sends an empty durable cancellation',async()=>{
+ const runId=randomUUID(),conversationId=randomUUID();
+ const request=vi.fn<typeof fetch>().mockResolvedValue(Response.json({runId,conversationId,revision:1,state:'UNAVAILABLE',terminalReason:'CANCELLED'}));
+ const controller=createResearchTransport(vi.fn(),request,runId);
+ expect(controller.getIntent()).toBeNull();expect(controller.getRunId()).toBe(runId);
+ expect(await controller.cancel()).toMatchObject({terminalReason:'CANCELLED'});
+ expect(request.mock.calls[0]).toEqual([`/api/runs/${runId}/cancellation`,expect.objectContaining({method:'POST',credentials:'same-origin',cache:'no-store'})]);
+ expect(request.mock.calls[0][1]?.body).toBeUndefined();
+});
