@@ -22,7 +22,8 @@ export function canonicalSourceUrl(value: string): string | null {
   for (const name of [...url.searchParams.keys()]) {
     if (/^utm_/iu.test(name) || ["fbclid","gclid","msclkid"].includes(name.toLowerCase())) url.searchParams.delete(name);
   }
-  return url.toString();
+  const canonical = url.toString();
+  return sourceUrlSchema.safeParse(canonical).success ? canonical : null;
 }
 function excerpt(text: string) {
   // slice by UTF-16 budget without splitting a surrogate pair; retain exact source text.
@@ -52,7 +53,7 @@ export function validateEvidence(value: unknown) {
   const parsed = evidencePackageSchema.safeParse(value);
   if (!parsed.success || parsed.data.sources.length > RETRIEVAL_LIMITS.results ||
     Buffer.byteLength(JSON.stringify(parsed.data),"utf8") > RETRIEVAL_LIMITS.evidenceBytes ||
-    parsed.data.sources.some(s=>canonicalSourceUrl(s.url) !== s.url || !safeEvidenceText(s.title)) ||
+    parsed.data.sources.some((s,i)=>s.sourceId !== `S${i+1}` || s.sourceRank !== i+1 || canonicalSourceUrl(s.url) !== s.url || !safeEvidenceText(s.title)) ||
     parsed.data.passages.some(p=>p.text.length > RETRIEVAL_LIMITS.passageCharacters || !safeEvidenceText(p.text) || hashPassage(p.text) !== p.contentHash) ||
     parsed.data.sources.some(s=>parsed.data.passages.filter(p=>p.sourceId === s.sourceId).length !== 1)) return null;
   return parsed.data;

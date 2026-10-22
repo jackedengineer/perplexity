@@ -14,6 +14,7 @@ async function readResponse(response: Response, signal: AbortSignal) {
   const chunks: Uint8Array[] = []; let length = 0;
   const cancel = () => { void reader.cancel().catch(()=>undefined); };
   signal.addEventListener("abort",cancel,{ once: true });
+  if (signal.aborted) cancel();
   try {
     while (true) {
       const { done,value } = await reader.read();
@@ -42,6 +43,7 @@ export function createTavilySearch(apiKey: string, request: typeof fetch = fetch
             auto_parameters: false,include_answer: false,include_raw_content: false,include_images: false,
             include_favicon: false,include_usage: true }),
         });
+        if (signal.aborted) { void response.body?.cancel().catch(()=>undefined); throw new RetrievalError(); }
         if (!response.ok || response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
           void response.body?.cancel().catch(()=>undefined); throw new RetrievalError();
         }
