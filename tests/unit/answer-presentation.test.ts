@@ -19,3 +19,7 @@ it("fixed no-evidence answers have no citations",()=>{
   const answer = presentAnswer({ ...payload("I couldn’t find enough usable evidence."),kind: "NO_EVIDENCE",sources: [] });
   expect(answer.sources).toEqual([]);
 });
+it("preserves approved ordered-list numbering instead of silently restarting at one",()=>{
+  const answer=presentAnswer(payload("5. Follow the fifth step [S1].\n6. Continue carefully."));
+  expect(answer.document[0]).toMatchObject({type:"list",ordered:true,start:5});
+});

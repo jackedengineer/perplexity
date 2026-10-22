@@ -28,6 +28,7 @@
     "test:completion:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/completion-neon.test.ts"
   },
   "dependencies": {
+    "@ai-sdk/react": "4.0.152",
     "@better-auth/drizzle-adapter": "1.7.12",
     "@openrouter/ai-sdk-provider": "3.1.0",
     "ai": "7.0.148",

@@ -5,13 +5,15 @@ import { ApprovedAnswer,SourcesPanel } from "./approved-answer";
 import type { PublicAnswer } from "@/server/answers/view";
 import { historyPageView, type HistoryPage } from "@/server/conversations/views";
 
-export function ConversationHistory({ conversationId, initial }: { conversationId: string; initial: HistoryPage }) {
+export function ConversationHistory({ conversationId, initial,sourcesOpen: controlledOpen,onSourcesOpenChange }: { conversationId: string; initial: HistoryPage;sourcesOpen?: boolean;onSourcesOpenChange?: (value:boolean)=>void }) {
   const router = useRouter();
   const [history, setHistory] = useState(initial);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(0);
-  const [sourcesOpen,setSourcesOpen] = useState(false);
+  const [localOpen,setLocalOpen] = useState(false);
+  const sourcesOpen=controlledOpen??localOpen;
+  const setSourcesOpen=onSourcesOpenChange??setLocalOpen;
   const [selected,setSelected] = useState<PublicAnswer | null>(null);
   const currentAnswer = selected ?? history.items.findLast(message=>message.answer)?.answer ?? null;
   const root = useRef<HTMLDivElement>(null);

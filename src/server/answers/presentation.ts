@@ -3,7 +3,7 @@ import remarkParse from "remark-parse";
 import { approvedPayloadSchema } from "@/server/contracts/answer";
 import { canonicalSourceUrl,safeEvidenceText } from "@/server/search/evidence";
 import { publicAnswerView,type AnswerNode } from "./view";
-type MarkdownNode = { type: string;value?: string;depth?: number;ordered?: boolean | null;children?: MarkdownNode[] };
+type MarkdownNode = { type: string;value?: string;depth?: number;ordered?: boolean | null;start?: number | null;children?: MarkdownNode[] };
 const containers = new Set(["paragraph","heading","strong","emphasis","blockquote","list","listItem"]);
 // Compile once on the server; the client needs no Markdown parser or HTML interpreter.
 export function presentAnswer(value: unknown) {
@@ -30,7 +30,7 @@ export function presentAnswer(value: unknown) {
     if (node.type === "break" || node.type === "thematicBreak") return [{ type: node.type }];
     if (!containers.has(node.type)) throw new Error("Invalid approved Markdown");
     return [{ type: node.type as AnswerNode["type"],...(node.depth ? { depth: node.depth } : {}),
-      ...(node.type === "list" ? { ordered: Boolean(node.ordered) } : {}),children: (node.children ?? []).flatMap(child=>compile(child,depth+1)) }];
+      ...(node.type === "list" ? { ordered: Boolean(node.ordered),...(node.ordered&&typeof node.start==="number"&&node.start!==1?{start:node.start}:{}) } : {}),children: (node.children ?? []).flatMap(child=>compile(child,depth+1)) }];
   }
   const root = unified().use(remarkParse).parse(payload.markdown);
   return publicAnswerView.parse({ kind: payload.kind,sources,document: root.children.flatMap(child=>compile(child,0)) });
