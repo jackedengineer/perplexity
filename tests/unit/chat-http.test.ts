@@ -96,3 +96,15 @@ it("rate denial and counter infrastructure failure cannot reach admission",async
  const unavailable=await f.http.post(f.request());expect(unavailable.status).toBe(503);expect(await unavailable.text()).not.toContain("PRIVATE");
  expect(f.backend.admit).not.toHaveBeenCalled();
 });
+it.each([['RATE_LIMITED','rate'],['BUDGET_EXCEEDED','quota']] as const)('records %s admission denial separately from other outcomes',async(code,category)=>{
+ const f=fixture();f.backend.admit.mockResolvedValue({kind:'DENIED',code});
+ const response=await f.http.post(f.request());expect(response.status).toBe(429);
+ expect(f.dependencies.log).toHaveBeenLastCalledWith(expect.objectContaining({event:'chat.admission',outcome:code,category}));
+ expect(f.backend.execute).not.toHaveBeenCalled();
+});
+it.each([['OUTPUT_BLOCKED','policy'],['PROVIDER_UNAVAILABLE','infrastructure'],['DEADLINE_EXCEEDED','deadline']] as const)('distinguishes %s after streaming starts',async(code,category)=>{
+ const f=fixture();f.backend.execute.mockRejectedValue(new AdmissionError(code));
+ const response=await f.http.post(f.request());await response.text();
+ expect(f.dependencies.log).toHaveBeenLastCalledWith(expect.objectContaining({event:'chat.execution',outcome:code,category}));
+ expect(f.backend.load).not.toHaveBeenCalled();
+});

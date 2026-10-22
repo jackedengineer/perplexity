@@ -71,3 +71,15 @@ continuation. Original bucket windows and held costs survive disconnect/retry.
 Claims constrain application dispatch, not a provider's ability to overbill or
 ignore cancellation; over-cap reports halt continuation and require investigation.
 Database deadline expiry takes precedence over an abort when persisting TIMED_OUT.
+
+## Outcomes
+
+Public failures retain fixed, distinct codes: RATE_LIMITED (request/attempt rate),
+BUDGET_EXCEEDED (funding quota), DEADLINE_EXCEEDED (run/stage time), INPUT_BLOCKED /
+OUTPUT_BLOCKED (policy), and configuration/provider/safety unavailability
+(infrastructure). Before headers, rate/quota use HTTP 429, deadline uses 408,
+policy uses 403 and infrastructure uses 503. After SSE headers, the fixed code's
+message is sent in-band with a terminal finish; the HTTP status stays 200.
+Admission and streaming logs additionally carry a fixed category and request ID,
+code and duration, without prompt, draft, evidence, credentials or raw driver
+errors. This is outcome classification; full stage tracing remains T20.
