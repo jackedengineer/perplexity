@@ -2,7 +2,7 @@
 
 Date: 2026-10-22. Status: proposed architecture for implementation, revised to include anonymous trials, concrete authentication, model selection and Indian payments.
 
-This is a design for a production-oriented, Perplexity-style web answer application, not a claim about Perplexity's private infrastructure. The workspace was empty when this plan was prepared. No application, database, deployment or provider configuration has been created.
+This is a design for a production-oriented, Perplexity-style web answer application, not a claim about Perplexity's private infrastructure. Implementation has begun: Next.js, Neon/Drizzle and Google sign-in are working. [The foundation verification record](foundation-verification.md) separates implemented behavior from the larger target. No production deployment exists yet.
 
 ## 1. Product contract and assumptions
 

@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: proposed, 2026-10-22. Scope: design and implementation preparation; no app code or cloud resources have been created.
+Status: implementation started, 2026-10-22. Next.js, Neon/Drizzle and Google sign-in/session lifecycle are implemented and verified. Private conversations and guarded AI admission are next; [the foundation record](../docs/foundation-verification.md) lists exact completed checks and limitations.
 
 Read [the system design](../docs/system-design.md), [authentication](../docs/authentication.md), [billing and entitlements](../docs/billing-and-entitlements.md), [the safety policy](../docs/safety-policy.md) and [the capability map](../CAPABILITY-MAP.md) before implementing. [todo.md](todo.md) is the canonical build checklist.
 
@@ -44,7 +44,7 @@ Tasks T01–T05 establish a pinned toolchain, server-owned contracts, versioned 
 
 Setup choices to record in T01: compatible stable package versions including Better Auth, Google OAuth configuration, evaluated OpenRouter model IDs, provider privacy settings, Neon region, deployment region and hosting request limits. Better Auth is now chosen. Razorpay test/live activation is handled in the monetization milestone.
 
-Use separate local/test/preview/prod credentials. An `.env.example` documents names only. No real secrets or cloud provisioning are part of the current planning deliverable.
+Use separate local/test/preview/prod credentials. An `.env.example` documents names only. Development Neon and Google OAuth resources now exist; secrets remain in ignored `.env.local`. No production resources have been provisioned.
 
 Checkpoint: a Google-signed-in user can create/reload a private empty conversation; a different user cannot read it; duplicate admission cannot reserve budget twice. All AI work remains disabled until the next milestone's guards exist.
 

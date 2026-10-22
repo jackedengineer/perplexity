@@ -11,12 +11,12 @@ function connect() {
   let pool = globalDatabase.perplexPool;
   if (!pool) {
     pool = new Pool({
-    connectionString: getServerEnv().DATABASE_URL,
-    max: 3,
-    connectionTimeoutMillis: 5_000,
-    idleTimeoutMillis: 30_000,
-    statement_timeout: 10_000,
-    application_name: "perplex-web",
+      connectionString: getServerEnv().DATABASE_URL,
+      max: 3,
+      connectionTimeoutMillis: 5_000,
+      idleTimeoutMillis: 30_000,
+      statement_timeout: 10_000,
+      application_name: "perplex-web",
     });
     pool.on("error", () => console.error(JSON.stringify({ event: "database.pool_error" })));
   }

@@ -1,16 +1,16 @@
 # Build backlog
 
-All tasks are unstarted. This is the canonical checklist; it is not a report of implemented behavior. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. File lists name expected implementation paths; generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
+T01's foundation is implemented; T03/T04 have auth/database sub-slices completed as noted below. Other tasks are unstarted. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
 
-The project has no package manifest yet. Verification commands become available after T01. Tests use mocked external APIs unless explicitly labeled live; database integration tests use isolated real Postgres/Neon, never production.
+Commands and current verification results are in [README](../README.md) and [the foundation record](../docs/foundation-verification.md). Default integration tests use isolated PGlite PostgreSQL. Opt-in live browser tests use synthetic identities in the dedicated development Neon project, never production.
 
 ## Milestone A — foundation and private admission
 
 ### T01 — Scaffold and verify the toolchain
 
-- [ ] Create a minimal Next.js App Router TypeScript app with one package manager/lockfile; pin compatible stable Next/React/AI SDK/OpenRouter adapter/Drizzle/Better Auth versions and a supported Node runtime. Verify peer dependencies instead of copying prerelease docs commands.
-- [ ] Add strict typecheck, lint, unit-test and build scripts; validate server environment names and keep all secret values out of committed files.
-- [ ] Verify: clean frozen install, `pnpm exec tsc --noEmit`, `pnpm exec eslint .`, one smoke test and `pnpm build` pass.
+- [x] Create a minimal Next.js App Router TypeScript app with one package manager/lockfile; pin compatible stable Next/React/Drizzle/Better Auth versions and a supported Node runtime. Strict peer checks remain enabled. AI SDK/OpenRouter adapter installation moves with its first guarded integration in T08.
+- [x] Add strict typecheck, lint, unit-test and build scripts; validate server environment names and keep all secret values out of committed files.
+- [x] Verify: frozen install, lint, strict types, isolated DB/auth tests and production build pass; desktop/mobile public and live development-Neon browser checks pass.
 - Dependencies: none. Files: generated scaffold, `package.json`, lockfile, `src/server/env.ts`, `.env.example`. This one-time mechanical scaffold is larger than later slices.
 
 ### T02 — Define boundary contracts and versioned policy
@@ -22,12 +22,16 @@ The project has no package manifest yet. Verification commands become available 
 
 ### T03 — Connect Neon and migrate private conversation records
 
+Completed sub-slice: restricted pooled runtime role, direct migration owner URL, generated five-table auth schema, reviewed/applied migration, verified TLS and isolated FK/uniqueness tests. Conversation records/repositories below are still unimplemented.
+
 - [ ] Configure a small Node `pg` pool with Drizzle, pooled application URL and distinct direct migration URL; define users/conversations/messages/runs with ownership, revisions, sequences and approved-message fields.
 - [ ] Generate/review migrations and repository methods for creating/loading owner-scoped conversations; reserve JSONB for versioned parts, not ownership/status fields.
 - [ ] Verify: migrate an empty test database, round-trip a conversation and reject invalid FK/sequence data; prove unapproved assistant rows are excluded by read repositories.
 - Dependencies: T02. Files: `src/server/db/client.ts`, `src/server/db/schema.ts`, `src/server/db/conversations.ts`, `drizzle.config.ts`, `tests/integration/conversations.test.ts` plus generated SQL.
 
 ### T04 — Implement signed-in ownership across UI and API
+
+Completed sub-slice: Google OAuth, protected workspace, seven-day/24-hour session renewal, 30-day application cutoff, logout/revocation, origin/PKCE/state tests and auth throttling. Application UUID mapping, conversation authorization and deployed-preview tests below remain outstanding.
 
 - [ ] Integrate Better Auth's Drizzle adapter and Google sign-in, map its user to the application UUID profile and implement the documented session policy; add create/list/load conversation routes and a minimal signed-in page.
 - [ ] Derive owner IDs from the session, validate origin on mutations and use the same owner-scoped access helper for every route.

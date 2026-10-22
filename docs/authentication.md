@@ -1,6 +1,6 @@
 # Authentication and session lifecycle
 
-Status: proposed design revision, 2026-10-22. Supersedes the earlier open authentication choice. No authentication code or provider account has been created.
+Status: core Google/session foundation implemented, 2026-10-22. See [verification](foundation-verification.md). Anonymous identities, application UUID profiles, guest linking and sensitive account operations below remain planned.
 
 ## Decision
 
@@ -10,9 +10,9 @@ Better Auth documents a cookie carrying a server-side session identifier, a Driz
 
 This is a stateful opaque-session design. A session cookie is itself a bearer credential, but it is not a self-contained access JWT. Every protected request validates the session against the database and loads current application entitlements. There is no application access-token/refresh-token pair or custom refresh endpoint in the first web version.
 
-## Proposed expiry policy
+## Expiry policy
 
-These are application settings, not claims about an installed configuration:
+The implemented core uses these session settings. Guest retention and sensitive-operation endpoints remain future work:
 
 | Item | Setting | Enforcement |
 | --- | --- | --- |

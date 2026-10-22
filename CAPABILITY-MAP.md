@@ -1,6 +1,6 @@
 # Capability map
 
-Status: proposed design, 2026-10-22. The requested deliverable is a design and implementation plan; application implementation has not started.
+Status: implementation started, 2026-10-22. Next.js, Neon/Drizzle and Google sign-in are implemented. The map below describes the full target; see [the foundation record](docs/foundation-verification.md) for verified current behavior.
 
 | Module | Responsibility | Depends on |
 | --- | --- | --- |
