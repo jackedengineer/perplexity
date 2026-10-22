@@ -64,7 +64,7 @@ export function createConversationRepository(db: PgDatabase<PgQueryResultHKT, ty
       throw new ConversationError("CONFLICT");
     },
     async history(authSubject: string, id: string, input: HistoryInput) {
-      await get(authSubject, id);
+      const conversation = await get(authSubject, id);
       const rows = await db.select({
         id: messages.id, role: messages.role, kind: messages.kind, parts: messages.parts,
         sequence: messages.sequence, schemaVersion: messages.schemaVersion, createdAt: messages.createdAt,
@@ -74,7 +74,7 @@ export function createConversationRepository(db: PgDatabase<PgQueryResultHKT, ty
         input.before ? lt(messages.sequence, input.before) : undefined,
       )).orderBy(desc(messages.sequence)).limit(input.limit + 1);
       const items = rows.slice(0, input.limit).reverse().map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
-      return { items, nextBefore: rows.length > input.limit ? items[0].sequence : null };
+      return { conversation, items, nextBefore: rows.length > input.limit ? items[0].sequence : null };
     },
   };
 }
