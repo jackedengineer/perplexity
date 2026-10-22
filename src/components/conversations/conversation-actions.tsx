@@ -5,7 +5,7 @@ import type { Conversation } from "@/server/conversations/contracts";
 import { ConversationRequestError, mutateConversation } from "./client-api";
 import { Icon } from "./icons";
 
-export function ConversationActions({ conversation }: { conversation: Conversation }) {
+export function ConversationActions({ conversation,renameUnavailable=false }: { conversation: Conversation;renameUnavailable?:boolean }) {
   const router = useRouter();
   const menuId = useId();
   const headingId = useId();
@@ -41,17 +41,17 @@ export function ConversationActions({ conversation }: { conversation: Conversati
   return <>
     <button ref={trigger} className="research-icon-button" aria-label="Conversation actions" aria-haspopup="menu" aria-expanded={menuOpen} popoverTarget={menuId}><Icon name="more" size={20} /></button>
     <div id={menuId} ref={menu} popover="auto" className="conversation-menu" role="menu" aria-label="Conversation actions"
-      onToggle={(event) => { const open = event.currentTarget.matches(":popover-open"); setMenuOpen(open); if (open) menu.current?.querySelector<HTMLButtonElement>("button")?.focus(); }}
+      onToggle={(event) => { const open = event.currentTarget.matches(":popover-open"); setMenuOpen(open); if (open) menu.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus(); }}
       onKeyDown={(event) => {
         if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
         event.preventDefault();
-        const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button")];
+        const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
         const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
         const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
         buttons[next]?.focus();
       }}>
       <p className="conversation-menu-title">{conversation.title}</p>
-      <button role="menuitem" onClick={rename}>Rename</button>
+      <button role="menuitem" onClick={rename} disabled={renameUnavailable} title={renameUnavailable?"Finish the active research request before renaming.":undefined}>Rename</button>
       <button role="menuitem" onClick={() => void copy()}><Icon name="link" size={16} />Copy private link</button>
       <p className="menu-hint" role="status">{copyStatus || "Only your account can open this conversation."}</p>
     </div>
