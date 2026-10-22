@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import { PUBLIC_STAGE_LABELS,publicStageEventSchema,type PublicStage } from "@/server/contracts/progress";
 import { committedAnswerView,runStateView,type CommittedAnswer,type ResearchMessage } from "@/server/chat/views";
-import { createResearchTransport,safeResearchMessage } from "./research-transport";
+import { createResearchTransport,safeResearchMessage,savedFailureMessage } from "./research-transport";
 export function useResearch(conversationId: string,revision: number,initialRunId:string|null=null) {
   const router=useRouter();
   const [controller]=useState(()=>createResearchTransport(()=>router.replace("/sign-in"),fetch,initialRunId));
@@ -26,7 +26,7 @@ export function useResearch(conversationId: string,revision: number,initialRunId
         if(status.conversationId!==conversationId)break;
         if(status.state==="COMPLETED"&&status.answer){resolved=true;setCommitted(status.answer);setError("");setStage(null);router.refresh();return;}
         if(status.state==="UNAVAILABLE"||status.state==="COMPLETED"){resolved=true;
-          setError(current=>status.terminalReason==="CANCELLED"?"Research stopped. You can start a new search.":status.terminalReason==="TIMED_OUT"?"This research request timed out. You can start a new search.":current||"Research is temporarily unavailable. Please try again later.");setStage(null);break;
+          setError(current=>savedFailureMessage(current,status.terminalReason));setStage(null);break;
         }
         setStage(status.state==="CHECKING_REQUEST"?null:status.state);
         await new Promise<void>(resolve=>{const aborted=()=>{clearTimeout(timer);resolve();};const timer=setTimeout(()=>{abort.signal.removeEventListener("abort",aborted);resolve();},pause);abort.signal.addEventListener("abort",aborted,{once:true});});pause=Math.min(5000,pause*1.5);

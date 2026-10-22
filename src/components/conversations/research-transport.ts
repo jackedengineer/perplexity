@@ -1,8 +1,14 @@
 import { DefaultChatTransport } from "ai";
 import type { SubmitQuery } from "@/server/contracts/chat";
 import { PUBLIC_ERRORS } from "@/server/contracts/error-messages";
-import { runStateView,type ResearchMessage } from "@/server/chat/views";
+import { runStateView,type ResearchMessage,type RunState } from "@/server/chat/views";
 export const safeResearchMessage=(value: unknown)=>Object.values(PUBLIC_ERRORS).find(([,text])=>text===value)?.[1]??PUBLIC_ERRORS.PROVIDER_UNAVAILABLE[1];
+export function savedFailureMessage(current:string,reason?:RunState['terminalReason']) {
+  if(reason==='CANCELLED')return 'Research stopped. You can start a new search.';
+  if(reason==='TIMED_OUT')return 'This research request timed out. You can start a new search.';
+  const terminal=['DEADLINE_EXCEEDED','INPUT_BLOCKED','OUTPUT_BLOCKED','SAFETY_UNAVAILABLE','PROVIDER_UNAVAILABLE','BUDGET_EXCEEDED'] as const;
+  return terminal.map(code=>PUBLIC_ERRORS[code][1]).find(message=>message===current)??PUBLIC_ERRORS.PROVIDER_UNAVAILABLE[1];
+}
 const uuid=(value: string|null)=>value&&/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/iu.test(value)?value:null;
 export function createResearchTransport(onUnauthenticated: ()=>void,request: typeof fetch = fetch,initialRunId:string|null=null) {
   // Event-driven transport state is deliberately independent of React's render state.
