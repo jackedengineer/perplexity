@@ -2,6 +2,7 @@ import Link from "next/link";
 import { listInput } from "@/server/conversations/contracts";
 import { getConversationRepository, requireConversationIdentity } from "@/server/conversations/service";
 import { Icon } from "@/components/conversations/icons";
+import { LibrarySearch } from "@/components/conversations/library-search";
 
 export const metadata = { title: "Sessions" };
 export default async function Library({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -11,7 +12,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
   if (!input.success) return <main id="main" className="research-state"><h1>Check your search.</h1><p>The search or page address is invalid.</p><Link href="/library" className="research-button">Clear search</Link></main>;
   const result = await getConversationRepository().list(identity.user.id, input.data);
   return <main id="main" className="library-page">
-    <header className="research-topbar"><h1>Sessions</h1><span className="toolbar-spacer" /><form action="/library" className="library-search"><Icon name="search" size={15} /><input aria-label="Search your conversations" type="search" name="q" placeholder="Search your conversations" defaultValue={input.data.q} maxLength={160} /></form><Link href="/workspace" className="research-button"><Icon name="plus" size={16} />New</Link></header>
+    <header className="research-topbar"><h1>Sessions</h1><span className="toolbar-spacer" /><LibrarySearch key={`${input.data.q}:${parameters.search}`} query={input.data.q} focusRequested={parameters.search === "1"} /><Link href="/workspace" className="research-button"><Icon name="plus" size={16} />New</Link></header>
     <div className="library-toolbar"><span className="sort-label">Newest first<Icon name="down" size={12} /></span></div>
     <div className="library-list">
       {result.items.length ? result.items.map((conversation) => <Link className="library-row" key={conversation.id} href={`/search/${conversation.id}`} prefetch={false}>

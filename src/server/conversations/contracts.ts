@@ -29,3 +29,12 @@ export type ConversationList = { items: Conversation[]; nextCursor: string | nul
 export type CreateInput = z.infer<typeof createInput>;
 export type ListInput = z.infer<typeof listInput>;
 export type HistoryInput = z.infer<typeof historyInput>;
+export const historyPageView = z.object({
+  items: z.array(z.strictObject({
+    id: z.uuid(), role: z.enum(["USER", "ASSISTANT"]), kind: z.enum(["QUESTION", "ANSWER", "CLARIFICATION"]),
+    parts: z.array(z.strictObject({ type: z.literal("text"), text: z.string().max(100_000) })).max(128),
+    sequence: z.number().int().positive(), schemaVersion: z.literal(1), createdAt: z.iso.datetime(),
+  })).max(50),
+  nextBefore: z.number().int().positive().nullable(),
+});
+export type HistoryPage = z.infer<typeof historyPageView>;

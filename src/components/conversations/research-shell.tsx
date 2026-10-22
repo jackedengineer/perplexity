@@ -19,11 +19,14 @@ export function ResearchShell({ children, recent, name, initialCollapsed }: {
   useEffect(() => {
     function shortcuts(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault(); router.push("/library?search=1");
+        event.preventDefault(); mobileNav.current?.close(); router.push("/library?search=1");
       }
     }
+    const desktop = window.matchMedia("(min-width: 768px)");
+    const closeOnDesktop = () => { if (desktop.matches) mobileNav.current?.close(); };
+    desktop.addEventListener("change", closeOnDesktop);
     window.addEventListener("keydown", shortcuts);
-    return () => window.removeEventListener("keydown", shortcuts);
+    return () => { window.removeEventListener("keydown", shortcuts); desktop.removeEventListener("change", closeOnDesktop); };
   }, [router]);
   function toggleSidebar() {
     const next = !collapsed;
@@ -54,7 +57,7 @@ export function ResearchShell({ children, recent, name, initialCollapsed }: {
         </div>
         {!isCollapsed && recentOpen && <div className="sidebar-recents">
           {recent.length === 0 ? <p>No recent conversations</p> : recent.map((conversation) =>
-            <Link key={conversation.id} href={`/search/${conversation.id}`} onClick={close} title={conversation.title}
+            <Link key={conversation.id} prefetch={false} href={`/search/${conversation.id}`} onClick={close} title={conversation.title}
               aria-current={pathname === `/search/${conversation.id}` ? "page" : undefined}>{conversation.title}</Link>)}
           {recent.length === 20 && <Link href="/library" onClick={close}>View all</Link>}
         </div>}
