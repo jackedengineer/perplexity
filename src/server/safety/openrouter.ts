@@ -1,3 +1,4 @@
+import { providerUsage,type ProviderUsage } from "@/server/ai/usage";
 import { z } from "zod";
 import type { SafetyModelConfig } from "@/server/ai/models";
 import { INPUT_SAFETY_PROMPT } from "./prompt";
@@ -9,7 +10,7 @@ const wireSchema = z.strictObject({ decision: z.enum(["ALLOW", "BLOCK", "UNAVAIL
 }).refine((value)=>new Set(value.categoryCodes).size === value.categoryCodes.length && (value.decision === "UNAVAILABLE"
   ? typeof value.retryable === "boolean" && value.categoryCodes.length === 0
   : value.retryable === null && (value.decision === "ALLOW" ? value.categoryCodes.length === 0 : value.categoryCodes.length > 0)));
-const responseSchema = z.object({ error: z.never().optional(), choices: z.array(z.object({ finish_reason: z.literal("stop"),
+const responseSchema = z.object({ usage: z.unknown().optional(),model: z.string().max(128).optional(),error: z.never().optional(), choices: z.array(z.object({ finish_reason: z.literal("stop"),
   message: z.object({ role: z.literal("assistant"), content: z.string().min(1).max(2048),
     tool_calls: z.array(z.never()).max(0).optional(), function_call: z.never().optional(), refusal: z.null().optional() }),
 })).length(1) });
@@ -40,10 +41,13 @@ async function readResponse(response: Response) {
   return JSON.parse(new TextDecoder("utf-8",{ fatal: true }).decode(bytes));
 }
 export function createOpenRouterSafetyProvider(config: SafetyModelConfig, request: typeof fetch = fetch, prompt: string = INPUT_SAFETY_PROMPT): SafetyProvider {
+  let usage: ProviderUsage | undefined;
   return {
+    usage: ()=>usage,
     modelId: config.modelId,
     async classify(input,signal) {
-      const body = JSON.stringify({ model: config.modelId, stream: false, max_completion_tokens: 384,
+      usage = undefined;
+      const body = JSON.stringify({ model: config.modelId, stream: false, usage: { include: true },max_completion_tokens: 384,
         tools: [], tool_choice: "none", plugins: [], reasoning: { enabled: false, exclude: true },
         provider: { only: [config.provider], allow_fallbacks: false, require_parameters: true, data_collection: "deny", zdr: true,
           max_price: { prompt: 0.1,completion: 0.4,request: 0 } },
@@ -65,6 +69,7 @@ export function createOpenRouterSafetyProvider(config: SafetyModelConfig, reques
       }
       try {
         const envelope = responseSchema.parse(await readResponse(response));
+        usage = providerUsage(envelope.usage,envelope.model);
         const verdict = wireSchema.parse(JSON.parse(envelope.choices[0].message.content));
         return verdict.decision === "UNAVAILABLE"
           ? { decision: verdict.decision, retryable: verdict.retryable, policyVersion: verdict.policyVersion }

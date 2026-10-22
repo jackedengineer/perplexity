@@ -30,6 +30,7 @@ export const sourcePassages = pgTable("source_passages",{
   contentKind: varchar("content_kind",{ length: 24 }).notNull(),
 },t=>[
   foreignKey({ columns: [t.runId,t.sourceId],foreignColumns: [runSources.runId,runSources.id],name: "passage_same_run_source_fk" }).onDelete("cascade"),
+  uniqueIndex("passage_run_source_id_unique").on(t.runId,t.sourceId,t.id),
   uniqueIndex("passage_source_unique").on(t.sourceId),uniqueIndex("passage_run_id_unique").on(t.runId,t.id),
   check("passage_content_valid",sql`length(${t.text}) BETWEEN 1 AND 1000 AND length(trim(${t.text})) > 0 AND ${t.contentKind} = 'SEARCH_PASSAGE' AND ${t.contentHash} = encode(sha256(convert_to(${t.text},'UTF8')),'hex')`),
   pgPolicy("passages_runtime_read",{ for: "select",using: sql`true` }),

@@ -67,10 +67,12 @@ test("private conversations persist, rename and deny a second user", async ({ br
     const admin = new Pool({ connectionString: process.env.DATABASE_URL_DIRECT, max: 1 });
     try {
       await admin.query(`INSERT INTO messages (conversation_id,role,kind,parts,sequence,approved_at,policy_version)
-        SELECT $1,'ASSISTANT','ANSWER',jsonb_build_array(jsonb_build_object('type','text','text','Approved answer ' || n)),n,now(),'test-v1'
+        SELECT $1,'ASSISTANT','ANSWER',jsonb_build_array(jsonb_build_object('type','text','text','Approved answer ' || n)),n,now(),'v1'
         FROM generate_series(1,23) n`, [id]);
+      await admin.query(`INSERT INTO messages (conversation_id,role,kind,parts,sequence,approved_at,policy_version)
+        VALUES ($1,'ASSISTANT','ANSWER',$2,24,now(),'old-v0')`, [id, JSON.stringify([{ type: "text",text: "STALE_POLICY_MUST_NOT_LEAK" }])]);
       await admin.query(`INSERT INTO messages (conversation_id,role,kind,parts,sequence)
-        VALUES ($1,'ASSISTANT','ANSWER',$2,24)`, [id, JSON.stringify([{ type: "text", text: "PRIVATE_DRAFT_MUST_NOT_LEAK" }])]);
+        VALUES ($1,'ASSISTANT','ANSWER',$2,25)`, [id, JSON.stringify([{ type: "text", text: "PRIVATE_DRAFT_MUST_NOT_LEAK" }])]);
     } finally { await admin.end(); }
     await page.reload();
     await expect(page.getByText("Approved answer 23", { exact: true })).toBeVisible();
@@ -83,7 +85,7 @@ test("private conversations persist, rename and deny a second user", async ({ br
     await expect(page.getByText("Approved answer 1", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Load earlier messages" })).toHaveCount(0);
     expect(await page.locator(".history-message p").allTextContents()).toEqual(Array.from({ length: 23 }, (_, i) => `Approved answer ${i + 1}`));
-    expect(await page.content()).not.toContain("PRIVATE_DRAFT_MUST_NOT_LEAK");
+    expect(await page.content()).not.toMatch(/PRIVATE_DRAFT_MUST_NOT_LEAK|STALE_POLICY_MUST_NOT_LEAK/u);
     expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze()).violations).toEqual([]);
     expect(errors).toEqual([]);
     await page.screenshot({ path: `.artifacts/conversation-${testInfo.project.name}.png`, fullPage: true });

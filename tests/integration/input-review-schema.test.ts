@@ -29,7 +29,7 @@ it("rejects contradictory review metadata, unknown categories and cross-conversa
   }
 });
 it("allows runtime question writes only through a matching ALLOW review and keeps assistants blocked", async () => {
-  await pg.exec("CREATE ROLE input_gate_writer_test; GRANT USAGE ON SCHEMA public TO input_gate_writer_test; GRANT SELECT,INSERT ON messages,input_safety_reviews TO input_gate_writer_test");
+  await pg.exec("CREATE ROLE input_gate_writer_test; GRANT USAGE ON SCHEMA public TO input_gate_writer_test; GRANT SELECT ON output_safety_reviews TO input_gate_writer_test; GRANT SELECT,INSERT ON messages,input_safety_reviews TO input_gate_writer_test");
   const base = { conversationId,sequence: 1,policyVersion: "v1",approvedAt: new Date(),parts: [{ type: "text" as const,text: "Synthetic RLS check" }] };
   await pg.exec("SET ROLE input_gate_writer_test");
   try {

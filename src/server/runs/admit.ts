@@ -53,7 +53,7 @@ export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, 
             const fingerprint = fingerprintSubmission(request,snapshot,config);
             await reserveBudgets(reserve,budgets,policy);
             const [run] = await reserve.insert(runs).values({
-              userId: owner.id, conversationId: conversation.id, clientRequestId: request.clientRequestId,
+              accountingVersion: 1, userId: owner.id, conversationId: conversation.id, clientRequestId: request.clientRequestId,
               payloadHmac: fingerprint.hmac, hmacKeyId: fingerprint.keyId, payloadVersion: fingerprint.version,
               mode: request.mode, modelKey: request.modelKey, policyVersion: policy.policyVersion,
               catalogVersion: policy.catalogVersion, priceVersion: policy.priceVersion, entitlementVersion: snapshot.entitlementVersion,

@@ -65,7 +65,8 @@ it("returns approved history chronologically with bounded older pages", async ()
   await db.insert(schema.messages).values([
     { conversationId: conversation.id, role: "USER", kind: "QUESTION", sequence: 1, parts: [{ type: "text", text: "Question" }] },
     { conversationId: conversation.id, role: "ASSISTANT", kind: "ANSWER", sequence: 2, parts: [{ type: "text", text: "NEVER RELEASE DRAFT" }] },
-    { conversationId: conversation.id, role: "ASSISTANT", kind: "ANSWER", sequence: 3, parts: [{ type: "text", text: "Approved answer" }], approvedAt: new Date(), policyVersion: "test-v1" },
+    { conversationId: conversation.id, role: "ASSISTANT", kind: "ANSWER", sequence: 3, parts: [{ type: "text", text: "Approved answer" }], approvedAt: new Date(), policyVersion: "v1" },
+    { conversationId: conversation.id,role: "ASSISTANT",kind: "ANSWER",sequence: 4,parts: [{ type: "text",text: "NEVER RELEASE STALE POLICY" }],approvedAt: new Date(),policyVersion: "old-v0" },
   ]);
   const latest = await repository.history("alice", conversation.id, { limit: 1 });
   expect(latest.items[0].sequence).toBe(3);
@@ -73,6 +74,6 @@ it("returns approved history chronologically with bounded older pages", async ()
   const older = await repository.history("alice", conversation.id, { limit: 1, before: latest.nextBefore! });
   expect(older.items.map((message) => message.sequence)).toEqual([1]);
   expect(older.nextBefore).toBeNull();
-  expect(JSON.stringify([latest, older])).not.toContain("NEVER RELEASE DRAFT");
+  expect(JSON.stringify([latest, older])).not.toMatch(/NEVER RELEASE DRAFT|NEVER RELEASE STALE POLICY/u);
   expect(JSON.stringify(latest)).not.toMatch(/userId|creationFingerprint|authSubject/u);
 });
