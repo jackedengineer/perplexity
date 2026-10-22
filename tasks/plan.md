@@ -44,7 +44,7 @@ Tasks T01–T05 establish a pinned toolchain, server-owned contracts, versioned 
 
 Setup choices to record in T01: compatible stable package versions including Better Auth, Google OAuth configuration, evaluated OpenRouter model IDs, provider privacy settings, Neon region, deployment region and hosting request limits. Better Auth is now chosen. Razorpay test/live activation is handled in the monetization milestone.
 
-Use separate local/test/preview/prod credentials. An `.env.example` documents names only. Development Neon and Google OAuth resources now exist; secrets remain in ignored `.env.local`. No production resources have been provisioned.
+Use separate local/test/preview/prod credentials. An `.env.example` documents names only. Development Neon and Google OAuth resources now exist; secrets remain in ignored `.env.local`. Capped provider verification keys and isolated production Neon now exist; see the [production setup inventory](../docs/production-setup.md). Production OAuth, paid-model verification and Vercel deployment remain pending.
 
 Checkpoint: a Google-signed-in user can create/reload a private empty conversation; a different user cannot read it; duplicate admission cannot reserve budget twice. All AI work remains disabled until the next milestone's guards exist.
 
