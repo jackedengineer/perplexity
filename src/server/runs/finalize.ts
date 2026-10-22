@@ -10,6 +10,7 @@ import { isApprovedResponse } from "@/server/safety/release";
 import { SAFETY_POLICY } from "@/server/safety/policy";
 import { serializeApprovedPayload } from "@/server/ai/approved-payload";
 import type { PublicErrorCode } from "@/server/contracts/errors";
+const isPolicyBlock=(code:PublicErrorCode)=>code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED";
 export type Finalization = { kind: "COMMITTED" | "ALREADY_COMMITTED";runId: string;messageId: string } | { kind: "DENIED";code: PublicErrorCode };
 export async function lockCompletionSession(tx: AdmissionTransaction,subject: string,sessionId: string) {
   const [current] = await tx.select({ id: session.id,expiresAt: session.expiresAt,createdAt: session.createdAt }).from(session)
@@ -66,7 +67,7 @@ export function createFinalization(db: AdmissionDatabase) {
       try { return await db.transaction(async(tx): Promise<Finalization>=>{
         const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
         if (fence && (run.attemptVersion !== fence.attemptVersion || conversation.revision !== fence.revision)) throw new AdmissionError("CONFLICT");
-        const outcome=run.deadlineAt<=now?'DEADLINE_EXCEEDED':code;
+        const outcome=!isPolicyBlock(code)&&run.deadlineAt<=now?'DEADLINE_EXCEEDED':code;
         await settleFailureLocked(tx,run,now,outcome,cancelled);
         return { kind: "DENIED",code:outcome };
       }); } catch (error) { return { kind: "DENIED",code: error instanceof AdmissionError ? error.code : "PROVIDER_UNAVAILABLE" }; }
@@ -86,9 +87,9 @@ export async function settleFailureLocked(tx: AdmissionTransaction,run: typeof r
   const [review]=await tx.select().from(outputReviews).where(eq(outputReviews.runId,run.id));
   if(review?.decision === "ALLOW")throw new AdmissionError("CONFLICT");
   if(!review)await tx.insert(outputReviews).values({runId:run.id,conversationId:run.conversationId,attemptVersion:run.attemptVersion,
-    decision:code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCK" : "UNAVAILABLE",policyVersion:SAFETY_POLICY.version,createdAt:now});
+    decision:isPolicyBlock(code) ? "BLOCK" : "UNAVAILABLE",policyVersion:SAFETY_POLICY.version,createdAt:now});
   await settleRun(tx,run,0,now);
-  const status=!active ? run.status : run.deadlineAt <= now || code === "DEADLINE_EXCEEDED" ? "TIMED_OUT" : cancelled ? "CANCELLED" : code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCKED" : "FAILED";
+  const status=!active ? run.status : isPolicyBlock(code) ? "BLOCKED" : run.deadlineAt <= now || code === "DEADLINE_EXCEEDED" ? "TIMED_OUT" : cancelled ? "CANCELLED" : "FAILED";
   await tx.update(runs).set({status,updatedAt:now,attemptVersion:run.attemptVersion+(active?1:0)})
     .where(and(eq(runs.id,run.id),eq(runs.status,run.status),eq(runs.attemptVersion,run.attemptVersion)));
 }
