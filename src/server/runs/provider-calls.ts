@@ -19,9 +19,8 @@ export function createProviderCalls(db: AdmissionDatabase,subject: string,runId:
         if (run.accountingVersion !== 1) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
         if(run.deadlineAt<=now)throw new AdmissionError('DEADLINE_EXCEEDED');
         if (signal?.aborted || run.status !== phases[stage] || run.attemptVersion!==1 || conversation.revision!==run.admittedRevision) throw new AdmissionError("CONFLICT");
-        const [existing]=await tx.select({id:providerCalls.id}).from(providerCalls).where(and(eq(providerCalls.runId,runId),eq(providerCalls.stage,stage)));
-        if(existing)throw new AdmissionError('RUN_IN_PROGRESS');
-        const [{ total,overages }] = await tx.select({ overages: sql<number>`count(*) filter (where ${providerCalls.costMicroUsd} > ${providerCalls.capMicroUsd})::integer`,total: sql<string>`coalesce(sum(${providerCalls.capMicroUsd}),0)::text` }).from(providerCalls).where(eq(providerCalls.runId,runId));
+        const [{ total,overages,repeats }] = await tx.select({repeats:sql<number>`count(*) filter (where ${providerCalls.stage}=${stage})::integer`,overages: sql<number>`count(*) filter (where ${providerCalls.costMicroUsd} > ${providerCalls.capMicroUsd})::integer`,total: sql<string>`coalesce(sum(${providerCalls.capMicroUsd}),0)::text` }).from(providerCalls).where(eq(providerCalls.runId,runId));
+        if(repeats>0)throw new AdmissionError('RUN_IN_PROGRESS');
         if (overages > 0 || BigInt(total)+STAGE_LIMITS[stage].capMicroUsd > run.providerReserveMicroUsd) throw new AdmissionError("BUDGET_EXCEEDED");
         const [call] = await tx.insert(providerCalls).values({ runId,stage,requestedModel,attemptVersion: run.attemptVersion,
           capMicroUsd: STAGE_LIMITS[stage].capMicroUsd,status: "STARTED",startedAt: now }).returning({ id: providerCalls.id });
