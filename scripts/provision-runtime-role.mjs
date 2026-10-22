@@ -30,6 +30,8 @@ try {
     GRANT SELECT ON usage_buckets, operator_usage_buckets TO perplex_web;
     GRANT UPDATE (reserved_credits, reserved_provider_micro_usd) ON usage_buckets TO perplex_web;
     GRANT UPDATE (reserved_provider_micro_usd) ON operator_usage_buckets TO perplex_web`);
+  await pool.query(`GRANT SELECT, INSERT ON run_retrievals, run_sources, source_passages TO perplex_web;
+    GRANT UPDATE (status, query_verdict, evidence_verdict, search_credits) ON run_retrievals TO perplex_web`);
   await pool.query("COMMIT");
   const runtimeUrl = new URL(process.env.DATABASE_URL);
   runtimeUrl.username = role;

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, gt, isNotNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
-import { appUsers, conversations, inputSafetyReviews, messages, runs } from "@/db/schema";
+import { conversations, inputSafetyReviews, messages, runs } from "@/db/schema";
 import { submissionSchema, type SubmitQuery } from "@/server/contracts/chat";
 import type { PublicErrorCode } from "@/server/contracts/errors";
 import { createInputGate, type InputCheck } from "@/server/safety/input";
@@ -10,6 +10,7 @@ import { guardVerdictSchema, SAFETY_POLICY } from "@/server/safety/policy";
 import { resolveSafetyDecision, type SafetyResponse } from "@/server/safety/responses";
 import { AdmissionError } from "./errors";
 import { matchesFingerprint, parseAdmissionConfig, type AdmissionConfig } from "./policy";
+import { lockOwnedRun } from "./lock";
 import type { AdmissionDatabase, AdmissionTransaction } from "./usage";
 
 export type InputAcceptance =
@@ -18,19 +19,6 @@ export type InputAcceptance =
   | { kind: "DENIED"; code: PublicErrorCode; response?: SafetyResponse };
 const denied = (code: PublicErrorCode): InputAcceptance => ({ kind: "DENIED", code });
 const terminal = ["COMPLETED","NEEDS_CLARIFICATION","BLOCKED","FAILED","CANCELLED","TIMED_OUT"];
-async function lockRun(tx: AdmissionTransaction, subject: string, runId: string) {
-  await tx.execute(sql`SET LOCAL lock_timeout = '2s'`);
-  const [owner] = await tx.select({ id: appUsers.id }).from(appUsers).where(eq(appUsers.authSubject,subject));
-  if (!owner) throw new AdmissionError("NOT_FOUND");
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'run-admission:'+owner.id}::text,0))`);
-  const [candidate] = await tx.select({ conversationId: runs.conversationId }).from(runs).where(and(eq(runs.id,runId),eq(runs.userId,owner.id)));
-  if (!candidate) throw new AdmissionError("NOT_FOUND");
-  const [conversation] = await tx.select().from(conversations).where(and(eq(conversations.id,candidate.conversationId),eq(conversations.userId,owner.id))).for("update");
-  const [run] = await tx.select().from(runs).where(and(eq(runs.id,runId),eq(runs.userId,owner.id))).for("update");
-  if (!conversation || !run) throw new AdmissionError("NOT_FOUND");
-  const [{ now }] = await tx.select({ now: sql<string>`clock_timestamp()::text`.mapWith((value)=>new Date(value)) }).from(runs).where(eq(runs.id,runId));
-  return { run,conversation,now };
-}
 function verifyPayload(run: typeof runs.$inferSelect, request: SubmitQuery, config: AdmissionConfig) {
   if (!matchesFingerprint(request,run,{ hmac: run.payloadHmac,keyId: run.hmacKeyId,version: run.payloadVersion },config)) {
     throw new AdmissionError("IDEMPOTENCY_MISMATCH");
@@ -65,7 +53,7 @@ export function createMessageAcceptance(db: AdmissionDatabase, keys: unknown, ga
       const request = parsed.data; // Independent schema copy; never read caller-owned mutable text again.
       try {
         const claim = await db.transaction(async (tx)=>{
-          const { run,conversation,now } = await lockRun(tx,subject,runId);
+          const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
           verifyPayload(run,request,config);
           if (run.status !== "RECEIVED") return { kind: terminal.includes(run.status) ? "RUN_ALREADY_FINISHED" : "RUN_IN_PROGRESS",runId } as const;
           if (signal.aborted || run.deadlineAt <= now) throw new AdmissionError("SAFETY_UNAVAILABLE");
@@ -78,7 +66,7 @@ export function createMessageAcceptance(db: AdmissionDatabase, keys: unknown, ga
         // Provider work is outside both short transactions. The claim is never retried automatically.
         const check = await gate.evaluate({ text: request.message.text,context: claim.context },{ signal,deadlineAt: claim.run.deadlineAt });
         return await db.transaction(async (tx): Promise<InputAcceptance> => {
-          const { run,conversation,now } = await lockRun(tx,subject,runId);
+          const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
           verifyPayload(run,request,config);
           if (run.status !== "CHECKING_INPUT" || run.attemptVersion !== claim.run.attemptVersion || conversation.revision !== run.admittedRevision) throw new AdmissionError("CONFLICT");
           const final = signal.aborted ? interrupted(check,"CANCELLED") : run.deadlineAt <= now ? interrupted(check,"TIMEOUT") : check;

@@ -1,6 +1,6 @@
 # Build backlog
 
-T01–T03 and T05–T06 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T07 bounded retrieval is next. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
+T01–T03 and T05–T07 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T08 private answer drafting is next. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
 
 Commands and current verification results are in [README](../README.md) and [the foundation record](../docs/foundation-verification.md). Default integration tests use isolated PGlite PostgreSQL. Opt-in live browser tests use synthetic identities in the dedicated development Neon project, never production.
 
@@ -68,10 +68,12 @@ T06 evidence: [input safety](../docs/input-safety.md). Context must fit six appr
 
 ### T07 — Retrieve one bounded evidence package
 
-- [ ] Wrap Tavily Search with schema validation, deadline/abort support, explicit limits and generated answers disabled; start with one unambiguous allowed query.
-- [ ] Add run-source/passage persistence, conservative URL deduplication and baseline evidence inspection through the safety provider; build a bounded evidence package without returning raw source metadata to the client.
-- [ ] Verify: recorded API fixtures handle duplicates, malformed URLs, timeout and zero results; source/passages belong to the admitted run and budget caps cannot be model-overridden.
+- [x] Wrap Tavily Search with schema validation, deadline/abort support, explicit limits and generated answers disabled; start with one unambiguous allowed query.
+- [x] Add run-source/passage persistence, conservative URL deduplication and baseline evidence inspection through the safety provider; build a bounded evidence package without returning raw source metadata to the client.
+- [x] Verify: frozen protocol fixtures handle duplicates, malformed URLs, timeout and zero results; source/passages belong to the admitted run and budget caps cannot be model-overridden.
 - Dependencies: T06. Files: `src/server/search/tavily.ts`, `src/server/search/evidence.ts`, `src/server/safety/evidence.ts`, `src/server/db/schema.ts`, `tests/unit/evidence.test.ts` plus generated SQL.
+
+T07 evidence: [bounded retrieval](../docs/retrieval.md). One approved first-question query, fixed basic search, conservative source selection and inspected private persistence are implemented. Frozen fixtures and provider doubles verify transport/lifecycle behavior; live search relevance, classifier accuracy and spending controls remain release gates. No public AI/source endpoint is enabled.
 
 ### T08 — Generate private drafts with one answer model
 

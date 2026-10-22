@@ -77,3 +77,18 @@ it("caps chunked response bytes even when stream cancellation does not settle", 
   await expect(createOpenRouterSafetyProvider(config(),fetcher).classify(input,new AbortController().signal)).rejects.toMatchObject({ reason: "MALFORMED_OUTPUT" });
   expect(cancelled).toBe(true);
 },1000);
+it("uses an evidence-specific system policy without treating sources as trusted history",async()=>{
+  const { EVIDENCE_SAFETY_PROMPT,createEvidenceGate } = await import("@/server/safety/evidence");
+  const { buildEvidence } = await import("@/server/search/evidence");
+  const { randomUUID } = await import("node:crypto");
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json(envelope()));
+  const evidence = buildEvidence(randomUUID(),[{ title: "Synthetic evidence",url: "https://example.org/source",content: "A source excerpt.",score: 0.8 }],new Date());
+  const gate = createEvidenceGate(createOpenRouterSafetyProvider(config(),fetcher,EVIDENCE_SAFETY_PROMPT));
+  expect((await gate.evaluate(evidence,{ signal: new AbortController().signal,deadlineAt: new Date(Date.now()+10000) })).verdict.decision).toBe("ALLOW");
+  const body = JSON.parse(String(fetcher.mock.calls[0][1]?.body));
+  expect(body.messages[0].content).toContain("UNTRUSTED SOURCE DATA");
+  expect(body.messages[0].content).not.toContain("A source excerpt.");
+  expect(body.messages[1].role).toBe("user");
+  expect(JSON.parse(body.messages[1].content).context[0].role).toBe("ASSISTANT");
+  expect(body).toMatchObject({ tools: [],tool_choice: "none",stream: false });
+});

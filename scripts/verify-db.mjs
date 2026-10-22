@@ -12,7 +12,7 @@ for (const key of ["DATABASE_URL", "DATABASE_URL_DIRECT"]) {
     const result = await client.query(`SELECT
       current_setting('server_version_num')::integer AS version,
       (SELECT count(*)::integer FROM information_schema.tables
-       WHERE table_schema='public' AND table_name IN ('user','session','account','verification','rate_limit','app_users','conversations','messages','runs','usage_buckets','operator_usage_buckets','usage_reservations','admission_attempt_buckets','input_safety_reviews')) AS tables`);
+       WHERE table_schema='public' AND table_name IN ('user','session','account','verification','rate_limit','app_users','conversations','messages','runs','usage_buckets','operator_usage_buckets','usage_reservations','admission_attempt_buckets','input_safety_reviews','run_retrievals','run_sources','source_passages')) AS tables`);
     const permissions = await client.query(`SELECT
       (has_table_privilege(current_user,'conversations','SELECT') AND has_table_privilege(current_user,'conversations','INSERT') AND has_table_privilege(current_user,'conversations','UPDATE')) AS conversations,
       has_table_privilege(current_user,'messages','SELECT') AS history,
@@ -24,6 +24,11 @@ for (const key of ["DATABASE_URL", "DATABASE_URL_DIRECT"]) {
       (SELECT count(*)::integer FROM pg_policy WHERE polrelid='messages'::regclass AND polname IN ('messages_runtime_read','messages_reviewed_question_insert')) AS message_policies,
       (has_table_privilege(current_user,'input_safety_reviews','SELECT') AND has_table_privilege(current_user,'input_safety_reviews','INSERT')) AS review_write,
       (has_table_privilege(current_user,'input_safety_reviews','UPDATE') OR has_table_privilege(current_user,'input_safety_reviews','DELETE')) AS review_mutation,
+      (has_table_privilege(current_user,'run_sources','SELECT') AND has_table_privilege(current_user,'run_sources','INSERT') AND has_table_privilege(current_user,'source_passages','SELECT') AND has_table_privilege(current_user,'source_passages','INSERT')) AS evidence_write,
+      (has_table_privilege(current_user,'run_sources','UPDATE') OR has_table_privilege(current_user,'source_passages','UPDATE') OR has_table_privilege(current_user,'run_sources','DELETE') OR has_table_privilege(current_user,'source_passages','DELETE')) AS evidence_mutation,
+      (SELECT bool_and(relrowsecurity) FROM pg_class WHERE oid IN ('run_sources'::regclass,'source_passages'::regclass)) AS evidence_rls,
+      (SELECT count(*)::integer FROM pg_policy WHERE polrelid IN ('run_sources'::regclass,'source_passages'::regclass)) AS evidence_policies,
+      has_column_privilege(current_user,'run_retrievals','expires_at','UPDATE') AS evidence_expiry_write,
       has_schema_privilege(current_user,'public','CREATE') AS schema_create,
       has_table_privilege(current_user,'usage_buckets','INSERT') AS budget_create,
       has_column_privilege(current_user,'usage_buckets','credit_limit','UPDATE') AS budget_limit_write,
@@ -34,8 +39,8 @@ for (const key of ["DATABASE_URL", "DATABASE_URL_DIRECT"]) {
       has_column_privilege(current_user,'usage_buckets','settled_credits','UPDATE') AS settlement_write,
       has_table_privilege(current_user,'usage_reservations','UPDATE') AS reservation_write`);
     const rights = permissions.rows[0];
-    if (key === "DATABASE_URL" && (!rights.conversations || !rights.history || !rights.message_write || rights.message_update || !rights.message_rls || rights.bypass_rls || rights.message_owner || rights.message_policies !== 2 || !rights.review_write || rights.review_mutation || rights.schema_create || rights.budget_create || rights.budget_limit_write || rights.operator_limit_write || rights.fingerprint_write || rights.settlement_write || rights.reservation_write || !rights.reserve_credits || !rights.reserve_operator)) throw new Error("Runtime privilege check failed");
-    if (!tls || result.rows[0].tables !== 14) throw new Error("Database check failed");
+    if (key === "DATABASE_URL" && (!rights.evidence_write || rights.evidence_mutation || !rights.evidence_rls || rights.evidence_policies !== 4 || rights.evidence_expiry_write || !rights.conversations || !rights.history || !rights.message_write || rights.message_update || !rights.message_rls || rights.bypass_rls || rights.message_owner || rights.message_policies !== 2 || !rights.review_write || rights.review_mutation || rights.schema_create || rights.budget_create || rights.budget_limit_write || rights.operator_limit_write || rights.fingerprint_write || rights.settlement_write || rights.reservation_write || !rights.reserve_credits || !rights.reserve_operator)) throw new Error("Runtime privilege check failed");
+    if (!tls || result.rows[0].tables !== 17) throw new Error("Database check failed");
     console.log(JSON.stringify({ connection: key, ...result.rows[0], permissions: permissions.rows[0], verifiedTls: tls, connectAndQueryMs: Math.round(performance.now() - start) }));
     } finally { client.release(); }
   } catch {
