@@ -12,13 +12,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:verify": "node scripts/verify-db.mjs",
+    "test:e2e:neon": "LIVE_NEON_E2E=1 playwright test",
+    "perf:check": "node scripts/measure-performance.mjs"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.12",
