@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  logging: { incomingRequests: { ignore: [/\/api\/auth\//] } },
   async headers() {
     return [{
       source: "/(.*)",
