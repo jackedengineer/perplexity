@@ -39,7 +39,7 @@ async function readResponse(response: Response) {
   for (const chunk of chunks) { bytes.set(chunk,offset); offset += chunk.length; }
   return JSON.parse(new TextDecoder("utf-8",{ fatal: true }).decode(bytes));
 }
-export function createOpenRouterSafetyProvider(config: SafetyModelConfig, request: typeof fetch = fetch): SafetyProvider {
+export function createOpenRouterSafetyProvider(config: SafetyModelConfig, request: typeof fetch = fetch, prompt: string = INPUT_SAFETY_PROMPT): SafetyProvider {
   return {
     modelId: config.modelId,
     async classify(input,signal) {
@@ -48,7 +48,7 @@ export function createOpenRouterSafetyProvider(config: SafetyModelConfig, reques
         provider: { only: [config.provider], allow_fallbacks: false, require_parameters: true, data_collection: "deny", zdr: true,
           max_price: { prompt: 0.1,completion: 0.4,request: 0 } },
         response_format: { type: "json_schema", json_schema: { name: "input_safety_v1", strict: true, schema: outputSchema } },
-        messages: [{ role: "system", content: INPUT_SAFETY_PROMPT },{ role: "user", content: JSON.stringify(input) }],
+        messages: [{ role: "system", content: prompt },{ role: "user", content: JSON.stringify(input) }],
       });
       if (Buffer.byteLength(body,"utf8") > 45_000) throw new SafetyProviderError("PROVIDER_UNAVAILABLE");
       let response: Response;
