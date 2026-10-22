@@ -1,4 +1,4 @@
-import { conversationView } from "@/server/conversations/contracts";
+import { conversationView } from "@/server/conversations/views";
 
 export class ConversationRequestError extends Error {
   constructor(readonly status: number) {
