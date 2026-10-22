@@ -59,3 +59,21 @@ it("caps actual response bytes, rejects non-JSON/error HTTP and makes no retry",
     expect(fetcher).toHaveBeenCalledTimes(1);
   }
 });
+it("bounds serialized outbound bytes and enforces classifier price ceilings", async()=>{
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json(envelope()));
+  const classifier = createOpenRouterSafetyProvider(config(),fetcher);
+  await classifier.classify(input,new AbortController().signal);
+  const body = JSON.parse(fetcher.mock.calls[0][1]!.body as string);
+  expect(body.provider.max_price).toEqual({ prompt: 0.1,completion: 0.4,request: 0 });
+  fetcher.mockClear();
+  await expect(classifier.classify({ text: "x".repeat(45001),context: [] },new AbortController().signal)).rejects.toThrow("Safety classifier unavailable.");
+  expect(fetcher).not.toHaveBeenCalled();
+});
+it("caps chunked response bytes even when stream cancellation does not settle", async()=>{
+  let cancelled = false;
+  const body = new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(16385)); },
+    cancel() { cancelled=true; return new Promise<void>(()=>undefined); } });
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(body,{ headers: { "content-type": "application/json" } }));
+  await expect(createOpenRouterSafetyProvider(config(),fetcher).classify(input,new AbortController().signal)).rejects.toMatchObject({ reason: "MALFORMED_OUTPUT" });
+  expect(cancelled).toBe(true);
+},1000);

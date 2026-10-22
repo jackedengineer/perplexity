@@ -43,17 +43,20 @@ export function createOpenRouterSafetyProvider(config: SafetyModelConfig, reques
   return {
     modelId: config.modelId,
     async classify(input,signal) {
+      const body = JSON.stringify({ model: config.modelId, stream: false, max_completion_tokens: 384,
+        tools: [], tool_choice: "none", plugins: [], reasoning: { enabled: false, exclude: true },
+        provider: { only: [config.provider], allow_fallbacks: false, require_parameters: true, data_collection: "deny", zdr: true,
+          max_price: { prompt: 0.1,completion: 0.4,request: 0 } },
+        response_format: { type: "json_schema", json_schema: { name: "input_safety_v1", strict: true, schema: outputSchema } },
+        messages: [{ role: "system", content: INPUT_SAFETY_PROMPT },{ role: "user", content: JSON.stringify(input) }],
+      });
+      if (Buffer.byteLength(body,"utf8") > 45_000) throw new SafetyProviderError("PROVIDER_UNAVAILABLE");
       let response: Response;
       try {
         response = await request("https://openrouter.ai/api/v1/chat/completions",{
           method: "POST", headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
           cache: "no-store", redirect: "error", credentials: "omit", signal,
-          body: JSON.stringify({ model: config.modelId, stream: false, max_completion_tokens: 384,
-            tools: [], tool_choice: "none", plugins: [], reasoning: { enabled: false, exclude: true },
-            provider: { only: [config.provider], allow_fallbacks: false, require_parameters: true, data_collection: "deny", zdr: true },
-            response_format: { type: "json_schema", json_schema: { name: "input_safety_v1", strict: true, schema: outputSchema } },
-            messages: [{ role: "system", content: INPUT_SAFETY_PROMPT },{ role: "user", content: JSON.stringify(input) }],
-          }),
+          body,
         });
       } catch { throw new SafetyProviderError("PROVIDER_UNAVAILABLE"); }
       if (!response.ok || response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") {

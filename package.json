@@ -22,7 +22,8 @@
     "db:verify": "node scripts/verify-db.mjs",
     "test:e2e:neon": "LIVE_NEON_E2E=1 playwright test",
     "perf:check": "node scripts/measure-performance.mjs",
-    "test:admission:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts"
+    "test:admission:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/admission-neon.test.ts",
+    "test:input:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/input-gate-neon.test.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.12",
