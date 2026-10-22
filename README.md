@@ -1,6 +1,6 @@
 # Perplex
 
-A web-research application in progress. Next.js, Neon/Drizzle, Google sign-in, private conversations and internal atomic run admission are implemented. Guarded research, guest allowances, models and billing remain on the [backlog](tasks/todo.md).
+A web-research application in progress. Next.js, Neon/Drizzle, Google sign-in, private conversations, atomic run admission and the internal input safety gate are implemented. Retrieval, guarded answers, guest allowances and billing remain on the [backlog](tasks/todo.md).
 
 ## Run locally
 
@@ -36,6 +36,9 @@ Avoid running dev and build simultaneously in the same checkout; Next.js regener
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Web OAuth client credentials |
 | `RUN_HMAC_ACTIVE_KEY_ID` | Active admission fingerprint key ID, for example `dev-v1` |
 | `RUN_HMAC_KEYS_JSON` | JSON object mapping key IDs to independent 32-byte lowercase hex secrets; retain historical keys |
+| `OPENROUTER_API_KEY` | Server-only classifier API key; no default or live key is configured by T06 |
+| `MODEL_SAFETY` | Explicit evaluated classifier model ID; never a browser model selection |
+| `SAFETY_OPENROUTER_PROVIDER` | Explicit provider slug supporting the model, strict output, privacy and price controls |
 
 Neon URLs use `sslmode=verify-full`. Certificate verification is enabled; do not use `rejectUnauthorized: false`. The runtime pool has a maximum of three connections, a five-second connection timeout and ten-second statement timeout.
 
@@ -46,7 +49,7 @@ The existing development resources are:
 - OAuth origin `http://localhost:3000`; redirect `http://localhost:3000/api/auth/callback/google`.
 - Google audience is **Testing**, with the project owner as a test user. Basic OpenID/profile/email only; no offline Google API access.
 
-For another development database, first migrate with its owner URL. Then run `node scripts/provision-runtime-role.mjs` once to create a restricted runtime role and update the local pooled URL. It grants auth CRUD, profile creation, conversation metadata access, read-only history and narrowly scoped admission/reserve writes, without budget provisioning, budget-limit changes, fingerprint mutation, settlement or schema creation/truncation. It refuses to rotate an existing role. Future migrations must explicitly grant appropriate permissions on new tables. Production provisioning belongs in a separately reviewed deployment workflow.
+For another development database, first migrate with its owner URL. Then run `node scripts/provision-runtime-role.mjs` once to create a restricted runtime role and update the local pooled URL. It grants auth CRUD, profile creation, conversation metadata access, history reads and narrowly scoped admission/reserve writes. Question insertion requires a matching persisted ALLOW review through message RLS; assistant insertion remains denied. It grants no budget provisioning, limit changes, fingerprint mutation, settlement, review mutation or schema creation/truncation. It refuses to rotate an existing role. Future migrations must explicitly grant appropriate permissions on new tables. Production provisioning belongs in a separately reviewed deployment workflow.
 
 In deployment settings, expose only `DATABASE_URL` to the web runtime. Keep the owner URL in the migration job's secret store. Use separate projects, OAuth clients and secrets for preview/production. OAuth-token encryption depends on the auth secret; plan migration/key rotation before replacing it.
 
@@ -72,23 +75,26 @@ Auth responses have `Cache-Control: no-store`, request IDs and `Server-Timing`. 
 
 The protected `/workspace`, `/library`, and `/search/:id` screens share the same database-backed identity. Every repository query scopes by the verified auth subject through an application UUID profile. Foreign and missing conversation IDs return the same unavailable response. Create retries are owner-idempotent, renames require the current revision, lists/history are bounded, and assistant drafts are excluded from history.
 
-The HTTP contract and inspected UI reference coverage are in [private-conversations.md](docs/private-conversations.md). Titles are metadata; there is no message-submission or AI endpoint yet. The runtime cannot insert message drafts. Input/output AI guards and settlement must be completed before connecting providers.
+The HTTP contract and inspected UI reference coverage are in [private-conversations.md](docs/private-conversations.md). Titles are metadata; there is no message-submission or AI endpoint yet. The runtime cannot insert message drafts. Output approval, execution and settlement must be completed before the public research path is enabled.
 
 ## Research boundary contracts
 
-T02 defines strict submission/planner/evidence/progress schemas, fixed public errors and versioned safety decisions. Unknown or unavailable verdicts fail closed; a 32-case synthetic seed set distinguishes harmful requests from benign near-misses. [Contract details and verification](docs/boundary-contracts.md) explain the limits and remaining enforcement work. These modules do not provide semantic classification or expose an AI endpoint. T06 safety-provider integration is next.
+T02 defines strict submission/planner/evidence/progress schemas, fixed public errors and versioned safety decisions. Unknown or unavailable verdicts fail closed; a 32-case synthetic seed set distinguishes harmful requests from benign near-misses. [Contract details and verification](docs/boundary-contracts.md) explain the seed set and contract boundaries.
 
 T05 adds the internal `admitRequest` service: verified session → bounded JSON body → owner lock and intent check → attempt counters → atomic four-bucket reservation/run/revision update. HMAC retries use the original versioned snapshot and never reserve twice. Customer answer credits and integer micro-USD provider exposure are independent. Budgets must be provisioned by a privileged process; login never creates grants. The [admission contract and evidence](docs/run-admission.md) describe configuration, denial/replay behavior and the remaining settlement/recovery work. HMAC environment settings are lazy and optional while the public submit path is disabled; missing settings fail closed if the internal service is invoked.
+
+T06 adds `checkAdmittedInput`: verified session → owned intent/HMAC check → one input-check claim → validated canonical context → local credential/abuse checks → isolated classifier → conditional atomic review/question commit. Denials retain metadata and fixed safe responses. Missing model configuration returns safe unavailability. The [input safety contract](docs/input-safety.md) records strict transport controls, RLS, timeouts, context limits and remaining quality evaluation. Long/stale histories fail closed until safe context selection/revalidation is implemented. T07 bounded Tavily retrieval is next; no public submit route is connected yet.
 
 ## Verification
 
 ```sh
-pnpm check                  # lint, generated route types, strict TS, 108 tests
+pnpm check                  # lint, generated route types, strict TS, 147 tests
 pnpm build                  # production build; no credentials needed to build
 pnpm exec playwright install chromium
 pnpm test:e2e               # 8 public desktop/mobile checks; starts the built app
 pnpm test:e2e:neon          # 4 OPT-IN live development DB checks
 pnpm test:admission:neon    # 6 OPT-IN live development DB races/rollback checks
+pnpm test:input:neon        # 6 OPT-IN live DB gate/RLS checks; classifier is a test double
 pnpm db:verify              # read-only TLS/schema verification for both URLs
 pnpm perf:check             # production server must already be running
 pnpm perf:check --private   # OPT-IN synthetic identity; 5 samples/private route
@@ -98,10 +104,10 @@ Stop `pnpm dev` before browser checks so they exercise the production build. Pub
 
 CI installs from the frozen lockfile with dependency scripts disabled, then runs lint/types/tests, production dependency audit, build and browser checks. Actions are pinned to verified commit SHAs. The GitHub remote is `jackedengineer/perplexity`; pull requests trigger the quality workflow. Live Neon tests remain explicitly opt-in and are excluded from default CI. Branch protection and deployed-preview verification remain outstanding.
 
-See [the foundation verification record](docs/foundation-verification.md), [private conversation verification](docs/private-conversations-verification.md) and [admission verification](docs/run-admission.md) for measured results, limitations and dependency-audit follow-ups. The complete app is not ready for public launch: AI guardrails, settlement, deletion/export, CSP/deployment hardening and operational recovery remain planned work.
+See [the foundation verification record](docs/foundation-verification.md), [private conversation verification](docs/private-conversations-verification.md), [admission verification](docs/run-admission.md) and [input gate verification](docs/input-safety.md) for evidence and limits. The complete app is not ready for public launch: live model evaluation, retrieval/output gates, settlement, deletion/export, CSP/deployment hardening and operational recovery remain planned work.
 
 ## Working agreements
 
-Use a feature branch and focused commits. Keep hand-written changes near 400–700 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. T05 is on `feat/run-admission`.
+Use a feature branch and focused commits. Keep hand-written changes near 400–700 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. T06 is on `codex/input-safety`, based on T05's `feat/run-admission`.
 
 The [system design](docs/system-design.md), [session contract](docs/authentication.md) and [implementation plan](tasks/plan.md) describe the larger product. SDK/OpenRouter/Tavily dependencies will be introduced when their guarded pipeline slices are built.

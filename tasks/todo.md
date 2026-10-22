@@ -1,6 +1,6 @@
 # Build backlog
 
-T01–T03 and T05 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T06 input safety is next. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
+T01–T03 and T05–T06 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T07 bounded retrieval is next. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
 
 Commands and current verification results are in [README](../README.md) and [the foundation record](../docs/foundation-verification.md). Default integration tests use isolated PGlite PostgreSQL. Opt-in live browser tests use synthetic identities in the dedicated development Neon project, never production.
 
@@ -59,10 +59,12 @@ Verification evidence: [private conversations](../docs/private-conversations-ver
 
 ### T06 — Enforce input safety before task work
 
-- [ ] Add deterministic checks and an isolated, tool-free `SafetyProvider` using `MODEL_SAFETY` with strict structured verdicts, timeout and policy version; include relevant authorized turn context.
-- [ ] Store only decision metadata for denial; accepted original messages enter history only after approval. No configured classifier in live mode means safe unavailability, not allow-all.
-- [ ] Verify: provider spies prove a blocked/timed-out/malformed verdict causes zero planner, Tavily and answer calls; accidental secrets are handled before external forwarding.
+- [x] Add deterministic checks and an isolated, tool-free `SafetyProvider` using `MODEL_SAFETY` with strict structured verdicts, timeout and policy version; include relevant authorized turn context.
+- [x] Store only decision metadata for denial; accepted original messages enter history only after approval. No configured classifier in live mode means safe unavailability, not allow-all.
+- [x] Verify: provider spies prove a blocked/timed-out/malformed verdict causes zero planner, Tavily and answer calls; accidental secrets are handled before external forwarding.
 - Dependencies: T05. Files: `src/server/ai/models.ts`, `src/server/safety/provider.ts`, `src/server/safety/input.ts`, `src/server/runs/accept-message.ts`, `tests/integration/input-gate.test.ts`.
+
+T06 evidence: [input safety](../docs/input-safety.md). Context must fit six approved current-policy turns/8,000 characters; truncation or stale context is unavailable until T13 revalidation. Transport and continuation ordering use provider test doubles; actual model accuracy, multilingual evaluation and a spending-capped live smoke remain release gates. No public submit endpoint is enabled.
 
 ### T07 — Retrieve one bounded evidence package
 

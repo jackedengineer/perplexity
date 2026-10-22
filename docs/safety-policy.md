@@ -1,6 +1,6 @@
 # Server-side safety and release policy
 
-Status: policy `v1` contracts, categories, static responses and seed fixtures implemented in T02, 2026-10-22. Runtime classification and enforcement remain T06–T11 work; evaluate them before live release. This is an application policy proposal, not a statement that classifiers can detect every unsafe request.
+Status: policy `v1` contracts/categories/fixtures were implemented in T02; the internal input gate, strict classifier transport and atomic approved-question persistence are implemented in T06, 2026-10-22. [T06 evidence and limits](input-safety.md) distinguish transport/lifecycle tests from model accuracy. Retrieval/output enforcement, evaluation and public delivery remain T07–T11 work. This policy does not claim that classifiers can detect every unsafe request.
 
 ## Assets and trust boundaries
 

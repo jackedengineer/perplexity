@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { check, index, integer, jsonb, pgEnum, pgPolicy, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
 export const appUsers = pgTable("app_users", {
@@ -42,10 +42,18 @@ export const messages = pgTable("messages", {
   approvedAt: timestamp("approved_at", { withTimezone: true, precision: 3 }),
   createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
 }, (table) => [
+  // Ownership remains in application queries; RLS protects the runtime write boundary.
+  pgPolicy("messages_runtime_read", { for: "select", using: sql`true` }),
+  pgPolicy("messages_reviewed_question_insert", { for: "insert", withCheck: sql`
+    role = 'USER' AND kind = 'QUESTION' AND approved_at IS NOT NULL AND policy_version IS NOT NULL
+    AND EXISTS (SELECT 1 FROM input_safety_reviews review WHERE review.accepted_message_id = messages.id
+      AND review.conversation_id = messages.conversation_id AND review.decision = 'ALLOW'
+      AND review.policy_version = messages.policy_version)` }),
+  uniqueIndex("messages_id_conversation_role_unique").on(table.id, table.conversationId, table.role),
   uniqueIndex("messages_conversation_sequence_unique").on(table.conversationId, table.sequence),
   check("messages_sequence_positive", sql`${table.sequence} > 0`),
   check("messages_parts_array", sql`jsonb_typeof(${table.parts}) = 'array'`),
   check("messages_approval_policy", sql`${table.approvedAt} IS NULL OR ${table.policyVersion} IS NOT NULL`),
   check("messages_schema_version_positive", sql`${table.schemaVersion} > 0`),
   check("messages_role_kind", sql`(${table.role} = 'USER' AND ${table.kind} = 'QUESTION') OR (${table.role} = 'ASSISTANT' AND ${table.kind} IN ('ANSWER', 'CLARIFICATION'))`),
-]);
+]).enableRLS();

@@ -21,6 +21,7 @@ export const runs = pgTable("runs", {
   createdAt: instant("created_at").notNull().defaultNow(), updatedAt: instant("updated_at").notNull().defaultNow(),
 }, (t) => [
   foreignKey({ columns: [t.conversationId, t.userId], foreignColumns: [conversations.id, conversations.userId], name: "runs_owned_conversation_fk" }).onDelete("cascade"),
+  uniqueIndex("runs_id_conversation_unique").on(t.id, t.conversationId),
   uniqueIndex("runs_owner_intent_unique").on(t.userId, t.clientRequestId),
   uniqueIndex("runs_snapshot_unique").on(t.id, t.userId, t.operatorBudgetKey, t.answerCredits, t.providerReserveMicroUsd),
   uniqueIndex("runs_active_owner_unique").on(t.userId).where(sql`${t.status} IN ('RECEIVED','CHECKING_INPUT','PLANNING','SEARCHING','PREPARING_EVIDENCE','GENERATING','CHECKING_OUTPUT')`),
