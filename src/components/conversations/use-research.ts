@@ -50,5 +50,5 @@ export function useResearch(conversationId: string,revision: number) {
   },[conversationId,revision,send,controller]);
   useEffect(()=>()=>{void stopChat();recovery.current?.abort();},[stopChat]);
   function stop(){void stopChat();recovery.current?.abort();busy.current=false;setPending(false);setError("Research stopped. Check for a saved result before trying again.");}
-  return {submit,retry:send,recover,stop,question,pending:pending||recovering,stage,label:stage?PUBLIC_STAGE_LABELS[stage]:recovering?"Checking saved result":"Checking request",error,committed};
+  return {submit,retry:send,recover,stop:pending&&!recovering?stop:undefined,question,pending:pending||recovering,stage,label:recovering?"Checking saved result":stage?PUBLIC_STAGE_LABELS[stage]:"Checking request",error,committed};
 }
