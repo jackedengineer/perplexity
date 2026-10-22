@@ -22,3 +22,11 @@ it('bounds the single-attempt FAST profile within its reserved monetary envelope
  expect(Object.values(STAGE_LIMITS).reduce((sum,s)=>sum+s.capMicroUsd,0n)).toBe(48000n);
  expect(Object.values(STAGE_LIMITS).every(s=>s.maxDurationMs>0&&s.maxDurationMs<=12000)).toBe(true);
 });
+it('distinguishes its own expiry from caller cancellation even if a provider ignores abort',async()=>{
+ vi.useFakeTimers();
+ const incoming=new AbortController(),budget=providerDeadline({remainingMs:100,observedAt:performance.now()},incoming.signal);
+ incoming.abort();await vi.advanceTimersByTimeAsync(200);
+ expect(budget.expired).toBe(false);budget.stop();
+ const timed=providerDeadline({remainingMs:100,observedAt:performance.now()},new AbortController().signal);
+ await vi.advanceTimersByTimeAsync(100);expect(timed.expired).toBe(true);timed.stop();
+});

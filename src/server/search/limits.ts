@@ -7,7 +7,7 @@ export const searchQuerySchema = z.string().min(1).max(RETRIEVAL_LIMITS.queryCha
   .refine((text)=>text.trim().length > 0 && text.isWellFormed() && !/[\u0000-\u001f\u007f-\u009f]/u.test(text));
 export type RetrievalOptions = { signal: AbortSignal; deadlineAt: Date };
 export class RetrievalError extends Error {
-  constructor(readonly code: "PROVIDER_UNAVAILABLE" | "SAFETY_UNAVAILABLE" | "INPUT_BLOCKED" | "OUTPUT_BLOCKED" | "INVALID_INPUT" = "PROVIDER_UNAVAILABLE") {
+  constructor(readonly code: "PROVIDER_UNAVAILABLE" | "SAFETY_UNAVAILABLE" | "INPUT_BLOCKED" | "OUTPUT_BLOCKED" | "INVALID_INPUT" | "DEADLINE_EXCEEDED" = "PROVIDER_UNAVAILABLE") {
     super("Retrieval unavailable");
   }
 }

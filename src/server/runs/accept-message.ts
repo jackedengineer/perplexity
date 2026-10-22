@@ -93,7 +93,7 @@ export function createMessageAcceptance(db: AdmissionDatabase, keys: unknown, ga
           if (!changed.length || (messageId && signal.aborted)) throw new AdmissionError("SAFETY_UNAVAILABLE");
           if (messageId) return { kind: "ACCEPTED",runId,messageId,revision: run.admittedRevision };
           const decision = resolveSafetyDecision(verdict);
-          return { kind: "DENIED",code: verdict.decision === "BLOCK" ? "INPUT_BLOCKED" : "SAFETY_UNAVAILABLE",
+          return { kind: "DENIED",code: verdict.decision === "BLOCK" ? "INPUT_BLOCKED" : final.reason === "TIMEOUT" ? "DEADLINE_EXCEEDED" : "SAFETY_UNAVAILABLE",
             ...(decision.decision !== "ALLOW" ? { response: decision.response } : {}) };
         });
       } catch (error) { if (error instanceof AdmissionError) return denied(error.code); throw error; }

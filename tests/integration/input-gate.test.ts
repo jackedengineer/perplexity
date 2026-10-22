@@ -135,7 +135,7 @@ it("a run-capped timeout cannot enter task work even with a non-cooperative clas
   await db.update(schema.runs).set({ deadlineAt: new Date(Date.now()+500) }).where(eq(schema.runs.id,runId));
   const provider = classifier(); provider.classify.mockImplementation(()=>new Promise(()=>undefined));
   const p = pipeline(provider);
-  expect(await p.execute()).toMatchObject({ kind: "DENIED",code: "SAFETY_UNAVAILABLE" });
+  expect(await p.execute()).toMatchObject({ kind: "DENIED",code: "DEADLINE_EXCEEDED" });
   expect((await db.select().from(schema.inputSafetyReviews))[0]).toMatchObject({ decision: "UNAVAILABLE",reason: "TIMEOUT" });
   expect(p.tavily).not.toHaveBeenCalled(); expect(p.planner).not.toHaveBeenCalled(); expect(p.answer).not.toHaveBeenCalled();
 });

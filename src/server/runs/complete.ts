@@ -54,7 +54,7 @@ export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { ans
         if(budget.signal.aborted)throw new AdmissionError('DEADLINE_EXCEEDED');
       } catch {
         try { await calls.finish(callId,"UNKNOWN",dependencies.answer?.usage?.()); } catch { /* Keep unknown attempt held. */ }
-        throw new AdmissionError(budget.signal.aborted?'DEADLINE_EXCEEDED':"PROVIDER_UNAVAILABLE");
+        throw new AdmissionError(budget.expired?'DEADLINE_EXCEEDED':signal.aborted?'CONFLICT':"PROVIDER_UNAVAILABLE");
       }finally{budget.stop();}
       await db.transaction(async(tx)=>{
         const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);

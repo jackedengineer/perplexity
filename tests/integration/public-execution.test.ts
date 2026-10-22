@@ -9,6 +9,7 @@ import { seedCompletion,completionSession,fakeSafety,knownUsage,keys } from "../
 import { createRunExecution,type ExecutionProviders } from "@/server/runs/execute";
 import { createAnswerDelivery } from "@/server/chat/delivery";
 import { createRunAdmission } from "@/server/runs/admit";
+import {SafetyProviderError} from '@/server/safety/provider';
 const pg = new PGlite(),db = drizzle(pg,{schema});
 let person: Awaited<ReturnType<typeof seedCompletion>>,identity: {user:{id:string};sessionId:string};
 beforeAll(async()=>{const journal=JSON.parse(await readFile("drizzle/meta/_journal.json","utf8"));for(const e of journal.entries)await pg.exec(await readFile(`drizzle/${e.tag}.sql`,"utf8"));});
@@ -65,4 +66,16 @@ it("a stopped admitted request becomes CANCELLED and never starts provider work"
   expect((await db.select().from(schema.runs))[0].status).toBe("CANCELLED");
   expect(p.search.search).not.toHaveBeenCalled();expect(p.answer.generate).not.toHaveBeenCalled();
   expect((await db.select().from(schema.runSettlements))[0].creditsCharged).toBe(0);
+});
+it.each(['input','query','evidence','output'] as const)('%s safety expiry returns a deadline outcome and persists TIMED_OUT',async stage=>{
+ const p=providers();p[stage]={...fakeSafety(),classify:async()=>{throw new SafetyProviderError('TIMEOUT');}};
+ expect((await run(p)).result).toEqual({kind:'DENIED',code:'DEADLINE_EXCEEDED'});
+ expect((await db.select().from(schema.runs))[0].status).toBe('TIMED_OUT');
+ expect((await db.select().from(schema.runSettlements))[0].creditsCharged).toBe(0);
+});
+it('answer cancellation remains cancellation rather than a fabricated deadline',async()=>{
+ const controller=new AbortController(),p=providers();
+ p.answer={modelId:'test/answer',generate:async()=>{controller.abort();throw new Error('PRIVATE');}};
+ expect((await run(p,controller.signal)).result).toEqual({kind:'DENIED',code:'CONFLICT'});
+ expect((await db.select().from(schema.runs))[0].status).toBe('CANCELLED');
 });

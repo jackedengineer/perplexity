@@ -17,7 +17,7 @@ export interface SafetyProvider {
   classify(input: SafetyInput, signal: AbortSignal): Promise<unknown>;
 }
 export class SafetyProviderError extends Error {
-  constructor(readonly reason: "PROVIDER_UNAVAILABLE" | "MALFORMED_OUTPUT") {
+  constructor(readonly reason: "PROVIDER_UNAVAILABLE" | "MALFORMED_OUTPUT" | "TIMEOUT") {
     super("Safety classifier unavailable.");
   }
 }

@@ -47,9 +47,9 @@ export function recordSafetyProvider(calls: ReturnType<typeof createProviderCall
         const result = await provider.classify(input,budget.signal);
         await calls.finish(id,"SUCCEEDED",provider.usage?.());
         if(budget.signal.aborted)throw new Error('Deadline reached');return result;
-      } catch {
+      } catch (error) {
         try { await calls.finish(id,"UNKNOWN",provider.usage?.()); } catch { /* STARTED remains an unknown outcome. */ }
-        throw new SafetyProviderError("PROVIDER_UNAVAILABLE");
+        throw new SafetyProviderError(budget.expired || error instanceof SafetyProviderError && error.reason==='TIMEOUT' ? "TIMEOUT" : "PROVIDER_UNAVAILABLE");
       }finally{budget.stop();}
     },
   };
@@ -62,7 +62,7 @@ export function recordSearchProvider(calls: ReturnType<typeof createProviderCall
       const response = await provider.search(query,{signal:budget.signal,deadlineAt:claim.deadlineAt});await calls.finish(id,"SUCCEEDED",undefined,response.credits);
       if(budget.signal.aborted)throw new AdmissionError('DEADLINE_EXCEEDED');return response;
     }
-    catch { try { await calls.finish(id,"UNKNOWN"); } catch { /* Preserve unknown reservation. */ } throw new AdmissionError(budget.signal.aborted?"DEADLINE_EXCEEDED":"PROVIDER_UNAVAILABLE"); }
+    catch { try { await calls.finish(id,"UNKNOWN"); } catch { /* Preserve unknown reservation. */ } throw new AdmissionError(budget.expired?"DEADLINE_EXCEEDED":options.signal.aborted?"CONFLICT":"PROVIDER_UNAVAILABLE"); }
     finally{budget.stop();}
   } };
 }
