@@ -5,7 +5,7 @@ import { user } from "./auth-schema";
 export const appUsers = pgTable("app_users", {
   id: uuid("id").defaultRandom().primaryKey(),
   authSubject: text("auth_subject").notNull().unique().references(() => user.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
 });
 
 export const conversations = pgTable("conversations", {
@@ -16,8 +16,8 @@ export const conversations = pgTable("conversations", {
   title: varchar("title", { length: 160 }).notNull(),
   revision: integer("revision").notNull().default(0),
   nextSequence: integer("next_sequence").notNull().default(1),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("conversations_owner_creation_unique").on(table.userId, table.creationRequestId),
   index("conversations_owner_updated_idx").on(table.userId, table.updatedAt.desc(), table.id.desc()),
@@ -38,8 +38,8 @@ export const messages = pgTable("messages", {
   schemaVersion: integer("schema_version").notNull().default(1),
   sequence: integer("sequence").notNull(),
   policyVersion: text("policy_version"),
-  approvedAt: timestamp("approved_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  approvedAt: timestamp("approved_at", { withTimezone: true, precision: 3 }),
+  createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("messages_conversation_sequence_unique").on(table.conversationId, table.sequence),
   check("messages_sequence_positive", sql`${table.sequence} > 0`),

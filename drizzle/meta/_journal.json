@@ -15,6 +15,13 @@
       "when": 1792663129852,
       "tag": "0001_private_conversations",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792663416789,
+      "tag": "0002_cursor_timestamp_precision",
+      "breakpoints": true
     }
   ]
 }
