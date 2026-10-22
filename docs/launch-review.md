@@ -103,6 +103,14 @@ and no deployment was triggered while these gates were unmet. A protected previe
 with research unavailable is a separate option, not evidence of a functional public
 research launch. No paid plan, billing activation or provider purchase was performed.
 
+`vercel.json` pins functions to `sin1` (Singapore), matching the configured Neon
+region. This prepares deployment placement; it is not a measured hosted speedup.
+Vercel documents `regions` as overriding the project default and supports the
+repository's Node.js 24 major version. Recheck placement when moving databases.
+Sources: [region configuration](https://vercel.com/docs/functions/configuring-functions/region),
+[region list](https://vercel.com/docs/regions),
+[Node versions](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions).
+
 ## Measured results
 
 Three samples per route/profile; maxima below are across the three profiled routes.
