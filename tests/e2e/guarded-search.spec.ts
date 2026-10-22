@@ -33,10 +33,31 @@ test("a public question shows guarded progress, committed citations and exact re
     await expect(page.locator(".answer-prose")).toContainText("A rainbow appears");expect(bytes).not.toMatch(/PRIVATE_REASONING_MUST_NOT_LEAK|UNREVIEWED_PRIVATE_DRAFT|contentHash|passageId/);
     expect(bytes.indexOf('"type":"text-delta"')).toBeGreaterThan(bytes.indexOf('"stage":"SAVING_ANSWER"'));
     await writeFile(`.artifacts/t11-wire-${info.project.name}.json`,JSON.stringify(await page.evaluate(()=>window.t11Timings[0]),null,2));
+    await writeFile(`.artifacts/launch-stream-${info.project.name}.json`,JSON.stringify({timing:response.request().timing(),serverTiming:response.headers()["server-timing"],contentType:response.headers()["content-type"],cacheControl:response.headers()["cache-control"]},null,2));
     const submitted=requests[0] as {clientRequestId:string;conversationId:string};expect(Object.keys(submitted).sort()).toEqual(["clientRequestId","conversationId","expectedRevision","message","mode","modelKey"]);
     await expect(page.locator("h1")).toHaveText("Why do rainbows form?");expect(requests).toHaveLength(1);
     const rendered=await page.locator(".answer-prose").textContent();
     await page.reload();await expect(page.locator(".answer-prose")).toHaveText(rendered??"");
+    await page.waitForTimeout(100); // Flush paint observers for the saved-answer lab sample.
+    await writeFile(`.artifacts/launch-answer-performance-${info.project.name}.json`,JSON.stringify(await page.evaluate(()=>({
+      ...window.t11Rendering,jsTransferBytes:performance.getEntriesByType("resource").filter(r=>r.name.includes(".js")).reduce((n,r)=>n+(r as PerformanceResourceTiming).transferSize,0),
+    })),null,2));
+    await expect(page.locator(".answer-prose")).toHaveCSS("font-size","16px");
+    await context.grantPermissions(["clipboard-read","clipboard-write"]);
+    const animation=await context.newCDPSession(page);
+    await animation.send("Animation.enable");await animation.send("Animation.setPlaybackRate",{playbackRate:.1});
+    await page.getByRole("button",{name:"Copy answer",exact:true}).click();
+    await expect(page.getByRole("button",{name:"Answer copied",exact:true})).toBeVisible();
+    const frame=bytes.split("\n").find(line=>line.startsWith('data: {"type":"data-answer"'));
+    expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe(JSON.parse(frame!.slice(6)).data.text);
+    // Observe the actual CSS transition at 10% speed without changing application state.
+    await page.waitForTimeout(300);
+    await page.screenshot({path:`.artifacts/launch-copy-slow-${info.project.name}.png`});
+    await animation.send("Animation.setPlaybackRate",{playbackRate:1});
+    await page.emulateMedia({reducedMotion:"reduce"});
+    await expect(page.locator(".copy-symbol").first()).toHaveCSS("transition-duration","0s");
+    await page.emulateMedia({reducedMotion:"no-preference"});
+    await animation.detach();
     await page.getByRole("button",{name:"Sources",exact:true}).click();
     const sourceSurface=info.project.name==="mobile"?page.getByRole("dialog",{name:"Answer sources"}):page.getByRole("complementary",{name:"Answer sources"});
     await expect(sourceSurface).toBeInViewport();await expect(sourceSurface.getByRole("link")).toHaveCount(3);

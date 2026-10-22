@@ -16,15 +16,20 @@ function Citation({ source }: { source: PublicAnswer["sources"][number] }) {
     return()=>{window.removeEventListener("scroll",dismiss,true);window.removeEventListener("resize",dismiss);};
   },[tip]);
   return <><a className="answer-citation" href={source.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label={`Source ${source.number}: ${source.title}`} aria-describedby={tip?id:undefined}
-    onFocus={event=>open(event.currentTarget)} onBlur={()=>setTip(null)} onKeyDown={event=>{if(event.key==="Escape")setTip(null);}}
+    onFocus={event=>{const element=event.currentTarget;requestAnimationFrame(()=>{if(document.activeElement===element)open(element);});}} onBlur={()=>setTip(null)} onKeyDown={event=>{if(event.key==="Escape")setTip(null);}}
     onPointerEnter={event=>{if(event.pointerType!=="touch")open(event.currentTarget);}} onPointerLeave={event=>{if(document.activeElement!==event.currentTarget)setTip(null);}}>
     <Icon name="link" size={10}/><span>{source.domain.replace(/\.(gov|com|org|edu)$/u,"")}</span>
   </a>{tip&&createPortal(<span className="citation-tooltip" role="tooltip" id={id} style={{left:tip.left,top:tip.top,width:tip.width,maxHeight:tip.maxHeight,transform:tip.above?"translateY(-100%)":undefined}}>{source.title}<small>{source.domain} · Source {source.number}</small></span>,document.body)}</>;
 }
 export function ApprovedAnswer({ answer,text,onSources }: { answer: PublicAnswer;text: string;onSources: ()=>void }) {
   const [copied,setCopied] = useState(false),[copyFailed,setCopyFailed] = useState(false);
+  const copyTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  useEffect(()=>()=>{if(copyTimer.current)clearTimeout(copyTimer.current);},[]);
   async function copy() {
-    try { await navigator.clipboard.writeText(text);setCopied(true);setCopyFailed(false);setTimeout(()=>setCopied(false),1800); }
+    try { await navigator.clipboard.writeText(text);setCopied(true);setCopyFailed(false);
+      if(copyTimer.current)clearTimeout(copyTimer.current);
+      copyTimer.current=setTimeout(()=>setCopied(false),1800);
+    }
     catch { setCopyFailed(true); }
   }
   function render(nodes: AnswerNode[]): ReactNode { return nodes.map((node,index)=>{
@@ -49,7 +54,10 @@ export function ApprovedAnswer({ answer,text,onSources }: { answer: PublicAnswer
     <div className="answer-researched">{answer.kind === "ANSWER" ? "Researched" : answer.kind === "NO_EVIDENCE" ? "Search complete" : "One more detail"}</div>
     <div className="answer-prose">{render(answer.document)}</div>
     <div className="answer-actions">
-      <button className="research-icon-button" onClick={()=>void copy()} aria-label={copied ? "Answer copied" : "Copy answer"}><Icon name={copied ? "check" : "copy"} size={17} /></button>
+      <button className="research-icon-button answer-copy" onClick={()=>void copy()} aria-label={copied ? "Answer copied" : "Copy answer"}>
+        <span className="copy-symbol" data-active={!copied} aria-hidden="true"><Icon name="copy" size={17}/></span>
+        <span className="copy-symbol" data-active={copied} aria-hidden="true"><Icon name="check" size={17}/></span>
+      </button>
       {answer.sources.length > 0 && <button className="answer-source-count" onClick={onSources}><Icon name="link" size={15} />{answer.sources.length} {answer.sources.length === 1 ? "source" : "sources"}</button>}
       <span className="copy-feedback" role="status">{copyFailed ? "Copy is unavailable. Select the text to copy it." : copied ? "Copied" : ""}</span>
     </div>

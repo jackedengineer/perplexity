@@ -1,9 +1,13 @@
 import type { Page } from "@playwright/test";
-declare global {interface Window {t11Received:string[];t11Timings:{type:string;stage?:string;atMs:number}[][]}}
+declare global {interface Window {t11Received:string[];t11Timings:{type:string;stage?:string;atMs:number}[][];t11Rendering:{lcp:number;cls:number;longTasks:number[]}}}
 // Observe a cloned response without buffering the actual UI stream or changing the endpoint.
 export async function observeChatWire(page: Page) {
   await page.addInitScript(()=>{
     const original=window.fetch;window.t11Received=[];window.t11Timings=[];
+    window.t11Rendering={lcp:0,cls:0,longTasks:[]};
+    new PerformanceObserver(list=>{for(const entry of list.getEntries())window.t11Rendering.lcp=entry.startTime;}).observe({type:"largest-contentful-paint",buffered:true});
+    new PerformanceObserver(list=>{for(const entry of list.getEntries()){const shift=entry as PerformanceEntry&{hadRecentInput:boolean;value:number};if(!shift.hadRecentInput)window.t11Rendering.cls+=shift.value;}}).observe({type:"layout-shift",buffered:true});
+    new PerformanceObserver(list=>{for(const entry of list.getEntries())window.t11Rendering.longTasks.push(entry.duration);}).observe({type:"longtask",buffered:true});
     window.fetch=async(...args)=>{
       const started=performance.now(),response=await original(...args);
       const url=String(args[0] instanceof Request?args[0].url:args[0]);
