@@ -28,27 +28,27 @@ for(const kind of ['rate','quota'] as const)test(`${kind} denial has a usable fi
   await page.screenshot({path:`.artifacts/t19-${kind}-${info.project.name}.png`});
  }finally{await page.goto('/workspace');await identity.cleanup();await f.close();}
 });
-test('a stage deadline stays visible and same-intent retries cannot restart paid stages',async({page,context},info)=>{
+for(const stage of ['answer','safety'] as const)test(`a ${stage} stage deadline stays visible and same-intent retries cannot restart paid stages`,async({page,context},info)=>{
  const identity=await identityFixture(context,'Deadline Tester'),f=createNeonFixture();let operatorIds:string[]=[];
  try{
   const [profile]=await f.owner.insert(schema.appUsers).values({authSubject:identity.id}).returning();
   const window={startsAt:new Date(Date.now()-86400000),endsAt:new Date(Date.now()+86400000)};
   await f.owner.insert(schema.usageBuckets).values((['PERIOD','DAY'] as const).map(kind=>({userId:profile.id,kind,...window,entitlementVersion:'test-t19',creditLimit:10,providerLimitMicroUsd:100000n})));
   operatorIds=(await f.owner.insert(schema.operatorUsageBuckets).values((['PERIOD','DAY'] as const).map(kind=>({budgetKey:process.env.T11_TEST_BUDGET_KEY!,kind,...window,providerLimitMicroUsd:100000n}))).returning({id:schema.operatorUsageBuckets.id})).map(r=>r.id);
-  await page.goto('/workspace');await page.getByRole('textbox',{name:'Ask a question'}).fill('t19-deadline Explain why rainbows form.');
+  await page.goto('/workspace');await page.getByRole('textbox',{name:'Ask a question'}).fill(`${stage==='safety'?'t19-safety-deadline':'t19-deadline'} Explain why rainbows form.`);
   const pending=page.waitForResponse(r=>r.url().endsWith('/api/chat'));await page.getByRole('button',{name:'Submit question'}).click();
   const response=await pending,runId=response.headers()['x-run-id'],body=response.request().postDataJSON();expect(response.status()).toBe(200);expect(runId).toBeTruthy();
   const [initial]=await f.owner.select().from(schema.runs).where(eq(schema.runs.id,runId));
-  await expect(page.getByRole('main').getByRole('alert')).toContainText('Research exceeded its time limit.',{timeout:45000});
-  const status=await context.request.get(`/api/runs/${runId}`);expect((await status.json()).state).toBe('UNAVAILABLE');
-  await expect(page.getByRole('main').getByRole('alert')).toContainText('Research exceeded its time limit.');
+  await expect(page.getByRole('main').getByRole('alert')).toContainText('This research request timed out.',{timeout:45000});
+  const status=await context.request.get(`/api/runs/${runId}`);expect(await status.json()).toMatchObject({state:'UNAVAILABLE',terminalReason:'TIMED_OUT'});
+  await expect(page.getByRole('main').getByRole('alert')).toContainText('This research request timed out.');
   const before=await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,runId));
-  expect(before.some(c=>c.stage==='OUTPUT_SAFETY')).toBe(false);expect(before.find(c=>c.stage==='ANSWER')?.status).toBe('UNKNOWN');
+  expect(before.some(c=>c.stage==='OUTPUT_SAFETY')).toBe(false);expect(before.find(c=>c.stage===(stage==='safety'?'INPUT_SAFETY':'ANSWER'))?.status).toBe('UNKNOWN');
   await expect(page.locator('.answer-prose')).toHaveCount(0);
   const replay=await context.request.post('/api/chat',{headers:{Origin:'http://localhost:3001'},data:body});await replay.text();
   expect(await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,runId))).toHaveLength(before.length);
   expect((await f.owner.select().from(schema.runs).where(eq(schema.runs.id,runId)))[0].deadlineAt).toEqual(initial.deadlineAt);
   expect((await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,runId)))[0].heldProviderMicroUsd).toBeGreaterThan(0n);
-  await page.screenshot({path:`.artifacts/t19-deadline-${info.project.name}.png`});
+  await page.screenshot({path:`.artifacts/t19-${stage}-deadline-${info.project.name}.png`});
  }finally{await page.goto('/workspace');await identity.cleanup();if(operatorIds.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,operatorIds));await f.close();}
 });

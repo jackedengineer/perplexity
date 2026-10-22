@@ -74,6 +74,13 @@ continuation. Original bucket windows and held costs survive disconnect/retry.
 Claims constrain application dispatch, not a provider's ability to overbill or
 ignore cancellation; over-cap reports halt continuation and require investigation.
 Database deadline expiry takes precedence over an abort when persisting TIMED_OUT.
+Each stage timer also records its own expiry independently of caller cancellation.
+Safety-stage expiry propagates TIMEOUT through each gate and becomes the same
+DEADLINE_EXCEEDED outcome as an answer/search deadline, with TIMED_OUT persistence.
+An obtained policy refusal remains BLOCKED even if its settlement acquires the
+lock after the deadline; settlement cannot replace that audit decision with an
+infrastructure/timeout verdict. Cancellation before a stage timer fires remains
+cancellation. In-progress duplicate admissions emit the fixed state category.
 
 ## Outcomes
 
@@ -132,3 +139,13 @@ are retained. Dependency audit has no high/critical production advisories; the
 existing moderate tooling advisory remains. Production migrations 0007–0008,
 hosted cron activation, retention automation and paid-provider verification remain
 separate release work. T12–T17 and the public/paid launch gates remain open.
+
+PR #8 review corrections add regression coverage for safety timeouts at all four
+gates, timer-versus-caller abort causes, answer/search cancellation, policy refusals
+crossing settlement deadlines and duplicate-admission logs. The corrected suite
+has 447 tests in 46 files; lint, TypeScript and production build pass. Browser
+deadline checks assert the saved TIMED_OUT reason and its fixed recovery message,
+as well as unchanged deadlines and provider counts on replay. An interrupted
+fixture run left two test-budget rows; only its captured disposable identity,
+budget IDs and subject counter digest were removed before rerunning. No real
+user allowance or production data was changed.
