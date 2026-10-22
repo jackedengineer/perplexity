@@ -46,6 +46,7 @@ it("duplicate running intents return a recoverable run ID without starting provi
   const f=fixture();f.backend.admit.mockResolvedValue({kind:"RUN_IN_PROGRESS",run:f.run});
   const response=await f.http.post(f.request());expect(response.status).toBe(409);expect(response.headers.get("x-run-id")).toBe(f.run.id);
   expect(f.backend.execute).not.toHaveBeenCalled();
+  expect(f.dependencies.log).toHaveBeenCalledWith(expect.objectContaining({event:'chat.admission',outcome:'RUN_IN_PROGRESS',category:'state'}));
 });
 it("completed retries load canonical state and never execute providers",async()=>{
   const f=fixture();f.backend.admit.mockResolvedValue({kind:"RUN_ALREADY_FINISHED",run:f.run});

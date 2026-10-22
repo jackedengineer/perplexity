@@ -44,7 +44,10 @@ export function createChatHttp(dependencies: Dependencies) {
           return failure(admission.code,requestId);
         }
         const run = admission.run;
-        if (admission.kind === "RUN_IN_PROGRESS") return failure("RUN_IN_PROGRESS",requestId,run);
+        if (admission.kind === "RUN_IN_PROGRESS") {
+          dependencies.log({event:"chat.admission",requestId,outcome:"RUN_IN_PROGRESS",category:"state",durationMs:Math.round(performance.now()-started)});
+          return failure("RUN_IN_PROGRESS",requestId,run);
+        }
         const controller = new AbortController(),signal = AbortSignal.any([request.signal,controller.signal]);
         const stream = createUIMessageStream<ResearchMessage>({
           onError: ()=>createPublicError("PROVIDER_UNAVAILABLE",requestId).body.error.message,
