@@ -33,11 +33,18 @@ credentials into local development or a normal local production build. Existing
 development configuration remains in `.env.local`. See the installed Next.js
 environment guide and [documented load order](https://nextjs.org/docs/app/guides/environment-variables#environment-variable-load-order).
 
-Production migration and read-only verification used explicit process environment:
+The original setup used Node `--env-file`. PR review identified that inherited
+variables could override it. The corrected commands below read only the explicit
+file, require both database URLs, validate the exact expected production host,
+roles, database and TLS mode, and never fall back to development:
 
 ```sh
-node --env-file=.env.launch.local node_modules/drizzle-kit/bin.cjs migrate
-node --env-file=.env.launch.local scripts/verify-db.mjs
+PERPLEX_DB_ENV_FILE=.env.launch.local \
+PERPLEX_DB_EXPECTED_HOST=ep-small-bread-b3we4v54.c-4.ap-southeast-1.aws.neon.tech \
+node node_modules/drizzle-kit/bin.cjs migrate
+PERPLEX_DB_ENV_FILE=.env.launch.local \
+PERPLEX_DB_EXPECTED_HOST=ep-small-bread-b3we4v54.c-4.ap-southeast-1.aws.neon.tech \
+node scripts/verify-db.mjs
 ```
 
 The existing runtime-role script is development-specific: **do not run it unchanged
