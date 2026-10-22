@@ -34,3 +34,45 @@ Protocol references: [AI SDK generateText](https://ai-sdk.dev/docs/reference/ai-
 and [OpenRouter AI SDK provider](https://github.com/OpenRouterTeam/ai-sdk-provider).
 Dependency installation uses pinned versions and disabled scripts; the existing
 moderate audit advisory remains, with no high/critical production advisory.
+
+## Output approval
+
+Parse Markdown as an AST. Reject HTML, links, images, definitions, unsafe
+schemes, unknown citation IDs and citation syntax hidden in code/escapes.
+A deterministic failure cannot be overridden by a classifier ALLOW. The initial
+answer role may write headings, lists, emphasis, quotes and code, but cannot
+create arbitrary links. Future rendering must keep raw HTML and autolinks off.
+
+Construct the visible source registry from the selected run package, not from
+model-written URLs. Number unique citations by first appearance, include only
+cited sources and preserve passage IDs/content hashes. Support remains
+NOT_CHECKED; citation membership does not establish factual accuracy.
+
+The semantic output guard inspects the complete answer plus every visible title,
+URL and source value, using the original question as data context. A distinct
+output-role prompt has no tools or permission to rewrite content. Missing,
+stale, malformed, timed-out or rejected verdicts return only fixed safe text.
+Clarifications and the fixed no-evidence answer use this same gate.
+
+Approval creates a deeply frozen payload registered in a private WeakSet. JSON
+cloning, object spreading, a matching TypeScript cast, or passing the storage
+schema cannot manufacture the in-process capability accepted by finalization.
+The storage schema validates shape only. Commit code must independently verify
+ownership, run/attempt/revision/policy, source membership and original deadline.
+
+The browser still reads committed approved history through the existing owner
+checks. No API route or Server Action exposes these private preparation helpers.
+Provider cost data and draft text never belong in progress events or logs.
+
+Stored payload digests use the runtime schema's deterministic field order, so
+JSONB key ordering cannot accidentally change the canonical response hash.
+Hash the complete approved payload separately from the exact UTF-8 message body.
+The latter binds reviewed text to the database's assistant-write policy; neither
+digest authorizes release by itself. Citation/source membership is rechecked
+against the run's relational evidence before a committed message is created.
+
+Output-verification coverage includes explicit schema overrides, reference-style
+links, encoded citations, repeated/out-of-order citations, unsafe unused metadata,
+legitimate Markdown and Unicode, frozen-object mutation and stale/unknown guards.
+The cases prove deterministic boundaries and adapter behavior with test doubles;
+they do not establish multilingual classifier accuracy or factual support rates.
