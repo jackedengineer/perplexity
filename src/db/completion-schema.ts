@@ -13,6 +13,7 @@ export const providerCalls = pgTable("provider_calls",{
   costMicroUsd: bigint("cost_micro_usd",{ mode: "bigint" }),inputTokens: integer("input_tokens"),outputTokens: integer("output_tokens"),searchCredits: integer("search_credits"),
   startedAt: instant("started_at").notNull(),finishedAt: instant("finished_at"),
 },t=>[
+  uniqueIndex("provider_id_run_unique").on(t.id,t.runId),
   uniqueIndex("provider_run_stage_unique").on(t.runId,t.stage),
   check("provider_attempt_valid",sql`${t.attemptVersion} > 0 AND length(trim(${t.requestedModel})) > 0 AND ${t.status} IN ('STARTED','SUCCEEDED','UNKNOWN','SKIPPED')`),
   check("provider_cap_valid",sql`${t.capMicroUsd} > 0 AND ${t.capMicroUsd} = CASE ${t.stage} WHEN 'INPUT_SAFETY' THEN 5000 WHEN 'QUERY_SAFETY' THEN 5000 WHEN 'SEARCH' THEN 8000 WHEN 'EVIDENCE_SAFETY' THEN 5000 WHEN 'ANSWER' THEN 20000 WHEN 'OUTPUT_SAFETY' THEN 5000 ELSE -1 END`),

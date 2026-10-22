@@ -36,6 +36,7 @@ try {
     GRANT UPDATE (status, actual_model, cost_micro_usd, input_tokens, output_tokens, search_credits, finished_at) ON provider_calls TO perplex_web;
     GRANT UPDATE (settled_credits, settled_provider_micro_usd) ON usage_buckets TO perplex_web;
     GRANT UPDATE (settled_provider_micro_usd) ON operator_usage_buckets TO perplex_web`);
+  await pool.query("GRANT SELECT ON provider_usage_resolutions TO perplex_web; GRANT SELECT, INSERT ON run_reconciliations TO perplex_web");
   await pool.query("COMMIT");
   const runtimeUrl = new URL(process.env.DATABASE_URL);
   runtimeUrl.username = role;

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and,eq,gt,sql } from "drizzle-orm";
 import { z } from "zod";
-import { conversations,messages,outputReviews,messageCitations,runs,inputSafetyReviews,providerCalls,runSettlements,runSources,sourcePassages,session,runRetrievals } from "@/db/schema";
+import { ACTIVE_RUN_STATUSES,conversations,messages,outputReviews,messageCitations,runs,inputSafetyReviews,providerCalls,runSettlements,runSources,sourcePassages,session,runRetrievals } from "@/db/schema";
 import type { AdmissionDatabase,AdmissionTransaction } from "./usage";
 import { lockOwnedRun } from "./lock";
 import { AdmissionError } from "./errors";
@@ -66,16 +66,28 @@ export function createFinalization(db: AdmissionDatabase) {
       try { return await db.transaction(async(tx): Promise<Finalization>=>{
         const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
         if (fence && (run.attemptVersion !== fence.attemptVersion || conversation.revision !== fence.revision)) throw new AdmissionError("CONFLICT");
-        const [settled] = await tx.select().from(runSettlements).where(eq(runSettlements.runId,runId));
-        if (run.status === "COMPLETED") throw new AdmissionError("CONFLICT");
-        if (!settled) {
-          await tx.insert(outputReviews).values({ runId,conversationId: conversation.id,attemptVersion: run.attemptVersion,
-            decision: code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCK" : "UNAVAILABLE",policyVersion: SAFETY_POLICY.version,createdAt: now });
-          await settleRun(tx,run,0,now);
-          await tx.update(runs).set({ status: cancelled || run.status === "CANCELLED" ? "CANCELLED" : run.deadlineAt <= now ? "TIMED_OUT" : code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCKED" : "FAILED",updatedAt: now }).where(eq(runs.id,runId));
-        }
+        await settleFailureLocked(tx,run,now,code,cancelled);
         return { kind: "DENIED",code };
       }); } catch (error) { return { kind: "DENIED",code: error instanceof AdmissionError ? error.code : "PROVIDER_UNAVAILABLE" }; }
     },
   };
+}
+
+// Caller holds owner/conversation/run locks. No external work occurs in this transaction.
+export async function settleFailureLocked(tx: AdmissionTransaction,run: typeof runs.$inferSelect,now: Date,code: PublicErrorCode,cancelled=false) {
+  const active=ACTIVE_RUN_STATUSES.some(s=>s===run.status);
+  if(run.status === "COMPLETED" || run.status === "NEEDS_CLARIFICATION") throw new AdmissionError("CONFLICT");
+  const [settled]=await tx.select().from(runSettlements).where(eq(runSettlements.runId,run.id));
+  if(settled) {
+    if(active)throw new AdmissionError("CONFLICT");
+    return;
+  }
+  const [review]=await tx.select().from(outputReviews).where(eq(outputReviews.runId,run.id));
+  if(review?.decision === "ALLOW")throw new AdmissionError("CONFLICT");
+  if(!review)await tx.insert(outputReviews).values({runId:run.id,conversationId:run.conversationId,attemptVersion:run.attemptVersion,
+    decision:code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCK" : "UNAVAILABLE",policyVersion:SAFETY_POLICY.version,createdAt:now});
+  await settleRun(tx,run,0,now);
+  const status=!active ? run.status : run.deadlineAt <= now ? "TIMED_OUT" : cancelled ? "CANCELLED" : code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCKED" : "FAILED";
+  await tx.update(runs).set({status,updatedAt:now,attemptVersion:run.attemptVersion+(active?1:0)})
+    .where(and(eq(runs.id,run.id),eq(runs.status,run.status),eq(runs.attemptVersion,run.attemptVersion)));
 }
