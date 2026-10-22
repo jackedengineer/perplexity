@@ -12,31 +12,32 @@ test("private conversations persist, rename and deny a second user", async ({ br
   page.on("pageerror", (error) => errors.push(error.message));
   try {
     await page.goto("/workspace");
-    await expect(page.getByRole("textbox", { name: "Conversation title" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Ask a question" })).toBeVisible();
     if (testInfo.project.name === "desktop") {
       const original = page.viewportSize()!;
       await page.setViewportSize({ width: 876, height: 804 });
       const composer = await page.locator("form.research-composer").boundingBox();
-      expect(composer?.x).toBeCloseTo(304, 0);
+      expect(composer?.x).toBeCloseTo(146, 0);
       expect(composer?.y).toBeCloseTo(321.6, 0);
-      expect(composer?.width).toBeCloseTo(508, 0);
-      expect(composer?.height).toBeCloseTo(120, 0);
+      expect(composer?.width).toBeCloseTo(640, 0);
+      expect(composer?.height).toBeCloseTo(96, 0);
       await page.screenshot({ path: ".artifacts/workspace-reference-viewport.png" });
       await page.setViewportSize(original);
     }
-    await page.getByRole("textbox", { name: "Conversation title" }).fill("Rainbows and curious questions");
+    await page.route("**/api/chat",route=>route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({error:{code:"CONFIGURATION_UNAVAILABLE",message:"Research is not available right now."},requestId:randomUUID()})}));
+    await page.getByRole("textbox", { name: "Ask a question" }).fill("Rainbows and curious questions");
     await page.route("**/api/conversations", (route) => route.fulfill({ status: 503,
       contentType: "application/json", body: JSON.stringify({ error: { message: "Temporary outage" } }) }));
-    await page.getByRole("button", { name: "Create conversation", exact: true }).click();
+    await page.getByRole("button", { name: "Submit question", exact: true }).click();
     await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
-    await expect(page.getByRole("textbox", { name: "Conversation title" })).toHaveValue("Rainbows and curious questions");
+    await expect(page.getByRole("textbox", { name: "Ask a question" })).toHaveValue("Rainbows and curious questions");
     await page.unroute("**/api/conversations");
-    await page.getByRole("button", { name: "Create conversation", exact: true }).click();
+    await page.getByRole("button", { name: "Submit question", exact: true }).click();
     await expect(page).toHaveURL(/\/search\/[\da-f-]{36}$/u);
     const id = page.url().split("/").at(-1)!;
-    await expect(page.getByRole("heading", { name: "Rainbows and curious questions" })).toBeVisible();
+    await expect(page.getByRole("article",{name:"Your question"})).toContainText("Rainbows and curious questions");
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Rainbows and curious questions" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "New search",exact:true })).toBeVisible();
     await page.getByRole("button", { name: "Conversation actions" }).click();
     await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Edit conversation title" });

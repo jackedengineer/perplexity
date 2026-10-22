@@ -1,0 +1,25 @@
+import type { Page } from "@playwright/test";
+declare global {interface Window {t11Received:string[];t11Timings:{type:string;stage?:string;atMs:number}[][]}}
+// Observe a cloned response without buffering the actual UI stream or changing the endpoint.
+export async function observeChatWire(page: Page) {
+  await page.addInitScript(()=>{
+    const original=window.fetch;window.t11Received=[];window.t11Timings=[];
+    window.fetch=async(...args)=>{
+      const started=performance.now(),response=await original(...args);
+      const url=String(args[0] instanceof Request?args[0].url:args[0]);
+      if(url.endsWith("/api/chat")&&response.body){
+        const reader=response.clone().body!.getReader();
+        void (async()=>{
+          const decoder=new TextDecoder(),events:{type:string;stage?:string;atMs:number}[]=[];let bytes="",buffer="";
+          try {for(;;){const next=await reader.read();if(next.done)break;const text=decoder.decode(next.value,{stream:true});bytes+=text;buffer+=text;
+            if(bytes.length>128000)throw new Error("Fixture wire exceeded bound");
+            const lines=buffer.split("\n");buffer=lines.pop()??"";
+            for(const line of lines){if(!line.startsWith("data: ")||line.includes("[DONE]"))continue;const frame=JSON.parse(line.slice(6));events.push({type:frame.type,...(frame.data?.stage?{stage:frame.data.stage}:{}),atMs:Math.round(performance.now()-started)});}
+          }} catch {/* Preserve partial bytes on an intentional abort. */}
+          finally {reader.releaseLock();window.t11Received.push(bytes);window.t11Timings.push(events);}
+        })();
+      }
+      return response;
+    };
+  });
+}

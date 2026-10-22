@@ -31,10 +31,10 @@ test("only committed approved answers survive browser reload and owner checks",a
     await context.addCookies([cookie(owner.token)]);await page.goto(`/search/${owner.conversation.id}`);
     await expect(page.locator(".answer-prose p")).toContainText("Water refracts sunlight");
     await expect(page.getByRole("link",{ name: "Source 1: Rainbow evidence",exact: true })).toHaveAttribute("href","https://example.org/rainbows");
-    const rendered = await page.locator(".answer-prose").innerText();
-    await page.reload();await expect(page.locator(".answer-prose")).toHaveText(rendered,{ useInnerText: true });
+    const rendered = await page.locator(".answer-prose").textContent();
+    await page.reload();await expect(page.locator(".answer-prose")).toHaveText(rendered??"");
     await page.getByRole("button",{ name: "1 source",exact: true }).click();
-    await expect(page.getByRole("complementary",{ name: "Answer sources" }).getByRole("link")).toHaveAttribute("rel","noopener noreferrer");
+    await expect((testInfo.project.name==="mobile"?page.getByRole("dialog",{name:"Answer sources"}):page.getByRole("complementary",{ name: "Answer sources" })).getByRole("link")).toHaveAttribute("rel","noopener noreferrer");
     const history = await context.request.get(`/api/conversations/${owner.conversation.id}/messages`);
     expect(history.status()).toBe(200);expect(await history.text()).not.toMatch(/PRIVATE REASONING|UNREVIEWED_PRIVATE_DRAFT/);
     expect((await new AxeBuilder({ page }).withTags(["wcag2a","wcag2aa","wcag21aa"]).analyze()).violations).toEqual([]);

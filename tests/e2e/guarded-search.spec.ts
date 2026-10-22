@@ -1,0 +1,126 @@
+import { writeFile } from "node:fs/promises";
+import { observeChatWire } from "./wire-observer";
+import { test,expect } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+import { identityFixture } from "./identity-fixture";
+import { createNeonFixture } from "../live/admission-fixture";
+import * as schema from "@/db/schema";
+import { eq,inArray } from "drizzle-orm";
+async function provision(f: ReturnType<typeof createNeonFixture>,subject: string) {
+  const [profile]=await f.owner.insert(schema.appUsers).values({authSubject:subject}).returning();
+  const window={startsAt:new Date(Date.now()-86400000),endsAt:new Date(Date.now()+86400000)};
+  await f.owner.insert(schema.usageBuckets).values((["DAY","PERIOD"] as const).map(kind=>({userId:profile.id,kind,...window,entitlementVersion:"test-t11",creditLimit:100,providerLimitMicroUsd:1000000n})));
+  // Only this dedicated test namespace; refuse to overwrite any existing buckets.
+  const operators=await f.owner.insert(schema.operatorUsageBuckets).values((["DAY","PERIOD"] as const).map(kind=>({budgetKey:process.env.T11_TEST_BUDGET_KEY!,kind,...window,providerLimitMicroUsd:1000000n}))).returning({id:schema.operatorUsageBuckets.id});
+  return operators.map(row=>row.id);
+}
+test("a public question shows guarded progress, committed citations and exact reload",async({page,context,browser},info)=>{
+  const identity=await identityFixture(context),f=createNeonFixture();let buckets:string[]=[];
+  await observeChatWire(page);
+  const errors:string[]=[],requests:unknown[]=[];page.on("pageerror",error=>errors.push(error.message));
+  page.on("request",request=>{if(request.url().endsWith("/api/chat"))requests.push(request.postDataJSON());});
+  try {
+    buckets=await provision(f,identity.id);await page.goto("/workspace");
+    await page.getByRole("textbox",{name:"Ask a question"}).fill("Why do rainbows form?");
+    const responsePromise=page.waitForResponse(response=>response.url().endsWith("/api/chat"));
+    await page.getByRole("button",{name:"Submit question"}).click();
+    await expect(page.getByRole("status").filter({hasText:/Checking request|Searching the web|Preparing an answer/u})).toBeVisible({timeout:15000});
+    expect(await page.locator(".answer-prose").count()).toBe(0);
+    await page.screenshot({path:`.artifacts/t11-progress-${info.project.name}.png`});
+    const response=await responsePromise;expect(response.status()).toBe(200);
+    await expect.poll(()=>page.evaluate(()=>window.t11Received.length),{timeout:60000}).toBe(1);
+    const bytes=await page.evaluate(()=>window.t11Received[0]);expect(bytes).toContain('"type":"data-answer"');
+    await expect(page.locator(".answer-prose")).toContainText("A rainbow appears");expect(bytes).not.toMatch(/PRIVATE_REASONING_MUST_NOT_LEAK|UNREVIEWED_PRIVATE_DRAFT|contentHash|passageId/);
+    expect(bytes.indexOf('"type":"text-delta"')).toBeGreaterThan(bytes.indexOf('"stage":"SAVING_ANSWER"'));
+    await writeFile(`.artifacts/t11-wire-${info.project.name}.json`,JSON.stringify(await page.evaluate(()=>window.t11Timings[0]),null,2));
+    const submitted=requests[0] as {clientRequestId:string;conversationId:string};expect(Object.keys(submitted).sort()).toEqual(["clientRequestId","conversationId","expectedRevision","message","mode","modelKey"]);
+    await expect(page.locator("h1")).toHaveText("Why do rainbows form?");expect(requests).toHaveLength(1);
+    const rendered=await page.locator(".answer-prose").textContent();
+    await page.reload();await expect(page.locator(".answer-prose")).toHaveText(rendered??"");
+    await page.getByRole("button",{name:"Sources",exact:true}).click();
+    const sourceSurface=info.project.name==="mobile"?page.getByRole("dialog",{name:"Answer sources"}):page.getByRole("complementary",{name:"Answer sources"});
+    await expect(sourceSurface).toBeInViewport();await expect(sourceSurface.getByRole("link")).toHaveCount(3);
+    await page.screenshot({path:`.artifacts/t11-sources-${info.project.name}.png`});
+    if(info.project.name==="mobile"){await page.getByRole("button",{name:"Close sources"}).press("Escape");await expect(page.getByRole("dialog",{name:"Answer sources"})).not.toBeVisible();}
+    const citation=page.getByRole("link",{name:/Source 1: What Causes/}).first();await expect(citation).toHaveAttribute("rel","noopener noreferrer");await citation.focus();const tooltip=page.getByRole("tooltip");await expect(tooltip).toBeVisible();
+    const bounds=await tooltip.boundingBox();expect(bounds!.x).toBeGreaterThanOrEqual(0);expect(bounds!.x+bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    await page.screenshot({path:`.artifacts/t11-citation-${info.project.name}.png`});
+    await page.getByRole("button",{name:"3 sources",exact:true}).focus();
+    expect((await new AxeBuilder({page}).withTags(["wcag2a","wcag2aa","wcag21aa"]).analyze()).violations).toEqual([]);
+    await page.getByRole("article",{name:"Your question"}).scrollIntoViewIfNeeded();
+    if(info.project.name==="desktop"){
+      const composer=await page.locator(".thread-bottom .research-composer").boundingBox();
+      expect(composer).toMatchObject({x:132,width:720,height:96});
+    }
+    await page.screenshot({path:`.artifacts/t11-answer-${info.project.name}.png`,fullPage:true});
+    if(info.project.name==="desktop"){
+      const original=page.viewportSize()!;
+      for(const width of [320,768,1024,1440]){await page.setViewportSize({width,height:800});expect(await page.locator(".answer-topbar").evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+      await page.setViewportSize(original);
+    }
+    expect(errors).toEqual([]);
+    // Same HTTP intent recovers the existing answer rather than another provider attempt.
+    const duplicate=await context.request.post("/api/chat",{headers:{Origin:"http://localhost:3001"},data:submitted});expect(duplicate.status()).toBe(200);expect(await duplicate.text()).toContain('"type":"data-answer"');
+    const [run]=await f.owner.select().from(schema.runs).where(eq(schema.runs.clientRequestId,submitted.clientRequestId));
+    expect(await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id))).toHaveLength(6);
+    expect(await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,run.id))).toHaveLength(1);
+    const stranger=await browser.newContext({baseURL:"http://localhost:3001"});const other=await identityFixture(stranger,"Other reader");
+    try {expect((await stranger.request.get(`/api/runs/${run.id}`)).status()).toBe(404);}finally{await other.cleanup();await stranger.close();}
+  } finally {
+    if(requests.length&&info.status!=="passed"){const value=requests[0] as {clientRequestId:string};const [run]=await f.owner.select().from(schema.runs).where(eq(schema.runs.clientRequestId,value.clientRequestId));if(run){console.info({state:run.status,ageMs:Date.now()-run.createdAt.getTime()});console.info((await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id))).map(c=>({stage:c.stage,status:c.status,durationMs:c.finishedAt?c.finishedAt.getTime()-c.startedAt.getTime():null})));}}
+    await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
+});
+for(const scenario of ["input-block","output-block","invalid-citation","search-failure","no-evidence"] as const){
+  test(`public ${scenario} keeps private content out of the stream and history`,async({page,context},info)=>{
+    const identity=await identityFixture(context),f=createNeonFixture();let buckets:string[]=[];
+    const errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));await observeChatWire(page);
+    try {
+      buckets=await provision(f,identity.id);await page.goto("/workspace");
+      await page.getByRole("textbox",{name:"Ask a question"}).fill(`t11-${scenario}: explain rainbow formation`);
+      const request=page.waitForRequest(request=>request.url().endsWith("/api/chat"));
+      await page.getByRole("button",{name:"Submit question"}).click();const submitted=(await request).postDataJSON();
+      await expect.poll(()=>page.evaluate(()=>window.t11Received.length),{timeout:60000}).toBe(1);
+      const bytes=await page.evaluate(()=>window.t11Received[0]);expect(bytes).not.toMatch(/PRIVATE_REASONING_MUST_NOT_LEAK|UNREVIEWED_PRIVATE_DRAFT|PRIVATE_UPSTREAM_MUST_NOT_LEAK|passageId|contentHash/);
+      const [run]=await f.owner.select().from(schema.runs).where(eq(schema.runs.clientRequestId,submitted.clientRequestId));
+      const calls=await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id));
+      const [receipt]=await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,run.id));expect(receipt.creditsCharged).toBe(0);
+      if(scenario==="no-evidence"){
+        await expect(page.locator(".answer-prose")).toContainText("I couldn’t find enough usable evidence");
+        expect(bytes).toContain('"type":"data-answer"');expect(bytes).not.toContain('"type":"source-url"');
+        expect(calls.find(call=>call.stage==="ANSWER")?.status).toBe("SKIPPED");
+      }else{
+        await expect(page.locator(".research-failure [role=alert]")).toBeVisible();expect(bytes).toContain('"type":"error"');expect(bytes).not.toContain('"type":"text-delta"');
+        await expect(page.locator(".answer-prose")).toHaveCount(0);
+      }
+      if(scenario==="input-block"){expect(calls.map(call=>call.stage)).toEqual(["INPUT_SAFETY"]);expect(bytes).not.toContain('"type":"data-stage"');}
+      if(scenario==="invalid-citation")expect(calls.some(call=>call.stage==="OUTPUT_SAFETY")).toBe(false);
+      if(scenario==="search-failure")expect(calls.some(call=>call.stage==="ANSWER")).toBe(false);
+      const history=await context.request.get(`/api/conversations/${submitted.conversationId}/messages`);expect(history.status()).toBe(200);
+      expect(await history.text()).not.toMatch(/UNREVIEWED_PRIVATE_DRAFT|PRIVATE_REASONING_MUST_NOT_LEAK|PRIVATE_UPSTREAM_MUST_NOT_LEAK/);
+      if(scenario==="input-block")expect((await history.json()).items).toEqual([]);
+      expect(errors).toEqual([]);expect((await new AxeBuilder({page}).withTags(["wcag2a","wcag2aa","wcag21aa"]).analyze()).violations).toEqual([]);
+      await page.screenshot({path:`.artifacts/t11-${scenario}-${info.project.name}.png`,fullPage:true});
+    }finally{await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
+  });
+}
+test("stop cancels the admitted request and replay cannot restart paid work",async({page,context},info)=>{
+  const identity=await identityFixture(context),f=createNeonFixture();let buckets:string[]=[];await observeChatWire(page);
+  const errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));
+  try {
+    buckets=await provision(f,identity.id);await page.goto("/workspace");
+    await page.getByRole("textbox",{name:"Ask a question"}).fill("t11-stop: explain rainbow formation");
+    const submittedPromise=page.waitForRequest(request=>request.url().endsWith("/api/chat"));
+    await page.getByRole("button",{name:"Submit question"}).click();const submitted=(await submittedPromise).postDataJSON();
+    await expect(page.getByRole("status").filter({hasText:"Searching the web"})).toBeVisible({timeout:15000});
+    await page.getByRole("button",{name:"Stop research"}).click();
+    await expect(page.locator(".research-failure [role=alert]")).toContainText("Research stopped");
+    await expect.poll(async()=>{const [run]=await f.owner.select().from(schema.runs).where(eq(schema.runs.clientRequestId,submitted.clientRequestId));return run.status;},{timeout:15000}).toBe("CANCELLED");
+    const [run]=await f.owner.select().from(schema.runs).where(eq(schema.runs.clientRequestId,submitted.clientRequestId));
+    const before=await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id));expect(before.some(call=>call.stage==="ANSWER")).toBe(false);
+    const response=await context.request.post("/api/chat",{headers:{Origin:"http://localhost:3001"},data:submitted});expect(await response.text()).not.toContain('"type":"text-delta"');
+    expect(await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id))).toHaveLength(before.length);
+    expect((await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,run.id)))[0].creditsCharged).toBe(0);
+    await expect(page.locator(".answer-prose")).toHaveCount(0);expect(errors).toEqual([]);
+    await page.screenshot({path:`.artifacts/t11-stopped-${info.project.name}.png`});
+  }finally{await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
+});

@@ -1,6 +1,6 @@
 # Build backlog
 
-T01–T03 and T05–T10 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T11 public guarded delivery is next. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
+T01–T03 and T05–T11 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T12 intent-preserving planning is next. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
 
 Commands and current verification results are in [README](../README.md) and [the foundation record](../docs/foundation-verification.md). Default integration tests use isolated PGlite PostgreSQL. Opt-in live browser tests use synthetic identities in the dedicated development Neon project, never production.
 
@@ -100,15 +100,17 @@ T08–T10 evidence: [guarded answers](../docs/guarded-answers.md). Private gener
 
 ### T11 — Deliver the minimal search UI end to end
 
-- [ ] Compose admission → input → search → private draft → approval → commit in `/api/chat`; implement the installed AI SDK UI protocol and transport for minimal newest-message submissions.
-- [ ] Add composer, fixed progress states, approved Markdown/citations, safe refusals and canonical reload; duplicate transport responses load existing status/history.
-- [ ] Verify: Playwright plus captured response bytes proves one real flow with mocked providers, exact reload, blocked input, blocked output, no raw-draft streaming and sanitized in-band errors.
+- [x] Compose admission → input → search → private draft → approval → commit in `/api/chat`; implement the installed AI SDK UI protocol and transport for minimal newest-message submissions.
+- [x] Add composer, fixed progress states, approved Markdown/citations, safe refusals and canonical reload; duplicate transport responses load existing status/history.
+- [x] Verify: Playwright plus captured response bytes proves one real flow with mocked providers, exact reload, blocked input, blocked output, no raw-draft streaming and sanitized in-band errors.
 - Dependencies: T10. Files: `src/server/runs/execute.ts`, `src/app/api/chat/route.ts`, `src/components/chat/chat.tsx`, `src/components/chat/answer.tsx`, `tests/e2e/guarded-search.spec.ts`.
+
+T11 evidence: [public search](../docs/public-search.md). Provider doubles and real development Neon verify transport, guards, settlement and browser behavior. Actual provider quality and a spending-capped live run remain unverified.
 
 ### Checkpoint B — first product milestone
 
-- [ ] One allowed query retrieves evidence, produces an approved cited answer and survives reload.
-- [ ] Input denial stops paid task/search calls; output denial exposes no unchecked text through stream/history/status/log capture.
+- [x] One allowed query retrieves evidence, produces an approved cited answer and survives reload.
+- [x] Input denial stops paid task/search calls; output denial exposes no unchecked text through stream/history/status/log capture.
 - [ ] Run a small spending-capped live smoke test after configuring actual credentials; record latency, usage and model IDs. This is the first point to demo the product.
 
 ## Milestone C — query planning and clarification
