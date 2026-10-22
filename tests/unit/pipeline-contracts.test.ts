@@ -48,7 +48,7 @@ it("requires bounded evidence with unique server IDs and valid source references
 });
 
 it("rejects unsafe display-link syntax without pretending URLs authorize network access", () => {
-  for (const url of ["https:example.com", "https://example.com\\path", "not a URL", "https://", "https://example.com/\0", "javascript:alert(1)", "data:text/html,hello", "file:///etc/passwd", "https://user:pass@example.com", "https://example.com/a\nb", "http://localhost/private", "http://127.0.0.1/private"]) {
+  for (const url of ["https://example.com/\ud800", "https:example.com", "https://example.com\\path", "not a URL", "https://", "https://example.com/\0", "javascript:alert(1)", "data:text/html,hello", "file:///etc/passwd", "https://user:pass@example.com", "https://example.com/a\nb", "http://localhost/private", "http://127.0.0.1/private"]) {
     expect(evidencePackageSchema.safeParse({ ...evidence, sources: [{ ...source, url }] }).success, url).toBe(false);
   }
 });
