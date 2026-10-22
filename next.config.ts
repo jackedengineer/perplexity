@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  logging: { incomingRequests: { ignore: [/\/api\/auth\//] } },
+  logging: { incomingRequests: { ignore: [/\/api\/auth\//, /\/api\/conversations/, /\/(?:library|workspace|search)(?:[/?]|$)/] } },
   async headers() {
     return [{
       source: "/(.*)",
