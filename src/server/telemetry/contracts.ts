@@ -4,7 +4,7 @@ import {INPUT_REASONS} from '@/server/safety/provider';
 import {safetyCategorySchema} from '@/server/safety/policy';
 const publicCodes=Object.keys(PUBLIC_ERRORS) as [keyof typeof PUBLIC_ERRORS,...(keyof typeof PUBLIC_ERRORS)[]];
 export const outcomeSchema=z.enum([...publicCodes,'ERROR','SUCCEEDED','UNKNOWN','SKIPPED','ALLOW','BLOCK','UNAVAILABLE','APPROVED','ACCEPTED','READY','NO_EVIDENCE','COMMITTED','ALREADY_COMMITTED','COMPLETED','ADMITTED']);
-export const stageSchema=z.enum(['http.identity','http.request_limit','http.validation','http.admission','http.delivery','http.status','run.execute','input.accept','retrieval','answer.complete','safety.input','safety.query','safety.evidence','safety.output','search','answer.draft','citations','output.release','persistence.commit','persistence.fail']);
+export const stageSchema=z.enum(['http.identity','http.request_limit','http.validation','http.configuration','http.admission','http.delivery','http.status','run.execute','input.accept','retrieval','answer.complete','safety.input','safety.query','safety.evidence','safety.output','search','answer.draft','citations','output.release','persistence.commit','persistence.fail']);
 export type TelemetryStage=z.infer<typeof stageSchema>;
 const count=z.int().min(0).max(1_000_000),money=z.string().regex(/^\d{1,16}$/u);
 const version=z.string().regex(/^[a-zA-Z0-9._-]{1,64}$/u);

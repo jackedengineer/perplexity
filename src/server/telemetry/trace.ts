@@ -41,7 +41,7 @@ export function recordTelemetry(event:TelemetryEvent['event'],value:unknown={}) 
  try {
   const fields=telemetryFieldsSchema.safeParse(value);if(!fields.success)return;
   const parsed=telemetryEventSchema.parse({...fields.data,...current.run,event,schemaVersion:1,timestamp:new Date().toISOString(),requestId:current.requestId,traceId:current.traceId,spanId:current.spanId,parentSpanId:current.parentSpanId,stage:current.stage});
-  try{current.sink(parsed);}catch{/* Logging is best effort; the ledger is authoritative. */}
+  try{void Promise.resolve(current.sink(parsed)).catch(()=>{});}catch{/* Logging is best effort; the ledger is authoritative. */}
   recordMetrics(parsed);
  }catch{/* Never emit validation errors or the rejected object. */}
 }
@@ -65,7 +65,7 @@ export async function traceStage<T>(stage:TelemetryStage,work:()=>Promise<T>,fie
   const emit=(phase:'START'|'END',details:TelemetryFields={})=>{
    const parsed=telemetryFieldsSchema.safeParse(details);if(!parsed.success)return;
    // phase is set only here, never accepted from caller/provider fields.
-   try{const event=telemetryEventSchema.parse({...parsed.data,...scope.run,event:'research.span',schemaVersion:1,timestamp:new Date().toISOString(),requestId:scope.requestId,traceId:scope.traceId,spanId:scope.spanId,parentSpanId:scope.parentSpanId,stage,phase});try{scope.sink(event);}catch{}recordMetrics(event);}catch{}
+   try{const event=telemetryEventSchema.parse({...parsed.data,...scope.run,event:'research.span',schemaVersion:1,timestamp:new Date().toISOString(),requestId:scope.requestId,traceId:scope.traceId,spanId:scope.spanId,parentSpanId:scope.parentSpanId,stage,phase});try{void Promise.resolve(scope.sink(event)).catch(()=>{});}catch{}recordMetrics(event);}catch{}
   };
   emit('START');let details:TelemetryFields={outcome:'ERROR'};
   try {

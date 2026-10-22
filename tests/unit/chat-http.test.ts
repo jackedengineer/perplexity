@@ -127,8 +127,17 @@ it('correlates server-only spans and approved delivery without reflecting client
   expect(bytes).not.toMatch(/research.span|traceId|knownCostMicroUsd/);
  }finally{capture.mockRestore();}
 });
-it('a broken request logger cannot change admission or approved delivery',async()=>{
- const f=fixture();f.dependencies.log.mockImplementation(()=>{throw Error('PRIVATE logger');});
+it.each(['sync','async'])('a broken %s request logger cannot change admission or approved delivery',async mode=>{
+ const f=fixture();f.dependencies.log.mockImplementation(()=>{if(mode==='async')return Promise.reject(Error('PRIVATE logger'));throw Error('PRIVATE logger');});
  const response=await f.http.post(f.request());expect(response.status).toBe(200);expect(await response.text()).toContain('Light bends');
  expect(f.backend.execute).toHaveBeenCalledOnce();
+});
+it('identifies configuration failure before admission without recording raw settings',async()=>{
+ const capture=vi.spyOn(console,'info').mockImplementation(()=>{}),f=fixture();
+ vi.spyOn(f.dependencies,'backend').mockImplementation(()=>{throw new AdmissionError('CONFIGURATION_UNAVAILABLE');});
+ try{
+  expect((await f.http.post(f.request())).status).toBe(503);
+  expect(capture.mock.calls.map(args=>JSON.parse(String(args[0]))).find(e=>e.stage==='http.configuration'&&e.phase==='END')).toMatchObject({outcome:'CONFIGURATION_UNAVAILABLE'});
+  expect(f.backend.admit).not.toHaveBeenCalled();expect(f.backend.execute).not.toHaveBeenCalled();
+ }finally{capture.mockRestore();}
 });

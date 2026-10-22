@@ -52,3 +52,8 @@ it('a broken OpenTelemetry adapter cannot retry work or expose its diagnostics',
  try{expect(await withTelemetry(randomUUID(),()=>traceStage('run.execute',work),e=>events.push(e))).toBe(42);expect(work).toHaveBeenCalledOnce();expect(JSON.stringify(events)).not.toContain('PRIVATE');}
  finally{broken.mockRestore();}
 });
+it('contains asynchronous sink rejection without changing the operation',async()=>{
+ const work=vi.fn(async()=>42);
+ expect(await withTelemetry(randomUUID(),()=>traceStage('run.execute',work),async()=>{throw Error('PRIVATE async sink');})).toBe(42);
+ await new Promise(resolve=>setImmediate(resolve));expect(work).toHaveBeenCalledOnce();
+});

@@ -30,7 +30,7 @@ function failure(code: PublicErrorCode,requestId: string,run?: Run) {
   return Response.json(error.body,{ status: error.status,headers: { ...headers(requestId),...(run ? { "X-Run-Id": run.id,"X-Run-Revision": String(run.revision) } : {}) } });
 }
 export function createChatHttp(dependencies: Dependencies) {
-  const log:Dependencies["log"]=event=>{try{dependencies.log(event);}catch{/* Diagnostics cannot affect delivery or admission. */}};
+  const log:Dependencies["log"]=event=>{try{void Promise.resolve(dependencies.log(event)).catch(()=>{});}catch{/* Diagnostics cannot affect delivery or admission. */}};
   return {
     async post(request: Request) {
       const requestId = crypto.randomUUID(),started = performance.now();
@@ -40,7 +40,7 @@ export function createChatHttp(dependencies: Dependencies) {
         const origin=dependencies.origin();
         await traceStage("http.request_limit",()=>dependencies.consumeRequest(isTrustedSubmissionOrigin(request,origin)?identity?.user.id??null:null));
         if (!identity) throw new AdmissionError("UNAUTHENTICATED");
-        const input = await traceStage("http.validation",()=>readSubmission(request,origin)),backend = dependencies.backend();
+        const input = await traceStage("http.validation",()=>readSubmission(request,origin)),backend = await traceStage("http.configuration",async()=>dependencies.backend());
         const admission = await traceStage("http.admission",async()=>{
           const result=await backend.admit(identity.user.id,input);if(result.kind!=="DENIED")bindRunTelemetry({runId:result.run.id});return result;
         });
