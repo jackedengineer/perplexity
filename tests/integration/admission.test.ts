@@ -8,6 +8,7 @@ import * as schema from "@/db/schema";
 import { createRunAdmission } from "@/server/runs/admit";
 import { FREE_ADMISSION_POLICY } from "@/server/runs/policy";
 import { createConversationRepository } from "@/server/conversations/repository";
+import { AdmissionError } from "@/server/runs/errors";
 
 const pg = new PGlite(), db = drizzle(pg, { schema });
 const keys = { activeKeyId: "test-v1", keys: { "test-v1": "a".repeat(64) } };
@@ -32,6 +33,19 @@ beforeEach(async () => {
 });
 afterAll(() => pg.close());
 const input = (extra = {}) => ({ conversationId: id, clientRequestId: randomUUID(), expectedRevision: 0, mode: "FAST", modelKey: "fast-default", message: { text: "RAW_QUESTION_MUST_NOT_BE_PERSISTED" }, ...extra });
+
+it("checks provider availability only for new work, before attempts and holds",async()=>{
+  const unavailable=createRunAdmission(db,keys,policy,()=>{throw new AdmissionError("CONFIGURATION_UNAVAILABLE");});
+  const request=input();
+  expect(await unavailable.admit("alice",request)).toEqual({kind:"DENIED",code:"CONFIGURATION_UNAVAILABLE"});
+  expect(await db.select().from(schema.runs)).toHaveLength(0);
+  expect(await db.select().from(schema.admissionAttemptBuckets)).toHaveLength(0);
+  expect((await db.select().from(schema.usageBuckets)).map(row=>row.reservedCredits)).toEqual([0,0]);
+  expect((await admission.admit("alice",request)).kind).toBe("ADMITTED");
+  expect((await unavailable.admit("alice",request)).kind).toBe("RUN_IN_PROGRESS");
+  await db.update(schema.runs).set({status:"TIMED_OUT"});
+  expect((await unavailable.admit("alice",request)).kind).toBe("RUN_ALREADY_FINISHED");
+});
 
 it("commits one run and four bounded holds without storing the question or messages", async () => {
   const result = await admission.admit("alice", input());

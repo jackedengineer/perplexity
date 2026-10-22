@@ -19,16 +19,23 @@ export const chatHttp = createChatHttp({
   identity: getCurrentSession,origin: ()=>getServerEnv().BETTER_AUTH_URL,
   load: (identity,runId)=>createAnswerDelivery(getDb()).load(identity,runId),
   backend() {
-    const safety = parseSafetyModel(process.env),answer = parseAnswerModel(process.env);
-    const searchKey = z.string().min(16).max(512).regex(/^[A-Za-z0-9._-]+$/u).safeParse(process.env.TAVILY_API_KEY);
-    if (!safety || !answer || !searchKey.success) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
     const db = getDb(),keys = parseAdmissionEnvironment(process.env);
-    const execution = createRunExecution(db,keys,{
-      input: createOpenRouterSafetyProvider(safety),query: createOpenRouterSafetyProvider(safety),
-      evidence: createOpenRouterSafetyProvider(safety,fetch,EVIDENCE_SAFETY_PROMPT),output: createOpenRouterSafetyProvider(safety,fetch,OUTPUT_SAFETY_PROMPT),
-      answer: createAnswerProvider(answer),search: createTavilySearch(searchKey.data),
-    });
-    return { admit: createRunAdmission(db,keys,parseAdmissionPolicyEnvironment(process.env)).admit,execute: execution.execute,load: createAnswerDelivery(db).load };
+    function configureExecution() {
+      const safety=parseSafetyModel(process.env),answer=parseAnswerModel(process.env);
+      const searchKey=z.string().min(16).max(512).regex(/^[A-Za-z0-9._-]+$/u).safeParse(process.env.TAVILY_API_KEY);
+      if(!safety||!answer||!searchKey.success)throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
+      return createRunExecution(db,keys,{
+        input:createOpenRouterSafetyProvider(safety),query:createOpenRouterSafetyProvider(safety),
+        evidence:createOpenRouterSafetyProvider(safety,fetch,EVIDENCE_SAFETY_PROMPT),output:createOpenRouterSafetyProvider(safety,fetch,OUTPUT_SAFETY_PROMPT),
+        answer:createAnswerProvider(answer),search:createTavilySearch(searchKey.data),
+      });
+    }
+    let execution:ReturnType<typeof configureExecution>|undefined;
+    const admission=createRunAdmission(db,keys,parseAdmissionPolicyEnvironment(process.env),()=>{execution=configureExecution();});
+    return {admit:admission.admit,execute:(...args)=>{
+      if(!execution)throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
+      return execution.execute(...args);
+    },load:createAnswerDelivery(db).load};
   },
   log: event=>console.info(JSON.stringify(event)),
 });
