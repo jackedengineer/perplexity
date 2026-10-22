@@ -122,7 +122,7 @@ See [the foundation verification record](docs/foundation-verification.md), [priv
 
 ## Working agreements
 
-Use a feature branch and focused commits. Keep hand-written changes near 400–700 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. T05–T10 are merged into main. T11 and its review fixes are tracked in [PR #5](https://github.com/jackedengineer/perplexity/pull/5).
+Use a feature branch and focused commits. Keep hand-written changes near 400–700 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. T05–T11 and production configuration preparation are merged into main through PR #6. T18 adds durable cancellation, stale-run recovery and append-only usage reconciliation; see [the recovery contract and operator procedure](docs/run-recovery.md). Production migration and cron activation remain separate deployment gates.
 
 The [system design](docs/system-design.md), [session contract](docs/authentication.md) and [implementation plan](tasks/plan.md) describe the larger product. T08 uses the Vercel AI SDK for answer generation; T06/T07 retain small fixed-protocol guard/search adapters. No paid provider smoke test has been run. Live answers require explicit provider configuration and provisioned development allowances; missing settings fail safely.
 

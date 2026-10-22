@@ -36,7 +36,7 @@ and [cron authentication](https://vercel.com/docs/cron-jobs/manage-cron-jobs#sec
 Configure a random `CRON_SECRET` before deploying; absent/invalid credentials fail
 closed. Higher-frequency scheduling requires an explicitly chosen scheduler/plan.
 
-Verification will cover killed handlers, late costs, missing/duplicate settlements,
+Verification covers killed handlers, late costs, missing/duplicate settlements,
 owner/origin/session denial, cancellation/completion/reaper races, immutable receipts,
 original-window balances, restricted grants and real browser recovery with synthetic
 providers in the dedicated development database. No paid-provider calls are needed.
@@ -86,3 +86,38 @@ runtime. Apply it before deploying T18, then run the explicit-target verifier
 at the prior 21-table checkpoint. Roll back application code without dropping
 receipts, adjustments or held reservations. A later forward-compatible deploy
 can resume recovery from these durable records.
+
+## Verification evidence — 2026-10-23
+
+- Default quality checks: lint, generated Next route types/TypeScript, 408 tests
+  across 42 files and a production build pass. Ten focused reconciliation tests
+  include unknown partial costs, expired original buckets, rolled-back adjustments,
+  immutable original settlement and contradictory late billing after release.
+- Five opt-in development Neon cases pass through independent connections: duplicate
+  cancellation, overlapping reapers, cancellation versus paused completion and late
+  reconciliation, restricted runtime grants, and the actual receipt CLI's duplicate/
+  conflicting metadata behavior. `pnpm test:recovery:neon` requires the named
+  development database; fixture guards reject production. No real charge was used.
+- Eight desktop/mobile recovery browser cases pass: status/retry cancellation,
+  reload discovery, killed-handler expiry and cross-tab cancellation of a paused
+  synthetic provider. Fourteen existing guarded-search cases and eight public-page
+  cases also pass. The cross-tab case observes upstream abort, zero output-guard
+  calls after cancellation, no draft publication and an uncertain cost held.
+- The in-app browser separately verified timeout and durable Stop with the actual
+  local development session, provider keys disabled and disposable owned runs.
+  No console errors appeared; those fixture rows and buckets were removed.
+  Screenshots are local ignored artifacts: `.artifacts/t18-iab-timeout.png` and
+  `.artifacts/t18-iab-cancelled.png`.
+- Local public-page performance budgets pass: home max TTFB 37 ms, LCP 112 ms,
+  CLS 0, first-load JS transfer 144,996 bytes; sign-in max TTFB 10 ms, LCP 56 ms,
+  CLS 0, JS 161,731 bytes. These are local measurements, not production latency
+  guarantees or paid-model timings. Audit has no high/critical production advisories;
+  one existing moderate development-tool transitive advisory remains.
+
+Development has 23 verified tables with encrypted role-separated connections.
+Production has not received migration 0007 or a T18 deploy. The scheduled route
+has been tested for authorization and failure behavior, but hosted execution is
+pending deployment/CRON_SECRET configuration. Unknown usage is intentionally not
+refunded without evidence; the receipt CLI is manual reconciliation, not a billing
+API integration. Paid provider quality, billing and latency verification remain
+pending funding. Public launch prerequisites elsewhere in the plan remain open.

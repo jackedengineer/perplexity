@@ -1,6 +1,6 @@
 # Build backlog
 
-T01–T03 and T05–T11 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T12 intent-preserving planning is next. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
+T01–T03 and T05–T11 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T18 recovery is implemented out of order on request, reusing T11 ownership/status boundaries; T12–T17 remain open. T12 intent-preserving planning is next in the original sequence. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
 
 Commands and current verification results are in [README](../README.md) and [the foundation record](../docs/foundation-verification.md). Default integration tests use isolated PGlite PostgreSQL. Opt-in live browser tests use synthetic identities in the dedicated development Neon project, never production.
 
@@ -175,10 +175,13 @@ T11 evidence: [public search](../docs/public-search.md). Provider doubles and re
 
 ### T18 — Add cancellation, status and stale-run recovery
 
-- [ ] Implement owner-scoped cancellation/status routes and cooperative aborts, plus a scheduled authenticated reaper for expired runs and unknown usage reconciliation.
-- [ ] Use conditional terminal transitions/fencing so late completions cannot override cancellation/timeout; completed answers remain recoverable after delivery loss.
-- [ ] Verify: concurrent cancellation/completion tests, killed-handler simulation and orphan reservation cleanup; no partial draft appears on status or reload.
-- Dependencies: T17. Files: `src/server/runs/cancel.ts`, `src/server/runs/reconcile.ts`, `src/app/api/runs/[id]/route.ts`, `src/app/api/runs/[id]/cancellation/route.ts`, `tests/integration/recovery.test.ts`.
+- [x] Implement owner-scoped cancellation/status routes and cooperative aborts, plus a scheduled authenticated reaper for expired runs and unknown usage reconciliation.
+- [x] Use conditional terminal transitions/fencing so late completions cannot override cancellation/timeout; completed answers remain recoverable after delivery loss.
+- [x] Verify: concurrent cancellation/completion tests, killed-handler simulation and orphan reservation cleanup; no partial draft appears on status or reload.
+- Dependencies: T11 ownership/status reused for this requested out-of-order slice; T12–T17 remain open. Files: `src/server/runs/recover.ts`, `src/server/runs/reconcile.ts`, `src/server/runs/monitor.ts`, `src/app/api/internal/recovery/route.ts`, `src/app/api/runs/[id]/cancellation/route.ts`, `tests/integration/run-recovery.test.ts`, `tests/live/recovery-neon.test.ts`.
+
+T18 evidence: [recovery and reconciliation](../docs/run-recovery.md). Development migration/browser/concurrency checks pass. Production migration, hosted cron activation and paid-provider testing remain pending.
+
 
 ### T19 — Prove distributed usage and deadline controls
 

@@ -27,6 +27,7 @@
     "test:admission:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/admission-neon.test.ts",
     "test:input:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/input-gate-neon.test.ts",
     "test:retrieval:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/retrieval-neon.test.ts",
+    "test:recovery:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/recovery-neon.test.ts",
     "test:completion:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/completion-neon.test.ts"
   },
   "dependencies": {
