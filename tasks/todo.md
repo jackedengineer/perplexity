@@ -1,6 +1,6 @@
 # Build backlog
 
-T01 and T02 are implemented. T03/T04 now include signed-in private conversations and owner isolation; run admission and deployed-preview verification remain outstanding. Other tasks are unstarted. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
+T01–T03 and T05 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T06 input safety is next. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
 
 Commands and current verification results are in [README](../README.md) and [the foundation record](../docs/foundation-verification.md). Default integration tests use isolated PGlite PostgreSQL. Opt-in live browser tests use synthetic identities in the dedicated development Neon project, never production.
 
@@ -24,9 +24,9 @@ T02 verification: [boundary contracts](../docs/boundary-contracts.md). Semantic 
 
 ### T03 — Connect Neon and migrate private conversation records
 
-Completed sub-slice: restricted pooled runtime role, direct migration owner URL, generated five-table auth schema, reviewed/applied migration, verified TLS and isolated FK/uniqueness tests. Application UUID profiles, constrained conversations/messages, owner-scoped repositories, replay-safe metadata creation, revision-checked rename, keyset pagination and approved-history filtering are implemented and tested. Runs remain with T05.
+Completed: restricted pooled runtime role, direct migration owner URL, generated auth schema, reviewed/applied migrations and verified TLS. Application UUID profiles, constrained conversations/messages/runs, owner-scoped repositories, replay-safe metadata creation, revision-checked rename, keyset pagination and approved-history filtering are implemented and tested. T05 adds run/reservation/budget constraints and verifies real-database races.
 
-- [ ] Configure a small Node `pg` pool with Drizzle, pooled application URL and distinct direct migration URL; define users/conversations/messages/runs with ownership, revisions, sequences and approved-message fields.
+- [x] Configure a small Node `pg` pool with Drizzle, pooled application URL and distinct direct migration URL; define users/conversations/messages/runs with ownership, revisions, sequences and approved-message fields.
 - [x] Generate/review migrations and repository methods for creating/loading owner-scoped conversations; reserve JSONB for versioned parts, not ownership/status fields.
 - [x] Verify: migrate an empty test database, round-trip a conversation and reject invalid FK/sequence data; prove unapproved assistant rows are excluded by read repositories.
 - Dependencies: T02. Files: `src/server/db/client.ts`, `src/server/db/schema.ts`, `src/server/db/conversations.ts`, `drizzle.config.ts`, `tests/integration/conversations.test.ts` plus generated SQL.
@@ -40,19 +40,19 @@ Completed sub-slice: Google OAuth, protected workspace, seven-day/24-hour sessio
 - [ ] Verify: two-user integration/browser cases prove cross-user IDs return safe unavailability; signed-out mutations fail; session protections work in the deployed preview.
 - Dependencies: T03. Files: `src/server/auth/session.ts`, `src/server/auth/ownership.ts`, `src/app/api/conversations/route.ts`, `src/app/(app)/search/[conversationId]/page.tsx`, `tests/integration/ownership.test.ts` plus auth-library setup.
 
-Verification evidence: [private conversations](../docs/private-conversations-verification.md). T03’s combined schema checkbox stays open for runs; T04’s combined verification checkbox stays open for a deployed preview.
+Verification evidence: [private conversations](../docs/private-conversations-verification.md) and [admission](../docs/run-admission.md). T04’s combined verification checkbox stays open for a deployed preview.
 
 ### T05 — Make run admission idempotent and budgeted
 
-- [ ] Add run-key uniqueness, payload HMAC, active-run partial index and usage-bucket/reservation constraints; atomically reserve usage and check conversation revision.
-- [ ] Define duplicate behavior for running/terminal/mismatched payloads; do not store raw rejected input at admission or replay an unknown paid attempt automatically.
-- [ ] Verify: concurrent identical requests create one run/reservation; different payload reuse fails; simultaneous quota admissions cannot overspend; stale revision produces a conflict.
+- [x] Add run-key uniqueness, payload HMAC, active-run partial index and usage-bucket/reservation constraints; atomically reserve usage and check conversation revision.
+- [x] Define duplicate behavior for running/terminal/mismatched payloads; do not store raw rejected input at admission or replay an unknown paid attempt automatically.
+- [x] Verify: concurrent identical requests create one run/reservation; different payload reuse fails; simultaneous quota admissions cannot overspend; stale revision produces a conflict.
 - Dependencies: T04. Files: `src/server/db/schema.ts`, `src/server/runs/admit.ts`, `src/server/runs/usage.ts`, `tests/integration/admission.test.ts` plus generated SQL.
 
 ### Checkpoint A
 
 - [x] Signed-in conversation creation/reload and cross-user denial work.
-- [ ] Real-database concurrent admission invariants pass. AI endpoints remain disabled until input and output guards are wired.
+- [x] Real-database concurrent admission invariants pass. AI endpoints remain disabled until input and output guards are wired.
 - [x] Typecheck, lint, focused integration tests and build pass; update docs if setup choices differ.
 
 ## Milestone B — one complete guarded answer
