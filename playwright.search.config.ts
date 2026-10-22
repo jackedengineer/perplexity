@@ -5,7 +5,7 @@ if(process.env.LIVE_NEON_E2E!=="1")throw new Error("Explicit development Neon op
 process.env.LIVE_NEON_ADMISSION="1";
 const budgetKey="test-t11-browser";
 process.env.T11_TEST_BUDGET_KEY=budgetKey;
-export default defineConfig({testDir:"./tests/e2e",testMatch:["**/guarded-search.spec.ts","**/recovery.spec.ts","**/stale-run-recovery.spec.ts","**/cross-process-recovery.spec.ts"],outputDir:".artifacts/t11-browser-results",workers:1,retries:0,forbidOnly:Boolean(process.env.CI),timeout:90000,
+export default defineConfig({testDir:"./tests/e2e",testMatch:["**/guarded-search.spec.ts","**/recovery.spec.ts","**/stale-run-recovery.spec.ts","**/cross-process-recovery.spec.ts","**/distributed-controls.spec.ts"],outputDir:".artifacts/t11-browser-results",workers:1,retries:0,forbidOnly:Boolean(process.env.CI),timeout:90000,
   use:{baseURL:"http://localhost:3001",trace:"retain-on-failure"},
   projects:[{name:"desktop",use:{...devices["Desktop Chrome"]}},{name:"mobile",use:{...devices["iPhone 13"],defaultBrowserType:"chromium"}}],
   webServer:{command:"node --import ./tests/e2e/search-provider-preload.mjs node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3001",url:"http://localhost:3001",reuseExistingServer:false,stdout:"pipe",
