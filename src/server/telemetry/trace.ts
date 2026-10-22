@@ -1,20 +1,40 @@
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {randomBytes} from 'node:crypto';
-import {context,trace,SpanStatusCode,isSpanContextValid,type Attributes,type Context,type Span} from '@opentelemetry/api';
+import {trace,ROOT_CONTEXT,TraceFlags,SpanStatusCode,isSpanContextValid,type Attributes,type Context,type Span,type SpanContext} from '@opentelemetry/api';
 import {AdmissionError} from '@/server/runs/errors';
-import {telemetryEventSchema,telemetryFieldsSchema,runMetadataSchema,outcomeSchema,type TelemetryEvent,type TelemetryFields,type TelemetryStage} from './contracts';
+import {telemetryEventSchema,telemetryFieldsSchema,runMetadataSchema,outcomeSchema,outcomeCategory,type TelemetryEvent,type TelemetryFields,type TelemetryStage} from './contracts';
 import {recordMetrics} from './metrics';
-type Scope={requestId:string;traceId:string;spanId:string;parentSpanId?:string;stage?:TelemetryStage;apiContext:Context;run:Partial<zRun>;sink:(event:TelemetryEvent)=>void};
+type Scope={requestId:string;traceId:string;spanId:string;parentSpanId?:string;stage?:TelemetryStage;apiContext:Context;run:Partial<zRun>;calls:Map<string,TelemetryFields>;sink:(event:TelemetryEvent)=>void};
 type zRun=ReturnType<typeof runMetadataSchema.parse>;
 const storage=new AsyncLocalStorage<Scope>();
 const hex=(bytes:number)=>randomBytes(bytes).toString('hex');
 const attributes=(fields:Record<string,unknown>):Attributes=>Object.fromEntries(Object.entries(fields).filter((entry):entry is [string,string|number|string[]]=>typeof entry[1]==='string'||typeof entry[1]==='number'||Array.isArray(entry[1])&&entry[1].every(v=>typeof v==='string')));
 export function withTelemetry<T>(requestId:string,work:()=>T,sink:(event:TelemetryEvent)=>void=event=>console.info(JSON.stringify(event))):T {
- return storage.run({requestId,traceId:hex(16),spanId:hex(8),apiContext:context.active(),run:{},sink},work);
+ const traceId=hex(16),spanId=hex(8);
+ let apiContext=ROOT_CONTEXT;try{apiContext=trace.setSpanContext(ROOT_CONTEXT,{traceId,spanId,traceFlags:TraceFlags.SAMPLED});}catch{}
+ return storage.run({requestId,traceId,spanId,apiContext,run:{},calls:new Map(),sink},work);
 }
 export function bindRunTelemetry(value:unknown) {
  const current=storage.getStore(),parsed=runMetadataSchema.safeParse(value);
- if(current&&parsed.success)current.run=parsed.data;
+ if(current&&parsed.success)Object.assign(current.run,parsed.data);
+}
+// A bounded observation of this execution, never a second billing ledger. Durable
+// receipts/reconciliation remain in Postgres, including calls that finish later.
+export function recordProviderObservation(value:unknown,started=false) {
+ const current=storage.getStore(),parsed=telemetryFieldsSchema.safeParse(value);if(!current||!parsed.success)return;
+ const fields=parsed.data;if(!fields.providerCallId||!fields.providerStage)return;
+ if(!current.calls.has(fields.providerCallId)&&current.calls.size>=6)return;
+ const observation={...current.calls.get(fields.providerCallId),...fields};
+ current.calls.set(fields.providerCallId,observation);
+ recordTelemetry(started?'research.provider_started':'research.usage',observation);
+}
+export function recordRunUsage() {
+ const current=storage.getStore();if(!current)return;
+ const calls=[...current.calls.values()],models=calls.filter(c=>c.providerStage!=='SEARCH');
+ const known=calls.reduce((n,c)=>n+BigInt(c.knownCostMicroUsd??'0'),0n),unknown=calls.filter(c=>c.costState!=='KNOWN').length;
+ const tokens=(key:'inputTokens'|'outputTokens')=>models.some(c=>c[key]!=null)?models.reduce((n,c)=>n+(c[key]??0),0):models.length?null:0;
+ recordTelemetry('research.run_usage',{knownCostMicroUsd:String(known),costState:unknown?known>0n?'PARTIAL':'UNKNOWN':'KNOWN',unknownCalls:unknown,inputTokens:tokens('inputTokens'),outputTokens:tokens('outputTokens'),
+  searchCredits:calls.some(c=>c.providerStage==='SEARCH'&&c.searchCredits==null)?null:calls.reduce((n,c)=>n+(c.searchCredits??0),0)});
 }
 export function recordTelemetry(event:TelemetryEvent['event'],value:unknown={}) {
  const current=storage.getStore();if(!current)return;
@@ -37,8 +57,9 @@ export async function traceStage<T>(stage:TelemetryStage,work:()=>Promise<T>,fie
  const parent=storage.getStore();if(!parent)return work();
  let span:Span|undefined;
  try{span=trace.getTracer('perplex.research','1').startSpan(stage,{attributes:{'request.id':parent.requestId,...parent.run}},parent.apiContext);}catch{/* No exporter can veto work. */}
- const sc=span?.spanContext(),valid=sc&&isSpanContextValid(sc);
- const scope:Scope={...parent,traceId:valid?sc.traceId:parent.traceId,spanId:valid?sc.spanId:hex(8),parentSpanId:parent.stage?parent.spanId:undefined,stage,apiContext:span?trace.setSpan(parent.apiContext,span):parent.apiContext};
+ let valid:SpanContext|undefined;
+ try{const sc=span?.spanContext();if(sc&&isSpanContextValid(sc)&&sc.spanId!==trace.getSpanContext(parent.apiContext)?.spanId)valid=sc;}catch{}
+ const scope:Scope={...parent,traceId:valid?.traceId??parent.traceId,spanId:valid?.spanId??hex(8),parentSpanId:parent.stage?parent.spanId:undefined,stage,apiContext:span&&valid?trace.setSpan(parent.apiContext,span):parent.apiContext};
  return storage.run(scope,async()=>{
   const started=performance.now();
   const emit=(phase:'START'|'END',details:TelemetryFields={})=>{
@@ -51,10 +72,11 @@ export async function traceStage<T>(stage:TelemetryStage,work:()=>Promise<T>,fie
    const result=await work();details={outcome:inferredOutcome(result)};
    try{details={...details,...telemetryFieldsSchema.parse(fields?.(result)??{})};}catch{}
    return result;
-  }catch(error){details={outcome:error instanceof AdmissionError?error.code:'ERROR'};throw error;}
+  }catch(error){details={outcome:error instanceof AdmissionError?error.code:'ERROR',...(stage==='citations'?{reason:'CITATION_INVALID' as const}:{})};throw error;}
   finally{
    const durationMs=Math.max(0,Math.round(performance.now()-started));emit('END',{...details,durationMs});
-   try{span?.setAttributes(attributes({...scope.run,...details,durationMs}));if(details.outcome==='ERROR')span?.setStatus({code:SpanStatusCode.ERROR});span?.end();}catch{}
+   try{span?.setAttributes(attributes({...scope.run,...details,durationMs}));if(['infrastructure','deadline'].includes(outcomeCategory(details.outcome??'ERROR')))span?.setStatus({code:SpanStatusCode.ERROR});}catch{}
+   try{span?.end();}catch{}
   }
  });
 }

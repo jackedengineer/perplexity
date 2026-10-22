@@ -28,6 +28,7 @@
     "test:input:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/input-gate-neon.test.ts",
     "test:retrieval:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/retrieval-neon.test.ts",
     "test:budgets:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/budgets-neon.test.ts",
+    "test:telemetry:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/telemetry-neon.test.ts",
     "test:recovery:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/recovery-neon.test.ts",
     "test:completion:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/completion-neon.test.ts"
   },

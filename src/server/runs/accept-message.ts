@@ -1,3 +1,4 @@
+import {bindRunTelemetry} from '@/server/telemetry/trace';
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, gt, isNotNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -63,6 +64,7 @@ export function createMessageAcceptance(db: AdmissionDatabase, keys: unknown, ga
           return { kind: "CLAIMED",run,context } as const;
         });
         if (claim.kind !== "CLAIMED") return claim;
+        bindRunTelemetry({...claim.run,runId:claim.run.id,estimatedUpperBoundMicroUsd:claim.run.providerReserveMicroUsd.toString(),estimateKind:"RESERVATION_CEILING"});
         // Provider work is outside both short transactions. The claim is never retried automatically.
         const check = await gate.evaluate({ text: request.message.text,context: claim.context },{ signal,deadlineAt: claim.run.deadlineAt });
         return await db.transaction(async (tx): Promise<InputAcceptance> => {

@@ -114,3 +114,21 @@ it.each([['OUTPUT_BLOCKED','policy'],['PROVIDER_UNAVAILABLE','infrastructure'],[
  expect(f.dependencies.log).toHaveBeenLastCalledWith(expect.objectContaining({event:'chat.execution',outcome:code,category}));
  expect(f.backend.load).not.toHaveBeenCalled();
 });
+it('correlates server-only spans and approved delivery without reflecting client diagnostics',async()=>{
+ const capture=vi.spyOn(console,'info').mockImplementation(()=>{});
+ try{
+  const f=fixture();f.question.message.text='PRIVATE_USER_QUESTION';
+  const response=await f.http.post(f.request(f.question,{'x-request-id':'PRIVATE_CLIENT_ID',traceparent:'PRIVATE_TRACE_PARENT'}));
+  const bytes=await response.text(),events=capture.mock.calls.map(args=>JSON.parse(String(args[0])));
+  expect(events.length).toBeGreaterThan(0);expect(events.every(e=>e.requestId===response.headers.get('x-request-id'))).toBe(true);
+  expect(events.find(e=>e.stage==='http.delivery'&&e.phase==='END')).toMatchObject({outcome:'COMPLETED',runId:f.run.id});
+  expect(events.some(e=>e.event==='research.approved_delivery')).toBe(true);
+  expect(JSON.stringify(events)).not.toMatch(/PRIVATE_|Light bends|weather.gov|sessionId/);
+  expect(bytes).not.toMatch(/research.span|traceId|knownCostMicroUsd/);
+ }finally{capture.mockRestore();}
+});
+it('a broken request logger cannot change admission or approved delivery',async()=>{
+ const f=fixture();f.dependencies.log.mockImplementation(()=>{throw Error('PRIVATE logger');});
+ const response=await f.http.post(f.request());expect(response.status).toBe(200);expect(await response.text()).toContain('Light bends');
+ expect(f.backend.execute).toHaveBeenCalledOnce();
+});

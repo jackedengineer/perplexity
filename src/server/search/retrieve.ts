@@ -1,3 +1,4 @@
+import {recordTelemetry} from '@/server/telemetry/trace';
 import { and, eq, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { inputSafetyReviews, messages, runRetrievals, runs, runSources, sourcePassages, usageReservations } from "@/db/schema";
@@ -69,6 +70,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
         });
         stage = "PREPARING_EVIDENCE";
         const evidence = buildEvidence(runId,response.results,new Date());
+        recordTelemetry("research.sources",{returnedSources:response.results.length,sourceCount:evidence.sources.length,discardedSources:Math.max(0,Math.min(response.results.length,5)-evidence.sources.length)});
         if (evidence.sources.length) {
           const checked = await evidenceGate.evaluate(evidence,options); evidenceVerdict = checked.verdict.decision;
           if (evidenceVerdict !== "ALLOW") throw new RetrievalError(evidenceVerdict === "BLOCK" ? "OUTPUT_BLOCKED" : "reason" in checked && checked.reason === "TIMEOUT" ? "DEADLINE_EXCEEDED" : "SAFETY_UNAVAILABLE");

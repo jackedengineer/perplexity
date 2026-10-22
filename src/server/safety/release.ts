@@ -1,3 +1,4 @@
+import {traceStage} from '@/server/telemetry/trace';
 import { z } from "zod";
 import { approvedPayloadSchema } from "@/server/contracts/answer";
 import { questionTextSchema } from "@/server/contracts/chat";
@@ -18,7 +19,7 @@ export type ReleaseResult = { kind: "APPROVED";response: ApprovedResponse }
 const approved = new WeakSet<object>();
 export function isApprovedResponse(value: unknown): value is ApprovedResponse { return typeof value === "object" && value !== null && approved.has(value); }
 export function createReleaseGate(provider: SafetyProvider | undefined) {
-  const gate = createInputGate(provider);
+  const gate = createInputGate(provider,"safety.output");
   return { async approve(value: unknown,options: ExecutionOptions): Promise<ReleaseResult> {
     const deny = (code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE" | "DEADLINE_EXCEEDED",response: SafetyResponse = SAFETY_RESPONSES.UNAVAILABLE): ReleaseResult=>({ kind: "DENIED",code,response });
     try {
@@ -27,7 +28,7 @@ export function createReleaseGate(provider: SafetyProvider | undefined) {
       const input = parsed.data;
       if (input.evidence.runId !== input.runId || (input.kind !== "ANSWER" && input.evidence.sources.length) ||
         (input.kind === "NO_EVIDENCE" && input.markdown !== NO_EVIDENCE_TEXT) || (input.kind === "CLARIFICATION" && input.markdown.length > 800)) return deny("OUTPUT_BLOCKED");
-      const sources = validateCitations(input.markdown,input.evidence,input.kind === "ANSWER");
+      const sources = await traceStage("citations",async()=>validateCitations(input.markdown,input.evidence,input.kind === "ANSWER"));
       const verdict = await gate.evaluate({ text: input.markdown,context: [
         { role: "USER",text: JSON.stringify({ originalQuestion: input.question }) },
         ...sources.map(source=>({ role: "ASSISTANT",text: JSON.stringify(source) })),

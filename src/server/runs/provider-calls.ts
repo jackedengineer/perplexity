@@ -7,6 +7,7 @@ import type { ProviderUsage } from "@/server/ai/usage";
 import { SafetyProviderError,type SafetyProvider } from "@/server/safety/provider";
 import type { SearchProvider } from "@/server/search/tavily";
 import {providerDeadline,STAGE_LIMITS,type ProviderStage} from './budgets';
+import {recordProviderObservation,traceStage} from '@/server/telemetry/trace';
 const noUsage:ProviderUsage={costMicroUsd:0n,inputTokens:0,outputTokens:0,actualModel:null};
 const phases = { INPUT_SAFETY: "CHECKING_INPUT",QUERY_SAFETY: "SEARCHING",SEARCH: "SEARCHING",EVIDENCE_SAFETY: "PREPARING_EVIDENCE",ANSWER: "GENERATING",OUTPUT_SAFETY: "CHECKING_OUTPUT" };
 export function createProviderCalls(db: AdmissionDatabase,subject: string,runId: string) {
@@ -14,7 +15,7 @@ export function createProviderCalls(db: AdmissionDatabase,subject: string,runId:
     async begin(stage: ProviderStage,requestedModel: string,signal?:AbortSignal) {
       const observedAt=performance.now();
       if(signal?.aborted)throw new AdmissionError('CONFLICT');
-      return db.transaction(async(tx)=>{
+      const claim=await db.transaction(async(tx)=>{
         const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
         if (run.accountingVersion !== 1) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
         if(run.deadlineAt<=now)throw new AdmissionError('DEADLINE_EXCEEDED');
@@ -26,6 +27,8 @@ export function createProviderCalls(db: AdmissionDatabase,subject: string,runId:
           capMicroUsd: STAGE_LIMITS[stage].capMicroUsd,status: "STARTED",startedAt: now }).returning({ id: providerCalls.id });
         return {id:call.id,deadlineAt:run.deadlineAt,remainingMs:Math.min(STAGE_LIMITS[stage].maxDurationMs,run.deadlineAt.getTime()-now.getTime()),observedAt};
       });
+      recordProviderObservation({providerCallId:claim.id,providerStage:stage,modelId:/^[a-z0-9-]+\/[A-Za-z0-9._:-]+$/u.test(requestedModel)?requestedModel:undefined,outcome:"UNKNOWN",costState:"UNKNOWN",inputTokens:null,outputTokens:null,searchCredits:null},true);
+      return claim;
     },
     async finish(id: string,status: "SUCCEEDED" | "UNKNOWN" | "SKIPPED",usage?: ProviderUsage,searchCredits?: 1) {
       // A paid result may arrive after cancellation/fencing; record its cost without authorizing continuation.
@@ -33,8 +36,9 @@ export function createProviderCalls(db: AdmissionDatabase,subject: string,runId:
         .where(and(eq(runs.id,runId),eq(appUsers.authSubject,subject)));
       const changed = await db.update(providerCalls).set({ status,costMicroUsd: usage?.costMicroUsd ?? null,
         inputTokens: usage?.inputTokens ?? null,outputTokens: usage?.outputTokens ?? null,actualModel: usage?.actualModel ?? null,
-        searchCredits: searchCredits ?? null,finishedAt: sql`clock_timestamp()` }).where(and(eq(providerCalls.id,id),eq(providerCalls.runId,runId),eq(providerCalls.status,"STARTED"),exists(owned))).returning({ id: providerCalls.id });
+        searchCredits: searchCredits ?? null,finishedAt: sql`clock_timestamp()` }).where(and(eq(providerCalls.id,id),eq(providerCalls.runId,runId),eq(providerCalls.status,"STARTED"),exists(owned))).returning({ id: providerCalls.id,stage:providerCalls.stage,requestedModel:providerCalls.requestedModel });
       if (changed.length !== 1) throw new AdmissionError("CONFLICT");
+      recordProviderObservation({providerCallId:id,providerStage:changed[0].stage,outcome:status,costState:usage?.costMicroUsd!=null&&status!=="UNKNOWN"?"KNOWN":"UNKNOWN",knownCostMicroUsd:usage?.costMicroUsd?.toString(),inputTokens:usage?.inputTokens??null,outputTokens:usage?.outputTokens??null,searchCredits:searchCredits??null,actualModelMatch:usage?.actualModel?usage.actualModel===changed[0].requestedModel?"MATCH":"OTHER":"UNAVAILABLE"});
     },
   };
 }
@@ -56,6 +60,7 @@ export function recordSafetyProvider(calls: ReturnType<typeof createProviderCall
 }
 export function recordSearchProvider(calls: ReturnType<typeof createProviderCalls>,provider: SearchProvider): SearchProvider {
   return { async search(query,options) {
+    return traceStage("search",async()=>{
     const claim = await calls.begin("SEARCH","tavily/basic",options.signal),id=claim.id,budget=providerDeadline(claim,options.signal);
     try {
       if(budget.signal.aborted){await calls.finish(id,'SKIPPED',noUsage);throw new AdmissionError('DEADLINE_EXCEEDED');}
@@ -64,5 +69,6 @@ export function recordSearchProvider(calls: ReturnType<typeof createProviderCall
     }
     catch { try { await calls.finish(id,"UNKNOWN"); } catch { /* Preserve unknown reservation. */ } throw new AdmissionError(budget.expired?"DEADLINE_EXCEEDED":options.signal.aborted?"CONFLICT":"PROVIDER_UNAVAILABLE"); }
     finally{budget.stop();}
+    });
   } };
 }

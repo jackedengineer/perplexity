@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {expect,it,vi} from 'vitest';
+import {trace} from '@opentelemetry/api';
 import {withTelemetry,traceStage,recordTelemetry,bindRunTelemetry} from '@/server/telemetry/trace';
 import {metricDimensions} from '@/server/telemetry/metrics';
 import type {TelemetryEvent} from '@/server/telemetry/contracts';
@@ -44,4 +45,10 @@ it('invalid fields and raw-provider outcome labels cannot escape the schema',asy
   recordTelemetry('research.safety',{outcome:'BLOCK',categoryCodes:['FRAUD'],reason:'CLASSIFIER'});
  },e=>events.push(e));
  expect(events).toHaveLength(1);expect(events[0]).toMatchObject({outcome:'BLOCK',categoryCodes:['FRAUD']});
+});
+it('a broken OpenTelemetry adapter cannot retry work or expose its diagnostics',async()=>{
+ const broken=vi.spyOn(trace,'getTracer').mockImplementation(()=>{throw Error('PRIVATE EXPORTER');});
+ const events:TelemetryEvent[]=[],work=vi.fn(async()=>42);
+ try{expect(await withTelemetry(randomUUID(),()=>traceStage('run.execute',work),e=>events.push(e))).toBe(42);expect(work).toHaveBeenCalledOnce();expect(JSON.stringify(events)).not.toContain('PRIVATE');}
+ finally{broken.mockRestore();}
 });
