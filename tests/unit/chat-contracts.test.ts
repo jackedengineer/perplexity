@@ -44,5 +44,8 @@ it("constructs correlated fixed errors without accepting model or exception pros
   expect(publicErrorSchema.parse(result.body)).toEqual(result.body);
   expect(publicErrorSchema.safeParse({ ...result.body, error: { ...result.body.error, message: "raw provider secret" } }).success).toBe(false);
   expect(publicErrorSchema.safeParse({ ...result.body, stack: "private stack" }).success).toBe(false);
+  for (const code of ["UNKNOWN", "__proto__", "constructor", null, 500]) {
+    expect(publicErrorSchema.safeParse({ requestId, error: { code, message: "raw provider secret" } }).success).toBe(false);
+  }
   expect(() => createPublicError("INVALID_INPUT", "uncorrelated")).toThrow();
 });

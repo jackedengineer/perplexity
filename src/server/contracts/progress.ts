@@ -8,7 +8,7 @@ export const PUBLIC_STAGE_LABELS = Object.freeze({
   SEARCHING: "Searching the web", PREPARING_ANSWER: "Preparing an answer",
   CHECKING_ANSWER: "Checking the answer", SAVING_ANSWER: "Saving the answer",
 } satisfies Record<PublicStage, string>);
-export const publicRunEventSchema = z.strictObject({ runId: z.uuid(), revision: z.int().min(0) });
+export const publicRunEventSchema = z.strictObject({ runId: z.uuid(), revision: z.int().min(0).max(2_147_483_647) });
 export const publicStageEventSchema = z.strictObject({ runId: z.uuid(), stage: publicStageSchema });
 export type PublicRunEvent = z.infer<typeof publicRunEventSchema>;
 export type PublicStageEvent = z.infer<typeof publicStageEventSchema>;

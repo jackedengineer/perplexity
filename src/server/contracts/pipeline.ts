@@ -32,7 +32,8 @@ export const queryPlanSchema = z.discriminatedUnion("action", [
 ]);
 
 // Display syntax only. This schema never authorizes fetching a URL (T07/T09).
-export const sourceUrlSchema = z.string().max(2_048).refine((value) => !/[\s\u0000-\u001f\u007f]/u.test(value))
+export const sourceUrlSchema = z.string().max(2_048).regex(/^https?:\/\//iu)
+  .refine((value) => !/[\s\\\u0000-\u001f\u007f]/u.test(value))
   .pipe(z.httpUrl()).refine((value) => {
   try { const url = new URL(value); return !url.username && !url.password; } catch { return false; }
 });
