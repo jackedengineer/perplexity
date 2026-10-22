@@ -69,3 +69,8 @@ it('a failed adjustment rolls every bucket change back',async()=>{
  try {await expect(reconcile()).rejects.toThrow();expect((await db.select().from(schema.usageBuckets))[0].reservedProviderMicroUsd).toBe(50000n);expect((await db.select().from(schema.operatorUsageBuckets))[0].settledProviderMicroUsd).toBe(0n);}
  finally {await pg.exec('DROP TRIGGER deny_adjustment ON run_reconciliations; DROP FUNCTION deny_adjustment();');}
 });
+it('the bounded sweep skips unresolved holds and applies actionable receipts once',async()=>{
+ expect(await createUsageReconciliation(db).sweep()).toEqual({scanned:0,reconciled:0,failed:0});
+ await proof();expect(await createUsageReconciliation(db).sweep()).toEqual({scanned:1,reconciled:1,failed:0});
+ expect(await createUsageReconciliation(db).sweep()).toEqual({scanned:0,reconciled:0,failed:0});
+});

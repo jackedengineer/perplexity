@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and,eq,gt,sql } from "drizzle-orm";
 import { z } from "zod";
-import { conversations,messages,outputReviews,messageCitations,runs,inputSafetyReviews,providerCalls,runSettlements,runSources,sourcePassages,session,runRetrievals } from "@/db/schema";
+import { ACTIVE_RUN_STATUSES,conversations,messages,outputReviews,messageCitations,runs,inputSafetyReviews,providerCalls,runSettlements,runSources,sourcePassages,session,runRetrievals } from "@/db/schema";
 import type { AdmissionDatabase,AdmissionTransaction } from "./usage";
 import { lockOwnedRun } from "./lock";
 import { AdmissionError } from "./errors";
@@ -75,10 +75,11 @@ export function createFinalization(db: AdmissionDatabase) {
 
 // Caller holds owner/conversation/run locks. No external work occurs in this transaction.
 export async function settleFailureLocked(tx: AdmissionTransaction,run: typeof runs.$inferSelect,now: Date,code: PublicErrorCode,cancelled=false) {
-  if(run.status === "COMPLETED") throw new AdmissionError("CONFLICT");
+  const active=ACTIVE_RUN_STATUSES.some(s=>s===run.status);
+  if(run.status === "COMPLETED" || run.status === "NEEDS_CLARIFICATION") throw new AdmissionError("CONFLICT");
   const [settled]=await tx.select().from(runSettlements).where(eq(runSettlements.runId,run.id));
   if(settled) {
-    if(["RECEIVED","CHECKING_INPUT","PLANNING","SEARCHING","PREPARING_EVIDENCE","GENERATING","CHECKING_OUTPUT"].includes(run.status))throw new AdmissionError("CONFLICT");
+    if(active)throw new AdmissionError("CONFLICT");
     return;
   }
   const [review]=await tx.select().from(outputReviews).where(eq(outputReviews.runId,run.id));
@@ -86,7 +87,7 @@ export async function settleFailureLocked(tx: AdmissionTransaction,run: typeof r
   if(!review)await tx.insert(outputReviews).values({runId:run.id,conversationId:run.conversationId,attemptVersion:run.attemptVersion,
     decision:code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCK" : "UNAVAILABLE",policyVersion:SAFETY_POLICY.version,createdAt:now});
   await settleRun(tx,run,0,now);
-  const status=cancelled || run.status === "CANCELLED" ? "CANCELLED" : run.deadlineAt <= now ? "TIMED_OUT" : code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCKED" : "FAILED";
-  await tx.update(runs).set({status,updatedAt:now,attemptVersion:run.attemptVersion+1})
+  const status=!active ? run.status : cancelled || run.status === "CANCELLED" ? "CANCELLED" : run.deadlineAt <= now ? "TIMED_OUT" : code === "OUTPUT_BLOCKED" || code === "INPUT_BLOCKED" ? "BLOCKED" : "FAILED";
+  await tx.update(runs).set({status,updatedAt:now,attemptVersion:run.attemptVersion+(active?1:0)})
     .where(and(eq(runs.id,run.id),eq(runs.status,run.status),eq(runs.attemptVersion,run.attemptVersion)));
 }

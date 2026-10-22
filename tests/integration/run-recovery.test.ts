@@ -78,3 +78,14 @@ it('stale finalization callbacks cannot change a recovered attempt',async()=>{
  expect(await createFinalization(db).fail(person.subject,person.runId,'PROVIDER_UNAVAILABLE',{attemptVersion:1,revision:1})).toMatchObject({kind:'DENIED',code:'CONFLICT'});
  expect((await db.select().from(schema.runs))[0].status).toBe('CANCELLED');
 });
+it('owned status loading repairs expiration and returns only fixed terminal metadata',async()=>{
+ const {createAnswerDelivery}=await import('@/server/chat/delivery');
+ await db.update(schema.runs).set({createdAt:new Date(Date.now()-120000),deadlineAt:new Date(Date.now()-60000)}).where(eq(schema.runs.id,person.runId));
+ const status=await createAnswerDelivery(db).load({user:{id:person.subject},sessionId},person.runId);
+ expect(status).toMatchObject({state:'UNAVAILABLE',terminalReason:'TIMED_OUT'});expect(status).not.toHaveProperty('answer');
+ expect((await db.select().from(schema.runs))[0]).toMatchObject({status:'TIMED_OUT',attemptVersion:2});
+});
+it('repairing a terminal missing receipt preserves its original refusal state',async()=>{
+ await db.update(schema.runs).set({status:'BLOCKED'}).where(eq(schema.runs.id,person.runId));
+ await createRunRecovery(db).sweep();expect((await db.select().from(schema.runs))[0].status).toBe('BLOCKED');
+});

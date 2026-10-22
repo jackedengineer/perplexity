@@ -1,11 +1,11 @@
 import { and,eq,inArray,sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { ACTIVE_RUN_STATUSES,providerCalls,providerUsageResolutions,runSettlements,runReconciliations,usageReservations,usageBuckets,operatorUsageBuckets } from '@/db/schema';
+import { ACTIVE_RUN_STATUSES,providerCalls,providerUsageResolutions,runSettlements,runReconciliations,usageReservations,usageBuckets,operatorUsageBuckets,appUsers,runs } from '@/db/schema';
 import type { AdmissionDatabase } from './usage';
 import { lockOwnedRun } from './lock';
 import { AdmissionError } from './errors';
 export function createUsageReconciliation(db:AdmissionDatabase) {
-  return { async reconcile(subject:string,runId:string) {
+  async function reconcile(subject:string,runId:string) {
     if(!z.uuid().safeParse(runId).success)throw new AdmissionError('NOT_FOUND');
     return db.transaction(async tx=>{
       const {run,now}=await lockOwnedRun(tx,subject,runId);
@@ -45,5 +45,22 @@ export function createUsageReconciliation(db:AdmissionDatabase) {
       await tx.insert(runReconciliations).values({runId,version:previous.length+1,previousHeldMicroUsd:held,chargedMicroUsd:charged,releasedMicroUsd:released,remainingHeldMicroUsd:remaining,createdAt:now});
       return 'RECONCILED' as const;
     });
-  } };
+  }
+  return {reconcile,async sweep(deadline=performance.now()+25000) {
+    if(performance.now()>=deadline)return {scanned:0,reconciled:0,failed:0};
+    // Only actionable holds enter the bounded batch. Unresolved old calls cannot
+    // starve a later receipt that actually changes accounting.
+    const candidates=await db.select({id:runs.id,subject:appUsers.authSubject}).from(runs)
+      .innerJoin(appUsers,eq(appUsers.id,runs.userId)).innerJoin(runSettlements,eq(runSettlements.runId,runs.id))
+      .where(and(eq(runs.accountingVersion,1),sql`${runs.status} NOT IN ('RECEIVED','CHECKING_INPUT','PLANNING','SEARCHING','PREPARING_EVIDENCE','GENERATING','CHECKING_OUTPUT')`,
+        sql`coalesce((select remaining_held_micro_usd from run_reconciliations where run_id=${runs.id} order by version desc limit 1),${runSettlements.heldProviderMicroUsd})>0`,
+        sql`(
+          (select coalesce(sum(coalesce(p.cost_micro_usd,c.cost_micro_usd,0)),0) from provider_calls c left join provider_usage_resolutions p on p.call_id=c.id where c.run_id=${runs.id})
+          > ${runSettlements.knownProviderMicroUsd}+(select coalesce(sum(charged_micro_usd),0) from run_reconciliations where run_id=${runs.id})
+          OR NOT EXISTS(select 1 from provider_calls c left join provider_usage_resolutions p on p.call_id=c.id where c.run_id=${runs.id} and p.call_id is null and (c.cost_micro_usd is null or c.status in ('STARTED','UNKNOWN')))
+        )`)).orderBy(runSettlements.createdAt,runs.id).limit(10);
+    let reconciled=0,failed=0;
+    for(const candidate of candidates) {if(performance.now()>=deadline)break;try{if(await reconcile(candidate.subject,candidate.id)==='RECONCILED')reconciled++;}catch{failed++;}}
+    return {scanned:candidates.length,reconciled,failed};
+  }};
 }
