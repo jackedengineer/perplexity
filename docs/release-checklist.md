@@ -59,11 +59,13 @@ Public guest access and paid tiers are required launch scope.
   is claimed. At least ten answers/30 reviewed claims and reviewed allowed
   completions are required by the unchanged [evaluation protocol](../evals/README.md).
 - [ ] **Required dispositions:** the one clarification case remains ERROR because
-  planner T12 is not implemented. One of two no-evidence cases also stopped at
-  output safety. The scorer correctly reports PENDING.
-- [ ] **Current PR review:** the former four code findings are fixed and their
-  threads resolved. Existing reviews predate the latest classifier/draft changes;
-  do not treat old review results as current approval. Check CI on the final head.
+  planner T12 is not implemented. Both no-evidence cases pass in the latest rerun.
+  One semantic distress check remains UNAVAILABLE; the scorer correctly reports
+  PENDING for that observation and independent review.
+- [ ] **Current PR review:** the original four findings and five subsequent code
+  findings are fixed and their threads resolved. The later checklist inconsistency
+  is corrected here. Require code/security approval and CI on the final head;
+  old security results are not current approval.
 - [ ] **T22 data lifecycle:** owner deletion, active-run fencing on deletion,
   evidence/safety TTL cleanup and private export are not implemented.
 - [ ] **T23 operations:** isolated preview/production migration execution,
