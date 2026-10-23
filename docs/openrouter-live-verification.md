@@ -7,6 +7,10 @@ No Vercel deployment or public rollout was performed. This record supersedes the
 older statement that all paid testing is pending; independent human quality and
 policy-label review remain pending.
 
+The subsequent [current-review corrections and live rerun](t21-review-fixes.md)
+record the latest candidate, category-aware routing checks and remaining outage.
+The observations below are historical and retain their actual revision/versions.
+
 ## Repaired candidate — immutable full rerun
 
 Revision `b101d4f` was committed before the run and verified unchanged with a clean

@@ -3,6 +3,10 @@
 Decision: **HOLD public deployment.** No Vercel project/deployment was created and
 no production database content or schema was changed by this verification.
 This checklist records evidence; it does not mark unfinished backlog tasks done.
+The [current-review corrections](t21-review-fixes.md) supersede the older model
+observations below: 13/13 answers and 2/2 no-evidence dispositions pass, but one
+semantic check is unavailable and clarification/human review remain pending.
+Public guest access and paid tiers are required launch scope.
 
 ## Candidate and provider controls
 
