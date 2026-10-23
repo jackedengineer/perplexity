@@ -235,3 +235,6 @@ fixed progress states, render approved Markdown/citations and reload canonical
 responses. Actual provider routing/privacy compatibility, classifier quality,
 search relevance, factual citation support and capped live spend remain separate
 release checks. The internal fixture result is not evidence of live model quality.
+
+
+Output protocol v7 uses a separate bounded context envelope for the complete original and every visible cited/additional-source field. Internal passage IDs and content hashes stay in the validated persisted payload, without occupying classifier context. The full 20,960-byte safety request ceiling still applies. Answer protocol v9 omits a byte-identical interpretation rather than sending the original twice; distinct interpretations remain. See [third-round review verification](./pr11-review-fixes.md#third-review-round) for boundaries and retained live-testing limitations.
