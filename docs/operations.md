@@ -60,7 +60,11 @@ the success denominator: a stream can finish with an in-band error.
 
 `research.first_progress` measures request arrival to the first neutral research
 stage after input acceptance. `research.approved_delivery` measures arrival to
-the first approved payload after persistence and owned loading. Progress streaming
+the first approved payload enqueued into the public response after persistence
+and owned loading. The SDK writer suppresses closed-stream enqueue errors, so
+the observation is made at the response queue boundary, with its captured trace
+context, rather than when writing to the SDK. This is not a network acknowledgement.
+Progress streaming
 does not stream a private draft. `http.delivery` ends when server delivery work
 finishes, not when a client paints or acknowledges the answer.
 
@@ -107,8 +111,9 @@ The named reports provide:
   add application context. Null unfinished durations are not zero-latency calls.
 - `retrieval_health`: unavailable/no-evidence and approved-source counts. Rejected
   source counts are log metrics; no rejected evidence is persisted for ops.
-- `safety_decisions`: durable gate decisions. Output settlement placeholders before
-  an output classifier are excluded. Citation/pre-classifier failures are visible
+- `safety_decisions`: durable gate decisions. Output settlement placeholders with
+  no finished classifier call (including abandoned STARTED and SKIPPED claims)
+  are excluded. Citation/pre-classifier failures are visible
   in stage traces; this report is not a count of all deterministic guard executions.
 - `false_refusal_feedback`: explicit NOT_COLLECTED_T17 coverage with null rates and
   denominators. T17 feedback collection and T21 human-labeled evaluations are open;
@@ -123,6 +128,9 @@ The named reports provide:
   replace uncertainty once; adjustments are aggregated before joining. Contradictory
   receipts never reduce an observed charge. UNKNOWN_LEGACY/IN_PROGRESS states are
   explicit. This report covers provider usage, not hosting/database/payment costs.
+  Runs with no search dispatch report zero search credits; dispatched searches
+  with missing usage retain null credits and an unknown count. Legacy accounting
+  retains null search totals and coverage rather than assuming a complete ledger.
 
 Read-only operator access, seven-day diagnostic-log retention, deletion/export
 handling for pseudonymous request/run IDs and a verified exporter/alert destination

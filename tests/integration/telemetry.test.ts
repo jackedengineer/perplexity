@@ -12,6 +12,8 @@ import {withTelemetry} from '@/server/telemetry/trace';
 import {eq} from 'drizzle-orm';
 import {createUsageReconciliation} from '@/server/runs/reconcile';
 import {createFinalization} from '@/server/runs/finalize';
+import {createProviderCalls} from '@/server/runs/provider-calls';
+import {createRunRecovery} from '@/server/runs/recover';
 import type {TelemetryEvent} from '@/server/telemetry/contracts';
 const pg=new PGlite(),db=drizzle(pg,{schema});
 let person:Awaited<ReturnType<typeof seedCompletion>>;
@@ -90,12 +92,21 @@ it('does not count an input-refusal settlement placeholder as an output safety c
  const p=providers();p.input={...fakeSafety(),classify:async()=>({decision:'BLOCK',categoryCodes:['FRAUD'],policyVersion:'v1'})};
  await run(p);const reports=await operatorReports();
  expect(reports.safety_decisions).toEqual([{gate:'INPUT',decision:'BLOCK',policy_version:'v1',decisions:1}]);
- expect(reports.costs[0]).toMatchObject({cost_state:'KNOWN',known_micro_usd:'100',held_micro_usd:'0'});
+ expect(reports.costs[0]).toMatchObject({cost_state:'KNOWN',known_micro_usd:'100',held_micro_usd:'0',search_credits:0,unknown_search_credits:0});
+});
+it('excludes a recovered output placeholder when only an unfinished provider claim exists',async()=>{
+ await db.update(schema.runs).set({status:'CHECKING_OUTPUT'}).where(eq(schema.runs.id,person.runId));
+ await createProviderCalls(db,person.subject,person.runId).begin('OUTPUT_SAFETY','test/safety');
+ await db.update(schema.runs).set({createdAt:new Date(Date.now()-120000),deadlineAt:new Date(Date.now()-1000)}).where(eq(schema.runs.id,person.runId));
+ expect((await createRunRecovery(db).sweep()).recovered).toBe(1);
+ expect(await db.select().from(schema.outputReviews)).toHaveLength(1);
+ expect((await operatorReports()).safety_decisions).toEqual([]);
 });
 it('keeps legacy accounting visibly unknown instead of presenting it as free usage',async()=>{
+ expect((await operatorReports()).costs[0]).toMatchObject({search_credits:0,unknown_search_credits:0});
  await db.update(schema.runs).set({accountingVersion:0}).where(eq(schema.runs.id,person.runId));
  await createFinalization(db).fail(person.subject,person.runId,'PROVIDER_UNAVAILABLE');
- expect((await operatorReports()).costs[0]).toMatchObject({cost_state:'UNKNOWN_LEGACY',held_micro_usd:'50000'});
+ expect((await operatorReports()).costs[0]).toMatchObject({cost_state:'UNKNOWN_LEGACY',held_micro_usd:'50000',search_credits:null,unknown_search_credits:null});
 });
 it('operator reports distinguish no-dispatch searches from unknown dispatched credits',async()=>{
  await run();

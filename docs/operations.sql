@@ -46,7 +46,8 @@ WITH decisions AS (
  SELECT 'OUTPUT',o.decision,o.policy_version FROM output_safety_reviews o
  WHERE o.created_at >= clock_timestamp()-interval '24 hours'
  -- Failure settlement can write an output-review placeholder before this gate.
- AND EXISTS (SELECT 1 FROM provider_calls c WHERE c.run_id=o.run_id AND c.stage='OUTPUT_SAFETY')
+ AND EXISTS (SELECT 1 FROM provider_calls c WHERE c.run_id=o.run_id AND c.stage='OUTPUT_SAFETY'
+  AND c.status IN ('SUCCEEDED','UNKNOWN') AND c.finished_at IS NOT NULL)
 )
 SELECT gate,decision,policy_version,count(*)::integer AS decisions
 FROM decisions GROUP BY gate,decision,policy_version ORDER BY gate,decision;
@@ -78,7 +79,8 @@ WITH observed AS (
    OR p.cost_micro_usd<c.cost_micro_usd)::integer AS unknown_calls,
   count(*) FILTER (WHERE p.cost_micro_usd<c.cost_micro_usd OR greatest(c.cost_micro_usd,p.cost_micro_usd)>c.cap_micro_usd)::integer AS anomalies,
   sum(c.input_tokens)::integer AS input_tokens,sum(c.output_tokens)::integer AS output_tokens,
-  sum(CASE WHEN c.stage='SEARCH' AND c.status='SKIPPED' THEN 0 ELSE c.search_credits END)::integer AS search_credits,
+  CASE WHEN count(*) FILTER (WHERE c.stage='SEARCH' AND c.status<>'SKIPPED' AND c.search_credits IS NULL)>0 THEN NULL
+   ELSE coalesce(sum(c.search_credits) FILTER (WHERE c.stage='SEARCH' AND c.status<>'SKIPPED'),0)::integer END AS search_credits,
   count(*) FILTER (WHERE c.stage='SEARCH' AND c.status<>'SKIPPED' AND c.search_credits IS NULL)::integer AS unknown_search_credits
  FROM provider_calls c LEFT JOIN provider_usage_resolutions p ON p.call_id=c.id
  GROUP BY c.run_id
@@ -93,7 +95,9 @@ SELECT r.id AS run_id,r.status,r.price_version,r.policy_version,r.accounting_ver
  coalesce(o.known,0)::text AS known_micro_usd,coalesce(o.unknown_calls,0) AS unknown_calls,coalesce(o.anomalies,0) AS anomalies,
  (s.known_provider_micro_usd+coalesce(a.charged,0))::text AS booked_micro_usd,
  coalesce(last_adjustment.remaining_held_micro_usd,s.held_provider_micro_usd,u.provider_reserve_micro_usd)::text AS held_micro_usd,
- s.credits_charged AS answer_credits,o.input_tokens,o.output_tokens,o.search_credits,o.unknown_search_credits
+ s.credits_charged AS answer_credits,o.input_tokens,o.output_tokens,
+ CASE WHEN r.accounting_version<>1 THEN NULL WHEN o.run_id IS NULL THEN 0 ELSE o.search_credits END AS search_credits,
+ CASE WHEN r.accounting_version<>1 THEN NULL ELSE coalesce(o.unknown_search_credits,0) END AS unknown_search_credits
 FROM runs r JOIN usage_reservations u ON u.run_id=r.id
 LEFT JOIN observed o ON o.run_id=r.id LEFT JOIN run_settlements s ON s.run_id=r.id
 LEFT JOIN adjustments a ON a.run_id=r.id

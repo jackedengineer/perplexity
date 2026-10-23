@@ -1,4 +1,5 @@
 import {withTelemetry,traceStage,bindRunTelemetry,recordTelemetry} from '@/server/telemetry/trace';
+import {AsyncLocalStorage} from 'node:async_hooks';
 import { createUIMessageStream,createUIMessageStreamResponse } from "ai";
 import type { SubmitQuery } from "@/server/contracts/chat";
 import { createPublicError,type PublicErrorCode } from "@/server/contracts/errors";
@@ -36,7 +37,7 @@ export function createChatHttp(dependencies: Dependencies) {
       const requestId = crypto.randomUUID(),started = performance.now();
       return withTelemetry(requestId,async()=>{
       try {
-        const identity = await traceStage("http.identity",()=>dependencies.identity(request));
+        const identity = await traceStage("http.identity",()=>dependencies.identity(request),identity=>({outcome:identity?'SUCCEEDED':'UNAUTHENTICATED'}));
         const origin=dependencies.origin();
         await traceStage("http.request_limit",()=>dependencies.consumeRequest(isTrustedSubmissionOrigin(request,origin)?identity?.user.id??null:null));
         if (!identity) throw new AdmissionError("UNAUTHENTICATED");
@@ -54,6 +55,7 @@ export function createChatHttp(dependencies: Dependencies) {
           return failure("RUN_IN_PROGRESS",requestId,run);
         }
         const controller = new AbortController(),signal = AbortSignal.any([request.signal,controller.signal]);
+        let reportApprovedDelivery:(()=>void)|undefined;
         const stream = createUIMessageStream<ResearchMessage>({
           onError: ()=>createPublicError("PROVIDER_UNAVAILABLE",requestId).body.error.message,
           async execute({ writer }) {
@@ -71,7 +73,9 @@ export function createChatHttp(dependencies: Dependencies) {
               const saved = await backend.load(identity,run.id);
               if (signal.aborted || saved.state !== "COMPLETED" || !saved.answer) throw new AdmissionError("RUN_ALREADY_FINISHED");
               const answer = saved.answer;
-              recordTelemetry("research.approved_delivery",{outcome:"COMPLETED",durationMs:Math.round(performance.now()-started)});
+              // The SDK writer suppresses closed-stream errors. Record only after
+              // the approved chunk is enqueued into the public response below.
+              reportApprovedDelivery=AsyncLocalStorage.bind(()=>recordTelemetry("research.approved_delivery",{outcome:"COMPLETED",durationMs:Math.round(performance.now()-started)}));
               writer.write({ type: "start",messageId: answer.messageId });
               writer.write({ type: "data-answer",data: answer });
               for (const source of answer.answer.sources) writer.write({ type: "source-url",sourceId: source.sourceId,url: source.url,title: source.title });
@@ -88,7 +92,10 @@ export function createChatHttp(dependencies: Dependencies) {
           },
         });
         const reader = stream.getReader();
-        const cancellable = new ReadableStream({ async pull(target) { const next = await reader.read();if (next.done) target.close();else target.enqueue(next.value); },
+        const cancellable = new ReadableStream({ async pull(target) { const next = await reader.read();if (next.done) target.close();else {
+          target.enqueue(next.value);
+          if(next.value.type==='data-answer'&&!signal.aborted){reportApprovedDelivery?.();reportApprovedDelivery=undefined;}
+        } },
           async cancel(reason) { controller.abort();await reader.cancel(reason); } });
         return createUIMessageStreamResponse({ stream: cancellable,headers: { ...headers(requestId),"X-Run-Id": run.id,"X-Run-Revision": String(run.revision),"Server-Timing": `admission;dur=${Math.round(performance.now()-started)}` } });
       } catch (error) {

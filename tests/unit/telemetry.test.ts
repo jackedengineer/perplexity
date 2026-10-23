@@ -87,3 +87,15 @@ it('exports a real request root and connects nested exported spans to it',async(
   expect(exported.map(e=>[e.name,e.parent,e.ended])).toEqual([['http.request',undefined,true],['run.execute',exported[0].id,true]]);
  }finally{tracer.mockRestore();}
 });
+it('retains run totals above one provider call limit without widening per-call observations',async()=>{
+ const {recordProviderObservation,recordRunUsage}=await import('@/server/telemetry/trace');
+ const events:TelemetryEvent[]=[];
+ await withTelemetry(randomUUID(),async()=>{
+  for(const providerStage of ['INPUT_SAFETY','QUERY_SAFETY','EVIDENCE_SAFETY','ANSWER','OUTPUT_SAFETY'] as const)
+   recordProviderObservation({providerCallId:randomUUID(),providerStage,outcome:'SUCCEEDED',costState:'KNOWN',knownCostMicroUsd:'100',inputTokens:1_000_000,outputTokens:1_000_000});
+  recordProviderObservation({providerCallId:randomUUID(),providerStage:'ANSWER',inputTokens:1_000_001});
+  recordRunUsage();
+ },e=>events.push(e));
+ expect(events.filter(e=>e.event==='research.usage')).toHaveLength(5);
+ expect(events.find(e=>e.event==='research.run_usage')).toMatchObject({inputTokens:5_000_000,outputTokens:5_000_000,knownCostMicroUsd:'500',unknownCalls:0,searchCredits:0});
+});

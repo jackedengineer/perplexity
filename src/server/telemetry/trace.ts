@@ -2,7 +2,7 @@ import {AsyncLocalStorage} from 'node:async_hooks';
 import {randomBytes} from 'node:crypto';
 import {trace,ROOT_CONTEXT,SpanStatusCode,isSpanContextValid,type Attributes,type Context,type Span,type SpanContext} from '@opentelemetry/api';
 import {AdmissionError} from '@/server/runs/errors';
-import {telemetryEventSchema,telemetryFieldsSchema,runMetadataSchema,outcomeSchema,outcomeCategory,type TelemetryEvent,type TelemetryFields,type TelemetryStage} from './contracts';
+import {telemetryEventSchema,telemetryFieldsSchema,providerTelemetryFieldsSchema,runMetadataSchema,outcomeSchema,outcomeCategory,type TelemetryEvent,type TelemetryFields,type TelemetryStage} from './contracts';
 import {recordMetrics} from './metrics';
 type Scope={requestId:string;traceId:string;spanId:string;parentSpanId?:string;stage?:TelemetryStage;apiContext:Context;run:Partial<zRun>;calls:Map<string,TelemetryFields>;sink:(event:TelemetryEvent)=>void};
 type zRun=ReturnType<typeof runMetadataSchema.parse>;
@@ -20,7 +20,7 @@ export function bindRunTelemetry(value:unknown) {
 // A bounded observation of this execution, never a second billing ledger. Durable
 // receipts/reconciliation remain in Postgres, including calls that finish later.
 export function recordProviderObservation(value:unknown,started=false) {
- const current=storage.getStore(),parsed=telemetryFieldsSchema.safeParse(value);if(!current||!parsed.success)return;
+ const current=storage.getStore(),parsed=providerTelemetryFieldsSchema.safeParse(value);if(!current||!parsed.success)return;
  const fields=parsed.data;if(!fields.providerCallId||!fields.providerStage)return;
  if(!current.calls.has(fields.providerCallId)&&current.calls.size>=6)return;
  const observation={...current.calls.get(fields.providerCallId),...fields};

@@ -8,6 +8,8 @@ export const outcomeSchema=z.enum([...publicCodes,'ERROR','SUCCEEDED','UNKNOWN',
 export const stageSchema=z.enum(['http.request','http.identity','http.request_limit','http.validation','http.configuration','http.admission','http.delivery','http.status','run.execute','input.accept','retrieval','answer.complete','safety.input','safety.query','safety.evidence','safety.output','search','answer.draft','citations','output.release','persistence.commit','persistence.fail']);
 export type TelemetryStage=z.infer<typeof stageSchema>;
 const count=z.int().min(0).max(1_000_000),money=z.string().regex(/^\d{1,16}$/u);
+// One request retains at most six provider observations; run totals can exceed a call's token limit.
+const aggregateTokens=z.int().min(0).max(6_000_000);
 const version=z.string().regex(/^[a-zA-Z0-9._-]{1,64}$/u);
 export const runMetadataSchema=z.object({runId:z.uuid(),policyVersion:version.optional(),catalogVersion:version.optional(),priceVersion:version.optional(),entitlementVersion:version.optional(),accountingVersion:z.int().min(0).max(100).optional(),estimatedUpperBoundMicroUsd:money.optional(),estimateKind:z.literal('RESERVATION_CEILING').optional()});
 // Strip unknown keys. Neither errors nor request/provider objects are serializable fields.
@@ -17,11 +19,12 @@ export const telemetryFieldsSchema=z.object({
  promptVersion:version.optional(),detectorVersion:version.optional(),
  modelId:modelIdSchema.optional(),actualModelMatch:z.enum(['MATCH','OTHER','UNAVAILABLE']).optional(),
  providerCallId:z.uuid().optional(),providerStage:z.enum(['INPUT_SAFETY','QUERY_SAFETY','SEARCH','EVIDENCE_SAFETY','ANSWER','OUTPUT_SAFETY']).optional(),
- inputTokens:count.nullable().optional(),outputTokens:count.nullable().optional(),searchCredits:count.nullable().optional(),
+ inputTokens:aggregateTokens.nullable().optional(),outputTokens:aggregateTokens.nullable().optional(),searchCredits:count.nullable().optional(),
  knownCostMicroUsd:money.optional(),estimatedUpperBoundMicroUsd:money.optional(),heldMicroUsd:money.optional(),bookedMicroUsd:money.optional(),
  costState:z.enum(['KNOWN','PARTIAL','UNKNOWN']).optional(),estimateKind:z.literal('RESERVATION_CEILING').optional(),unknownCalls:count.optional(),
  answerCredits:count.optional(),sourceCount:count.optional(),discardedSources:count.optional(),returnedSources:count.optional(),
 });
+export const providerTelemetryFieldsSchema=telemetryFieldsSchema.extend({inputTokens:count.nullable().optional(),outputTokens:count.nullable().optional()});
 export type TelemetryFields=z.infer<typeof telemetryFieldsSchema>;
 export const eventNameSchema=z.enum(['research.span','research.safety','research.sources','research.provider_started','research.usage','research.run_usage','research.first_progress','research.approved_delivery','research.telemetry_unavailable']);
 export const telemetryEventSchema=telemetryFieldsSchema.extend({
