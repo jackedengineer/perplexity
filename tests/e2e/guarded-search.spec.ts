@@ -36,8 +36,10 @@ test("a public question shows guarded progress, committed citations and exact re
     await writeFile(`.artifacts/launch-stream-${info.project.name}.json`,JSON.stringify({timing:response.request().timing(),serverTiming:response.headers()["server-timing"],contentType:response.headers()["content-type"],cacheControl:response.headers()["cache-control"]},null,2));
     const submitted=requests[0] as {clientRequestId:string;conversationId:string};expect(Object.keys(submitted).sort()).toEqual(["clientRequestId","conversationId","expectedRevision","message","mode","modelKey"]);
     await expect(page.locator("h1")).toHaveText("Why do rainbows form?");expect(requests).toHaveLength(1);
+    const feedback=page.getByRole('button',{name:'Helpful answer',exact:true});await expect(feedback).toBeEnabled();await feedback.click();await expect(feedback).toHaveAttribute('aria-pressed','true');
     const rendered=await page.locator(".answer-prose").textContent();
     await page.reload();await expect(page.locator(".answer-prose")).toHaveText(rendered??"");
+    await expect(page.getByRole('button',{name:'Helpful answer',exact:true})).toHaveAttribute('aria-pressed','true');
     await page.waitForTimeout(100); // Flush paint observers for the saved-answer lab sample.
     await writeFile(`.artifacts/launch-answer-performance-${info.project.name}.json`,JSON.stringify(await page.evaluate(()=>({
       ...window.t11Rendering,jsTransferBytes:performance.getEntriesByType("resource").filter(r=>r.name.includes(".js")).reduce((n,r)=>n+(r as PerformanceResourceTiming).transferSize,0),
@@ -86,7 +88,7 @@ test("a public question shows guarded progress, committed citations and exact re
     expect(await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id))).toHaveLength(8);
     expect(await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,run.id))).toHaveLength(1);
     const stranger=await browser.newContext({baseURL:"http://localhost:3001"});const other=await identityFixture(stranger,"Other reader");
-    try {expect((await stranger.request.get(`/api/runs/${run.id}`)).status()).toBe(404);}finally{await other.cleanup();await stranger.close();}
+    try {expect((await stranger.request.get(`/api/runs/${run.id}`)).status()).toBe(404);const [approved]=await f.owner.select().from(schema.outputReviews).where(eq(schema.outputReviews.runId,run.id));expect((await stranger.request.put(`/api/messages/${approved.messageId}/feedback`,{headers:{Origin:'http://localhost:3001'},data:{rating:'NOT_HELPFUL',reason:'FALSE_REFUSAL',expectedVersion:0}})).status()).toBe(404);}finally{await other.cleanup();await stranger.close();}
   } finally {
     if(requests.length&&info.status!=="passed"){const value=requests[0] as {clientRequestId:string};const [run]=await f.owner.select().from(schema.runs).where(eq(schema.runs.clientRequestId,value.clientRequestId));if(run){console.info({state:run.status,ageMs:Date.now()-run.createdAt.getTime()});console.info((await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id))).map(c=>({stage:c.stage,status:c.status,durationMs:c.finishedAt?c.finishedAt.getTime()-c.startedAt.getTime():null})));}}
     await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}

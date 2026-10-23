@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 const paths = {
+  thumbUp:"M7 10H3v11h4M7 20h11l3-10h-7l1-6-3-1-5 8v9",thumbDown:"M7 14H3V3h4M7 4h11l3 10h-7l1 6-3 1-5-8V4",
   copy: "M9 9h12v12H9zM15 9V3H3v12h6",external: "M14 3h7v7M21 3 10 14M10 3H3v18h18v-7",
   plus: "M12 5v14M5 12h14", search: "m20 20-4-4M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0",
   panel: "M9 3v18M4 3h16v18H4z", chevron: "m9 5 7 7-7 7", down: "m6 9 6 6 6-6",

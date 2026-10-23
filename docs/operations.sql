@@ -53,9 +53,11 @@ SELECT gate,decision,policy_version,count(*)::integer AS decisions
 FROM decisions GROUP BY gate,decision,policy_version ORDER BY gate,decision;
 
 -- name: false_refusal_feedback
--- Refusals are not confirmed false refusals. T17 collection/human labeling is open.
-SELECT 'NOT_COLLECTED_T17'::text AS coverage,NULL::numeric AS false_refusal_rate,
- NULL::bigint AS labeled_cases,NULL::bigint AS confirmed_false_refusals;
+-- Owner reports are not adjudicated false refusals; denied input has no approved-message target.
+SELECT 'OWNER_REPORTS_ONLY'::text AS coverage,
+ count(*)::integer AS rated_messages,count(*) FILTER(WHERE reason='FALSE_REFUSAL')::integer AS reported_false_refusals,
+ NULL::numeric AS false_refusal_rate,NULL::bigint AS labeled_cases,NULL::bigint AS confirmed_false_refusals
+FROM message_feedback WHERE updated_at>=clock_timestamp()-interval '24 hours';
 
 -- name: reservations
 SELECT r.id AS run_id,r.status,r.deadline_at,

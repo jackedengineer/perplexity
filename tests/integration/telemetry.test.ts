@@ -74,7 +74,7 @@ it('executes the operator query set with honest failure, latency, cost and feedb
  expect(reports.costs[0]).toMatchObject({known_micro_usd:'600',booked_micro_usd:'600',held_micro_usd:'49400',unknown_calls:1,search_credits:1});
  expect(reports.reservations[0]).toMatchObject({reason:'AWAITING_USAGE',held_micro_usd:'49400'});
  expect(reports.provider_latency).toHaveLength(7);expect(reports.provider_latency.every(r=>Number(r.p95_ms)>=0)).toBe(true);
- expect(reports.false_refusal_feedback[0]).toMatchObject({coverage:'NOT_COLLECTED_T17',false_refusal_rate:null,labeled_cases:null});
+ expect(reports.false_refusal_feedback[0]).toMatchObject({coverage:'OWNER_REPORTS_ONLY',false_refusal_rate:null,labeled_cases:null});
  expect(JSON.stringify(reports)).not.toMatch(/PRIVATE_|Why do rainbows|weather.gov|sessionId|payloadHmac/);
 });
 it('operator cost totals include reconciled receipts once and reveal missing settlement',async()=>{

@@ -1,8 +1,9 @@
 "use client";
-import { useEffect,useId,useRef,useState,type ReactNode } from "react";
+import { lazy,Suspense,useEffect,useId,useRef,useState,type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AnswerNode,PublicAnswer } from "@/server/answers/view";
 import { Icon } from "./icons";
+const AnswerFeedback=lazy(()=>import("./answer-feedback"));
 function Citation({ source }: { source: PublicAnswer["sources"][number] }) {
   const id=useId(),[tip,setTip]=useState<{left:number;top:number;width:number;maxHeight:number;above:boolean}|null>(null);
   function open(element: HTMLAnchorElement) {
@@ -21,7 +22,7 @@ function Citation({ source }: { source: PublicAnswer["sources"][number] }) {
     <Icon name="link" size={10}/><span>{source.domain.replace(/\.(gov|com|org|edu)$/u,"")}</span>
   </a>{tip&&createPortal(<span className="citation-tooltip" role="tooltip" id={id} style={{left:tip.left,top:tip.top,width:tip.width,maxHeight:tip.maxHeight,transform:tip.above?"translateY(-100%)":undefined}}>{source.title}<small>{source.domain} · Source {source.number}</small></span>,document.body)}</>;
 }
-export function ApprovedAnswer({ answer,text,onSources }: { answer: PublicAnswer;text: string;onSources: ()=>void }) {
+export function ApprovedAnswer({ messageId,answer,text,onSources }: {messageId:string; answer: PublicAnswer;text: string;onSources: ()=>void }) {
   const [copied,setCopied] = useState(false),[copyFailed,setCopyFailed] = useState(false);
   const copyTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   useEffect(()=>()=>{if(copyTimer.current)clearTimeout(copyTimer.current);},[]);
@@ -59,6 +60,7 @@ export function ApprovedAnswer({ answer,text,onSources }: { answer: PublicAnswer
         <span className="copy-symbol" data-active={copied} aria-hidden="true"><Icon name="check" size={17}/></span>
       </button>
       {answer.sources.length > 0 && <button className="answer-source-count" onClick={onSources}><Icon name="link" size={15} />{answer.sources.length} {answer.sources.length === 1 ? "source" : "sources"}</button>}
+      <Suspense fallback={<div className="feedback-placeholder" aria-hidden="true"/>}><AnswerFeedback messageId={messageId}/></Suspense>
       <span className="copy-feedback" role="status">{copyFailed ? "Copy is unavailable. Select the text to copy it." : copied ? "Copied" : ""}</span>
     </div>
   </div>;
