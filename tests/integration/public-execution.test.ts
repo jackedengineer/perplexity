@@ -80,7 +80,9 @@ it('answer cancellation remains cancellation rather than a fabricated deadline',
  expect((await run(p,controller.signal)).result).toEqual({kind:'DENIED',code:'CONFLICT'});
  expect((await db.select().from(schema.runs))[0].status).toBe('CANCELLED');
 });
+async function ambiguous(){person=await seedCompletion(db,50000n,'Is it better?',2);identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};}
 it('commits an output-approved clarification without any search or answer dispatch and reloads it',async()=>{
+ await ambiguous();
  const p=providers();p.planner={modelId:'test/planner',plan:vi.fn().mockResolvedValue({plan:{action:'CLARIFY',question:'Which products are you comparing?',reasonCode:'MISSING_ENTITY'},usage:knownUsage})};
  expect((await run(p)).result.kind).toBe('COMPLETED');
  expect(p.search.search).not.toHaveBeenCalled();expect(p.answer.generate).not.toHaveBeenCalled();
@@ -91,6 +93,7 @@ it('commits an output-approved clarification without any search or answer dispat
  expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({creditsCharged:0,knownProviderMicroUsd:300n,heldProviderMicroUsd:0n});
 });
 it('clarification is withheld on output outage, with no search, answer or public question bytes',async()=>{
+ await ambiguous();
  const p=providers();p.planner={modelId:'test/planner',plan:async()=>({plan:{action:'CLARIFY',question:'Which products are you comparing?',reasonCode:'MISSING_ENTITY'},usage:knownUsage})};
  p.output={...fakeSafety(),classify:async()=>{throw Error('PRIVATE');}};
  expect((await run(p)).result).toMatchObject({kind:'DENIED',code:'SAFETY_UNAVAILABLE'});
@@ -99,6 +102,7 @@ it('clarification is withheld on output outage, with no search, answer or public
  expect(await db.select().from(schema.messages)).toHaveLength(1);
 });
 it('clarification reply creates a separately admitted linked run with canonical context, not browser history',async()=>{
+ await ambiguous();
  const p=providers();p.planner={modelId:'test/planner',plan:async()=>({plan:{action:'CLARIFY',question:'Which products are you comparing?',reasonCode:'MISSING_ENTITY'},usage:knownUsage})};
  await run(p);
  const request={...person.request,clientRequestId:crypto.randomUUID(),expectedRevision:1,message:{text:'Neon and Supabase'}};

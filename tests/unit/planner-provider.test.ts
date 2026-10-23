@@ -36,3 +36,9 @@ it('does not dispatch expired, cancelled or oversized planning inputs and does n
  fetcher.mockResolvedValue(new Response('PRIVATE_UPSTREAM_ERROR',{status:503}));
  await expect(provider.plan(input(),options())).rejects.toThrow('Planning unavailable');expect(fetcher).toHaveBeenCalledOnce();
 });
+it('resolves one exact user-topic pricing reference locally, with no paid call or assistant-fact reuse',async()=>{
+ const fetcher=vi.fn<typeof fetch>(),provider=createPlannerProvider(config,fetcher),i=input();i.original.text='What about its pricing?';i.context=[{id:randomUUID(),role:'USER',text:'Explain Neon'}];
+ expect(await provider.plan(i,options())).toMatchObject({plan:{action:'ANSWER',standaloneQuestion:'What about Neon pricing?'},usage:{costMicroUsd:0n},engine:'CONTEXT_RULE'});expect(fetcher).not.toHaveBeenCalled();
+ i.context.push({id:randomUUID(),role:'USER',text:'Explain Supabase'});fetcher.mockResolvedValue(response({plan:{action:'CLARIFY',question:'Which product do you mean?',reasonCode:'AMBIGUOUS_REFERENCE'}}));
+ expect((await provider.plan(i,options())).plan.action).toBe('CLARIFY');expect(fetcher).toHaveBeenCalledOnce();
+});

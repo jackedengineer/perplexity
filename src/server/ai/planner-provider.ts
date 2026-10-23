@@ -4,10 +4,10 @@ import {createOpenRouter} from '@openrouter/ai-sdk-provider';
 import {queryPlanSchema,type QueryPlan} from '@/server/contracts/pipeline';
 import {boundedModelFetch,boundedWork,type ExecutionOptions} from './bounded';
 import {isVerifiedNonReasoningModel,type SafetyModelConfig} from './models';
-import {plannerInputSchema,validatePlan,PlanningError,type PlannerInput} from './plan';
+import {plannerInputSchema,resolvePricingFollowup,validatePlan,PlanningError,type PlannerInput} from './plan';
 import {providerUsage,type ProviderUsage} from './usage';
 import {PLANNER_PROMPT} from './prompts/planner';
-export interface PlannerProvider {readonly modelId:string;plan(input:PlannerInput,options:ExecutionOptions):Promise<{plan:QueryPlan;usage:ProviderUsage}>;usage?():ProviderUsage|undefined}
+export interface PlannerProvider {readonly modelId:string;plan(input:PlannerInput,options:ExecutionOptions):Promise<{plan:QueryPlan;usage:ProviderUsage;engine?:"MODEL"|"CONTEXT_RULE"}>;usage?():ProviderUsage|undefined}
 export function createPlannerProvider(config:SafetyModelConfig,request:typeof fetch=fetch):PlannerProvider{
  let usage:ProviderUsage|undefined;
  const boundedFetch=boundedModelFetch(request),router=createOpenRouter({apiKey:config.apiKey,compatibility:'strict',fetch:async(url,init)=>{
@@ -18,6 +18,9 @@ export function createPlannerProvider(config:SafetyModelConfig,request:typeof fe
   usage=undefined;
   try{
    const canonical=plannerInputSchema.parse(input);
+   if(options.signal.aborted||options.deadlineAt.getTime()<=Date.now())throw new PlanningError();
+   const local=resolvePricingFollowup(canonical);
+   if(local){usage={costMicroUsd:0n,inputTokens:0,outputTokens:0,actualModel:null};return {plan:local,usage,engine:'CONTEXT_RULE'};}
    return await boundedWork(options,5000,async(signal)=>{
     const result=await generateText({model:router.chat(config.modelId,{
      provider:{only:[config.provider],allow_fallbacks:false,require_parameters:true,data_collection:'deny',zdr:true,max_price:{prompt:.075,completion:.2,request:0}},
@@ -27,7 +30,7 @@ export function createPlannerProvider(config:SafetyModelConfig,request:typeof fe
     const meta=result.providerMetadata?.openrouter?.usage,reported=providerUsage({cost:meta&&typeof meta==='object'&&'cost'in meta?meta.cost:undefined,prompt_tokens:result.usage.inputTokens,completion_tokens:result.usage.outputTokens},result.response.modelId);
     usage={...reported,costMicroUsd:reported.costMicroUsd??usage?.costMicroUsd??null};
     if(result.finishReason!=='stop'||result.toolCalls.length)throw new PlanningError();
-    return {plan:validatePlan(result.output.plan,canonical,2),usage};
+    return {plan:validatePlan(result.output.plan,canonical,2),usage,engine:'MODEL' as const};
    });
   }catch{throw new PlanningError();}
  }};

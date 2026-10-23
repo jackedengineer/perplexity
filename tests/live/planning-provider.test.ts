@@ -8,7 +8,7 @@ import {createPlannerProvider} from '@/server/ai/planner-provider';
 import {createAnswerProvider} from '@/server/ai/answer';
 import {boundedModelFetch} from '@/server/ai/bounded';
 import {providerUsage} from '@/server/ai/usage';
-import {standaloneFallback} from '@/server/ai/plan';
+import {PLANNING_VERSION,standaloneFallback} from '@/server/ai/plan';
 import {createOpenRouterSafetyProvider} from '@/server/safety/openrouter';
 import {createInputGate} from '@/server/safety/input';
 import {createEvidenceGate,EVIDENCE_SAFETY_PROMPT} from '@/server/safety/evidence';
@@ -17,6 +17,7 @@ import {createReleaseGate} from '@/server/safety/release';
 import {buildEvidence} from '@/server/search/evidence';
 import {rankEvidenceResults} from '@/server/search/rank';
 import {loadPlanningCorpus,planningInput,frozenPlanningEvidence,compareFrozenPlanning,PLANNING_CLOCK,type PlanningObservation} from '../../evals/planning';
+import {CURRENT_PROMPT_VERSIONS} from '../../evals/report';
 import type {QueryPlan} from '@/server/contracts/pipeline';
 const git=(...args:string[])=>execFileSync('git',args,{encoding:'utf8'}).trim();
 it('evaluates the complete fixed planning corpus and paired frozen answers within the existing non-resetting $1 key cap',async()=>{
@@ -48,7 +49,7 @@ it('evaluates the complete fixed planning corpus and paired frozen answers withi
  const evidenceGate=createEvidenceGate(createOpenRouterSafetyProvider(safetyConfig,capped,EVIDENCE_SAFETY_PROMPT));
  const release=createReleaseGate(createOpenRouterSafetyProvider(safetyConfig,capped,OUTPUT_SAFETY_PROMPT));
  const {cases,corpusHash}=await loadPlanningCorpus(),observations:PlanningObservation[]=[],packet:Array<Record<string,unknown>>=[];
- let directPlans=0,fallbackPlans=0,approvedClarifications=0,pairedApproved=0;
+ let directPlans=0,fallbackPlans=0,deterministicPlans=0,approvedClarifications=0,clarificationResponses=0,pairedApproved=0;
  const options=()=>({signal:AbortSignal.timeout(45000),deadlineAt:new Date(Date.now()+45000)});
  const directory=`.artifacts/planning-live/${revision.slice(0,8)}-${randomUUID()}`;await mkdir(directory,{recursive:true,mode:0o700});
  for(const fixture of cases){
@@ -58,7 +59,7 @@ it('evaluates the complete fixed planning corpus and paired frozen answers withi
    const checked=await inputGate.evaluate({text:input.original.text,context:input.context.map(({role,text})=>({role,text}))},options());
    if(checked.verdict.decision!=='ALLOW')throw Error('Input unavailable');
    const planStart=performance.now();
-   try{const result=await planner.plan(input,options());plan=result.plan;directPlans++;}
+   try{const result=await planner.plan(input,options());plan=result.plan;directPlans++;if(result.engine==='CONTEXT_RULE')deterministicPlans++;}
    catch{plan=standaloneFallback(input);if(plan)fallbackPlans++;}
    finally{plannerLatency=Math.round(performance.now()-planStart);plannerCost=planner.usage?.()?.costMicroUsd?.toString()??null;}
    if(plan?.action==='ANSWER'){
@@ -67,7 +68,7 @@ it('evaluates the complete fixed planning corpus and paired frozen answers withi
    }else if(plan?.action==='CLARIFY'){
     const runId=randomUUID(),approved=await release.approve({runId,attemptVersion:1,revision:1,kind:'CLARIFICATION',question:input.original.text,markdown:plan.question,evidence:{runId,sources:[],passages:[]}},options());
     // Use one same-run registry, including for an empty clarification package.
-    if(approved.kind==='APPROVED')approvedClarifications++;
+    if(approved.kind==='APPROVED'){clarificationResponses++;if(fixture.expectedPlan.action==='CLARIFY')approvedClarifications++;}
    }
   }catch{/* Disposition and missing receipt remain visible, without upstream diagnostics. */}
   observations.push({id:fixture.id,plan,latencyMs:plannerLatency,costMicroUsd:plannerCost});
@@ -90,7 +91,7 @@ it('evaluates the complete fixed planning corpus and paired frozen answers withi
   }
   packet.push(row);await writeFile(`${directory}/review-packet.json`,JSON.stringify(packet,null,2),{mode:0o600});
  }
- const after=await metadata(),report={sourceRevision:revision,corpusHash,models:{planner:plannerConfig.modelId,safety:safetyConfig.modelId,answer:answerConfig.modelId},keyCap:{before,after},localEnvelopeMicroUsd:String(cap),knownAllRoleMicroUsd:String(known),bookedIncludingUnknownMicroUsd:String(booked),unknownReceipts:unknown,providerRequests:calls,directPlans,fallbackPlans,approvedClarifications,clarificationDenominator:5,pairedApproved,pairedDenominator:14,...compareFrozenPlanning(cases,observations,'LIVE_PROVIDER')};
+ const after=await metadata(),report={sourceRevision:revision,plannerVersion:PLANNING_VERSION,promptVersions:CURRENT_PROMPT_VERSIONS,corpusHash,models:{planner:plannerConfig.modelId,safety:safetyConfig.modelId,answer:answerConfig.modelId},keyCap:{before,after},localEnvelopeMicroUsd:String(cap),knownAllRoleMicroUsd:String(known),bookedIncludingUnknownMicroUsd:String(booked),unknownReceipts:unknown,providerRequests:calls,directPlans,deterministicPlans,fallbackPlans,clarificationResponses,approvedClarifications,clarificationDenominator:5,pairedApproved,pairedDenominator:14,...compareFrozenPlanning(cases,observations,'LIVE_PROVIDER')};
  await writeFile(`${directory}/report.json`,JSON.stringify(report,null,2),{mode:0o600});
  console.info(JSON.stringify({event:'planning.live_complete',directory,routeMatches:report.routeMatches,directPlans,fallbackPlans,approvedClarifications,pairedApproved,calls,knownMicroUsd:String(known)}));
  expect(git('rev-parse','HEAD')).toBe(revision);expect(git('status','--porcelain')).toBe('');expect(booked).toBeLessThanOrEqual(cap);expect(after.limit).toBe(1);

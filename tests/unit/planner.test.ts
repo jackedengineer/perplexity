@@ -44,3 +44,13 @@ it('falls back only to an unambiguous standalone original and keeps the original
  for(const text of ['Explain photosynthesis','Why do rainbows form?'])expect(standaloneFallback(input(text))).toMatchObject({action:'ANSWER',standaloneQuestion:text,retrieval:{queries:[text]}});
  for(const text of ['Is it better?','Which database is best?','What about its pricing?','Explain '+ 'a'.repeat(301)])expect(standaloneFallback(input(text))).toBeNull();
 });
+it('rejects optional clarification for explicit comparisons and false premises instead of shifting scope',()=>{
+ for(const text of ['Compare Neon and Supabase','Compare Python and Java for India','Why does the Sun orbit Earth?','Explain why all databases are free']){
+  const i=input(text);expect(()=>validatePlan({action:'CLARIFY',question:'Which aspect do you mean?',reasonCode:'MISSING_CONSTRAINT'},i)).toThrow();expect(standaloneFallback(i)).toMatchObject({action:'ANSWER',standaloneQuestion:text});
+ }
+});
+it('normalizes grammatical possessives without allowing new entities or material scope',()=>{
+ const i=input('What about its pricing?');i.context=[{id:randomUUID(),role:'USER',text:'Explain Supabase'}];
+ const p={...answer(i),standaloneQuestion:"What is Supabase’s pricing?",explicitConstraints:[],retrieval:{...answer(i).retrieval,queries:['Supabase pricing details']}};
+ expect(validatePlan(p,i)).toMatchObject({action:'ANSWER'});expect(()=>validatePlan({...p,standaloneQuestion:"What is Python’s pricing?"},i)).toThrow();
+});

@@ -20,6 +20,7 @@ import { createFinalization } from "./finalize";
 import { AdmissionError } from "./errors";
 import { startRunMonitor } from "./monitor";
 import type {PlannerProvider} from '@/server/ai/planner-provider';
+import {PLANNING_VERSION} from '@/server/ai/plan';
 import {planRun} from './plan';
 import {clarifyRun} from './clarify';
 type Admitted = Exclude<AdmissionResult,{kind: "DENIED"}>["run"];
@@ -44,11 +45,10 @@ export function createRunExecution(db: AdmissionDatabase,keys: unknown,providers
         sql`${session.expiresAt} > clock_timestamp()`,sql`${session.createdAt} + interval '30 days' > clock_timestamp()`));
       if (!liveSession) throw new AdmissionError("UNAUTHENTICATED");
       onStage('PLANNING');
-      const planned=await traceStage('planning',()=>planRun(db,subject,run.id,input,recordPlannerProvider(calls,providers.planner),signal));
+      const planned=await traceStage('planning',()=>planRun(db,subject,run.id,input,recordPlannerProvider(calls,providers.planner),signal),()=>({promptVersion:PLANNING_VERSION}));
       if(planned.plan.action==='CLARIFY'){
         onStage('CHECKING_ANSWER');
-        await clarifyRun(db,subject,identity.sessionId,run,planned.original,planned.plan.question,providers.output,signal);
-        onStage('SAVING_ANSWER');return {kind:'COMPLETED'} as const;
+        await clarifyRun(db,subject,identity.sessionId,run,planned.original,planned.plan.question,providers.output,signal,()=>onStage('SAVING_ANSWER'));return {kind:'COMPLETED'} as const;
       }
       onStage("SEARCHING");
       const retrieval = createRetrieval(db,{...(providers.extract?{extract:recordExtractProvider(calls,providers.extract)}:{}),searchSecond:recordSearchProvider(calls,providers.search,"SEARCH_SECOND"),querySecondGate:createInputGate(recordSafetyProvider(calls,"QUERY_SECOND",providers.query),"safety.query"),modelId: providers.query.modelId,search: recordSearchProvider(calls,providers.search),

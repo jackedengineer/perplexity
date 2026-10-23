@@ -79,7 +79,7 @@ export function recordPlannerProvider(calls:ReturnType<typeof createProviderCall
   const claim=await calls.begin('PLANNER',provider.modelId,options.signal),budget=providerDeadline(claim,options.signal);
   try{
    if(budget.signal.aborted){await calls.finish(claim.id,'SKIPPED',noUsage);throw new Error('No dispatch');}
-   const result=await provider.plan(input,{signal:budget.signal,deadlineAt:claim.deadlineAt});await calls.finish(claim.id,'SUCCEEDED',result.usage);
+   const result=await provider.plan(input,{signal:budget.signal,deadlineAt:claim.deadlineAt});await calls.finish(claim.id,result.engine==='CONTEXT_RULE'?'SKIPPED':'SUCCEEDED',result.usage);
    if(budget.signal.aborted)throw new Error('Deadline');return result;
   }catch(error){try{await calls.finish(claim.id,'UNKNOWN',provider.usage?.());}catch{}throw error;}finally{budget.stop();}
  }};

@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import {and,eq} from 'drizzle-orm';
 import {inputSafetyReviews,messages,runPlans,runs} from '@/db/schema';
-import {plannerInputSchema,standaloneFallback,validatePlan} from '@/server/ai/plan';
+import {PLANNING_VERSION,plannerInputSchema,standaloneFallback,validatePlan} from '@/server/ai/plan';
 import type {PlannerProvider} from '@/server/ai/planner-provider';
 import type {SubmitQuery} from '@/server/contracts/chat';
 import {lockOwnedRun} from './lock';
@@ -24,7 +24,7 @@ export async function planRun(db:AdmissionDatabase,subject:string,runId:string,s
  await db.transaction(async tx=>{
   const {run,conversation,now}=await lockOwnedRun(tx,subject,runId);
   if(run.status!=='PLANNING'||run.attemptVersion!==loaded.run.attemptVersion||conversation.revision!==loaded.run.admittedRevision||run.deadlineAt<=now||signal.aborted)throw new AdmissionError('CONFLICT');
-  await tx.insert(runPlans).values({runId,conversationId:run.conversationId,messageId:loaded.input.original.id,attemptVersion:run.attemptVersion,version:'planner-v1',plan,contextIds:loaded.input.context.map(m=>m.id),originalHash:createHash('sha256').update(loaded.input.original.text).digest('hex'),createdAt:now});
+  await tx.insert(runPlans).values({runId,conversationId:run.conversationId,messageId:loaded.input.original.id,attemptVersion:run.attemptVersion,version:PLANNING_VERSION,plan,contextIds:loaded.input.context.map(m=>m.id),originalHash:createHash('sha256').update(loaded.input.original.text).digest('hex'),createdAt:now});
   if(plan.action==='CLARIFY')await tx.update(runs).set({status:'CHECKING_OUTPUT',updatedAt:now}).where(eq(runs.id,runId));
  });
  return {plan,original:loaded.input.original.text};
