@@ -89,10 +89,10 @@ it("bounds serialized outbound bytes and enforces classifier price ceilings", as
   await expect(classifier.classify({ text: "x".repeat(45001),context: [] },new AbortController().signal)).rejects.toThrow("Safety classifier unavailable.");
   expect(fetcher).not.toHaveBeenCalled();
 });
-it('fits a maximum accepted multibyte question inside the unchanged safety cost ceiling',async()=>{
+it.each([config(),{...config(),modelId:'a/'+ 'b'.repeat(126),provider:'p'.repeat(64)}])('fits maximum accepted multibyte text inside the unchanged safety cost ceiling (%o)',async model=>{
  const fetcher=vi.fn<typeof fetch>().mockResolvedValue(json(envelope()));
  const text=questionTextSchema.parse('🌈'.repeat(4000));
- await createOpenRouterSafetyProvider(config(),fetcher).classify({text,context:[]},new AbortController().signal);
+ await createOpenRouterSafetyProvider(model,fetcher).classify({text,context:[]},new AbortController().signal);
  const bytes=Buffer.byteLength(String(fetcher.mock.calls[0][1]?.body),'utf8');
  expect(Math.ceil(bytes*.1+384*.4)).toBeLessThanOrEqual(2250);
  expect(fetcher).toHaveBeenCalledOnce();
