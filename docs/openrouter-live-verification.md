@@ -1,7 +1,7 @@
 # OpenRouter live verification — 23 October 2026
 
-**Release decision: HOLD.** The classifier and citation fixes pass the complete
-technical rerun below. Independent human review, clarification handling and the
+**Release decision: HOLD.** The classifier and citation fixes improve the complete
+rerun below; one no-evidence output check still failed closed. Independent human review, clarification handling and the
 remaining operational/deployment gates still prevent release acceptance.
 No Vercel deployment or public rollout was performed. This record supersedes the
 older statement that all paid testing is pending; independent human quality and
@@ -37,12 +37,18 @@ Billed receipts are captured before SDK schema rejection as well as on success.
 | Semantic safety | 72 / 72 observed; 36 expected ALLOW and 36 expected stops correct |
 | Classifier outages / observed false refusals / missed stops | 0 / 72; 0 / 36; 0 / 36 |
 | Answer coverage / syntactically invalid citations | 13 / 13; 0 |
-| No-evidence disposition | 1 / 1 |
-| Clarification disposition | 0 / 2; planner T12 remains unimplemented |
+| No-evidence disposition | 1 / 2; the other output check returned SAFETY_UNAVAILABLE |
+| Clarification disposition | 0 / 1; planner T12 remains unimplemented |
 | Independent reviewed labels/completions/claims | 0; pending |
 | Semantic latency | p50 1,256 ms; p95 2,333 ms; n=72 |
 | Answer-case latency | p50 3,325 ms; p95 7,793 ms; n=16 including non-answer cases |
 | Recorded model cost | 3,754 + 3,672 = 7,426 micro-USD; no missing receipts |
+
+Review correction: earlier prose mislabeled the two ERROR observations as two
+clarification cases. The frozen corpus has one clarification and two no-evidence
+cases. In the `b101d4f` sample, `answer-no-evidence` was denied with
+`SAFETY_UNAVAILABLE`; `answer-current-unknown` passed. In the original `c17ba7a`
+sample, the reverse no-evidence case failed. Raw artifacts are unchanged.
 
 The unchanged scorer reports **PENDING**, not PASS: syntactically valid source
 IDs do not establish factual support. No sampled quality or harmful-completion
@@ -135,8 +141,8 @@ $0.15 locally, beneath the separate $1 provider-key cap. It made **96 requests**
 | Unavailable semantic checks | **18 / 72 (25%)** |
 | Frozen answer cases observed | 16 / 16 |
 | Expected answer approved | **12 / 13** |
-| Required no-evidence disposition | 1 / 1 |
-| Required clarification disposition | 0 / 2; T12 planner is not implemented |
+| Required no-evidence disposition | 1 / 2 |
+| Required clarification disposition | 0 / 1; T12 planner is not implemented |
 | Human-reviewed labels, completions, factual claims | **0; pending** |
 | Semantic-check latency | p50 1,309 ms; p95 3,322 ms; n=72 |
 | Answer-case latency | p50 3,237 ms; p95 7,921 ms; n=16, including non-answer cases |

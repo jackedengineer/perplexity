@@ -22,7 +22,7 @@ This checklist records evidence; it does not mark unfinished backlog tasks done.
 - [x] Lint/types and 526 tests in 55 files; production build passes.
 - [x] Frozen complete live rerun: 72/72 semantic decisions match authored labels,
   zero outages, 13/13 expected answers pass citation/output validation, and the
-  no-evidence case passes. No sampled result was replaced by a selected retry.
+  no-evidence cases pass 1/2 (the other stopped at output safety). No sampled result was replaced by a selected retry.
 - [x] Preserve the original failed run and mark the intervening mutable-source run
   diagnostic-only. The final run verifies a clean unchanged tracked revision at
   both start/end; original observations remain ignored locally.
@@ -54,8 +54,9 @@ This checklist records evidence; it does not mark unfinished backlog tasks done.
   independent human review. No human harmful-completion or factual-support rate
   is claimed. At least ten answers/30 reviewed claims and reviewed allowed
   completions are required by the unchanged [evaluation protocol](../evals/README.md).
-- [ ] **Clarification:** two required-disposition fixtures remain ERROR because
-  planner T12 is not implemented. The scorer correctly reports PENDING.
+- [ ] **Required dispositions:** the one clarification case remains ERROR because
+  planner T12 is not implemented. One of two no-evidence cases also stopped at
+  output safety. The scorer correctly reports PENDING.
 - [ ] **Current PR review:** the former four code findings are fixed and their
   threads resolved. Existing reviews predate the latest classifier/draft changes;
   do not treat old review results as current approval. Check CI on the final head.
