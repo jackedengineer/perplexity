@@ -83,9 +83,14 @@ test("a public question shows guarded progress, committed citations and exact re
     }
     expect(errors).toEqual([]);
     // Same HTTP intent recovers the existing answer rather than another provider attempt.
-    const duplicate=await context.request.post("/api/chat",{headers:{Origin:"http://localhost:3001"},data:submitted});expect(duplicate.status()).toBe(200);expect(await duplicate.text()).toContain('"type":"data-answer"');
     const [run]=await f.owner.select().from(schema.runs).where(eq(schema.runs.clientRequestId,submitted.clientRequestId));
-    expect(await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id))).toHaveLength(8);
+    const beforeCalls=await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id));
+    expect(beforeCalls.filter(call=>call.stage!=="EXTRACT").map(call=>call.stage).sort()).toEqual(["INPUT_SAFETY","PLANNER","QUERY_SAFETY","SEARCH","EVIDENCE_SAFETY","ANSWER","OUTPUT_SAFETY"].sort());
+    expect(beforeCalls.filter(call=>call.stage==="EXTRACT").length).toBeLessThanOrEqual(1);
+    expect(beforeCalls.length).toBeLessThanOrEqual(8); // Extraction is optional under the absolute deadline.
+    const duplicate=await context.request.post("/api/chat",{headers:{Origin:"http://localhost:3001"},data:submitted});expect(duplicate.status()).toBe(200);expect(await duplicate.text()).toContain('"type":"data-answer"');
+    const afterCalls=await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id));
+    expect(afterCalls.map(call=>call.id).sort()).toEqual(beforeCalls.map(call=>call.id).sort());
     expect(await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,run.id))).toHaveLength(1);
     const stranger=await browser.newContext({baseURL:"http://localhost:3001"});const other=await identityFixture(stranger,"Other reader");
     try {expect((await stranger.request.get(`/api/runs/${run.id}`)).status()).toBe(404);const [approved]=await f.owner.select().from(schema.outputReviews).where(eq(schema.outputReviews.runId,run.id));expect((await stranger.request.put(`/api/messages/${approved.messageId}/feedback`,{headers:{Origin:'http://localhost:3001'},data:{rating:'NOT_HELPFUL',reason:'FALSE_REFUSAL',expectedVersion:0}})).status()).toBe(404);}finally{await other.cleanup();await stranger.close();}
