@@ -17,6 +17,7 @@ import {rankEvidenceResults,explicitPreferredDomains,type RankedResult} from "./
 import {freshnessTimeRange} from './freshness';
 import type { SearchProvider } from "./tavily";
 import {queryPlanSchema} from "@/server/contracts/pipeline";
+import {STAGE_LIMITS} from '@/server/runs/budgets';
 import type { EvidencePackage } from "@/server/contracts/pipeline";
 
 type Dependencies = {extract?:ExtractProvider;searchSecond?:SearchProvider;querySecondGate?:ReturnType<typeof createInputGate>;modelId: string; search: SearchProvider; queryGate: ReturnType<typeof createInputGate>; evidenceGate: ReturnType<typeof createEvidenceGate> };
@@ -24,6 +25,8 @@ export type RetrievalResult = { kind: "READY" | "NO_EVIDENCE";runId: string;sour
   | { kind: "RUN_IN_PROGRESS" | "RUN_ALREADY_FINISHED";runId: string } | { kind: "DENIED";code: PublicErrorCode };
 const denied = (code: PublicErrorCode): RetrievalResult => ({ kind: "DENIED",code });
 const terminal = new Set(["COMPLETED","NEEDS_CLARIFICATION","BLOCKED","FAILED","CANCELLED","TIMED_OUT"]);
+const extractionMinimumRemainingMs=STAGE_LIMITS.EXTRACT.maxDurationMs+STAGE_LIMITS.EVIDENCE_SAFETY.maxDurationMs+
+ STAGE_LIMITS.ANSWER.maxDurationMs+STAGE_LIMITS.OUTPUT_SAFETY.maxDurationMs+5000; // persistence reserve
 type Fence = { attemptVersion: number; admittedRevision: number };
 async function checkpoint(tx: AdmissionTransaction,subject: string,runId: string,fence: Fence,status: string,signal: AbortSignal) {
   const locked = await lockOwnedRun(tx,subject,runId), { run,conversation,now } = locked;
@@ -92,7 +95,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
         let extractionFailures=0;
         let selected:RankedResult[]=plan?rankEvidenceResults(response.results,plan.standaloneQuestion,new Date(),filters):response.results;
         // Preserve enough of the absolute deadline for answer, output safety and persistence.
-        if(dependencies.extract&&selected.length&&prepared.run.deadlineAt.getTime()-Date.now()>20000){
+        if(dependencies.extract&&selected.length&&prepared.run.deadlineAt.getTime()-Date.now()>extractionMinimumRemainingMs){
           await db.transaction(tx=>checkpoint(tx,subject,runId,prepared.run,stage,signal));
           try{
             const extracted=await dependencies.extract.extract(selected.slice(0,2).map(r=>r.url),options);

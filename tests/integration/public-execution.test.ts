@@ -168,6 +168,13 @@ it('an extraction transport outage preserves unknown usage and uses only the sea
  expect((await run(p)).result.kind).toBe('COMPLETED');expect((await db.select().from(schema.sourcePassages))[0].contentKind).toBe('SEARCH_PASSAGE');
  expect((await db.select().from(schema.providerCalls)).find(c=>c.stage==='EXTRACT')).toMatchObject({status:'UNKNOWN',costMicroUsd:null});
 });
+it('skips optional extraction when its full duration would crowd out answer and release work',async()=>{
+ await db.update(schema.runs).set({deadlineAt:new Date(Date.now()+27000)}).where(eq(schema.runs.id,person.runId));
+ const p=providers();p.extract={extract:vi.fn().mockResolvedValue({pages:[],failedUrls:[],rejectedUrls:[],credits:0})};
+ expect((await run(p)).result.kind).toBe('COMPLETED');
+ expect(p.extract.extract).not.toHaveBeenCalled();expect(p.answer.generate).toHaveBeenCalledOnce();
+ expect((await db.select().from(schema.sourcePassages))[0].contentKind).toBe('SEARCH_PASSAGE');
+});
 
 it('database planning metadata rejects missing JSON action instead of accepting SQL UNKNOWN',async()=>{
  await run(providers());const [plan]=await db.select().from(schema.runPlans);await db.delete(schema.runPlans);
