@@ -19,6 +19,9 @@ const outputSchema = { type: "object", additionalProperties: false,
     policyVersion: { type: "string", enum: [SAFETY_POLICY.version] },
   },
 };
+// 20,960 input bytes at $0.10/1M plus 384 output tokens at $0.40/1M
+// stays within the unchanged 2,250-microUSD safety claim.
+export const SAFETY_REQUEST_BYTES=20960;
 async function readResponse(response: Response) {
   const reader = response.body?.getReader();
   if (!reader) throw new SafetyProviderError("MALFORMED_OUTPUT");
@@ -53,7 +56,7 @@ export function createOpenRouterSafetyProvider(config: SafetyModelConfig, reques
         response_format: { type: "json_schema", json_schema: { name: "research_safety_v3", strict: true, schema: outputSchema } },
         messages: [{ role: "system", content: prompt },{ role: "user", content: JSON.stringify(input) }],
       });
-      if (Buffer.byteLength(body,"utf8") > 20_000) throw new SafetyProviderError("PROVIDER_UNAVAILABLE");
+      if (Buffer.byteLength(body,"utf8") > SAFETY_REQUEST_BYTES) throw new SafetyProviderError("PROVIDER_UNAVAILABLE");
       let response: Response;
       try {
         response = await request("https://openrouter.ai/api/v1/chat/completions",{

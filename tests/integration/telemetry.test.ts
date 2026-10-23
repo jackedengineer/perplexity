@@ -43,7 +43,7 @@ it('captures every paid stage and safety decision without question, draft, evide
 it('counts output refusal costs and distinguishes the policy decision from infrastructure failure',async()=>{
  const p=providers();p.output={...fakeSafety(),classify:async()=>({decision:'BLOCK',categoryCodes:['FRAUD'],policyVersion:'v1'})};
  const {events,result}=await run(p);expect(result).toEqual({kind:'DENIED',code:'OUTPUT_BLOCKED'});
- expect(events.find(e=>e.event==='research.safety'&&e.stage==='safety.output')).toMatchObject({outcome:'BLOCK',categoryCodes:['FRAUD'],reason:'CLASSIFIER',promptVersion:'output-v5'});
+ expect(events.find(e=>e.event==='research.safety'&&e.stage==='safety.output')).toMatchObject({outcome:'BLOCK',categoryCodes:['FRAUD'],reason:'CLASSIFIER',promptVersion:'output-v6'});
  expect(events.find(e=>e.event==='research.run_usage')).toMatchObject({knownCostMicroUsd:'600',searchCredits:1,unknownCalls:1});
  expect(await db.select().from(schema.messages)).toHaveLength(1);
 });

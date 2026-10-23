@@ -6,7 +6,7 @@ export const LEGACY_STAGE_LIMITS=Object.freeze({
  ANSWER:Object.freeze({capMicroUsd:20000n,maxDurationMs:12000}),OUTPUT_SAFETY:Object.freeze({capMicroUsd:5000n,maxDurationMs:5000}),
 });
 // v2 adds independent fanout/extraction claims without raising the 50,000 reserve.
-// Safety wire bytes are capped at 20k: .1/1M input + 384*.4/1M output < 2,250.
+// Safety wire bytes are capped at 20,960: .1/1M input + 384*.4/1M output <= 2,250.
 // Answer wire bytes are capped at 20k: .5/1M input + 1,200*2/1M output < 12,500.
 export const STAGE_LIMITS=Object.freeze({
  PLANNER:Object.freeze({capMicroUsd:2000n,maxDurationMs:5000}),
