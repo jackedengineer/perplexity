@@ -10,6 +10,7 @@ import {scoreAnswers} from './score-answers';
 import {rate} from './shared';
 import {ANSWER_PROMPT_VERSION} from '@/server/ai/prompts/answer';
 import {SAFETY_PROMPT_VERSIONS} from '@/server/safety/versions';
+export const CURRENT_PROMPT_VERSIONS=Object.freeze({input:SAFETY_PROMPT_VERSIONS.input,query:SAFETY_PROMPT_VERSIONS.input,evidence:SAFETY_PROMPT_VERSIONS.evidence,output:SAFETY_PROMPT_VERSIONS.output,answer:ANSWER_PROMPT_VERSION,detector:'input-v1'} as const);
 // This module accepts no provider or credential configuration and performs no network work.
 export async function loadCorpus(root='evals/cases'){
  const safetyText=await readFile(`${root}/safety.jsonl`,'utf8'),answerText=await readFile(`${root}/answers.jsonl`,'utf8');
@@ -26,16 +27,16 @@ export async function loadCorpus(root='evals/cases'){
 export async function evaluateOffline(sourceRevision:string,root?:string,sourceDirty=true){
  const corpus=await loadCorpus(root),safetyRows=await runOfflineSafety(corpus.safety),citations=runFrozenCitationChecks(corpus.answers);
  const safety=scoreSafety(corpus.safety,safetyRows),answers=scoreAnswers(corpus.answers.filter(c=>c.expectedCitationValid),[]);
- const manifest=manifestSchema.parse({schemaVersion:1,sourceRevision,sourceDirty,corpusHash:corpus.corpusHash,policyVersion:'v1',mode:'OFFLINE',judge:null,models:{safety:null,answer:null},promptVersions:{input:SAFETY_PROMPT_VERSIONS.input,query:SAFETY_PROMPT_VERSIONS.input,evidence:SAFETY_PROMPT_VERSIONS.evidence,output:SAFETY_PROMPT_VERSIONS.output,answer:ANSWER_PROMPT_VERSION,detector:'input-v1'}});
+ const manifest=manifestSchema.parse({schemaVersion:1,sourceRevision,sourceDirty,corpusHash:corpus.corpusHash,policyVersion:'v1',mode:'OFFLINE',judge:null,models:{safety:null,answer:null},promptVersions:CURRENT_PROMPT_VERSIONS});
  return {manifest,profile:corpus.profile,safety,answers,frozenCitations:rate(citations.filter(r=>r.valid===r.expected).length,citations.length),
   criticalMismatches:safetyRows.filter(r=>r.decision!==corpus.safety.find(c=>c.id===r.id)!.expected).map(r=>r.id),
   citationMismatches:citations.filter(r=>r.valid!==r.expected).map(r=>r.id),
   scope:'DETERMINISTIC_AND_SERVICE_FAILURES_ONLY',paidTesting:'PENDING',humanQuality:'PENDING',releaseStatus:safety.criticalStatus==='FAIL'||citations.some(r=>r.valid!==r.expected)?'FAIL':'PENDING'};
 }
-export async function scoreManualResults(value:unknown,root?:string){
+export async function scoreManualResults(value:unknown,expectedSourceRevision:string,root?:string){
  const corpus=await loadCorpus(root);
  const parsed=z.strictObject({manifest:manifestSchema,safety:z.array(safetyObservationSchema).max(1000),answers:z.array(z.unknown()).max(1000)}).safeParse(value);
- if(!parsed.success||parsed.data.manifest.mode!=='MANUAL_LIVE'||parsed.data.safety.length>0&&parsed.data.manifest.models.safety===null||parsed.data.answers.length>0&&(parsed.data.manifest.models.answer===null||parsed.data.manifest.models.safety===null)||parsed.data.manifest.corpusHash!==corpus.corpusHash)throw Error('Invalid evaluation manifest; no contents logged');
+ if(!parsed.success||!z.string().regex(/^[a-f0-9]{40}$/u).safeParse(expectedSourceRevision).success||parsed.data.manifest.sourceRevision!==expectedSourceRevision||!isDeepStrictEqual(parsed.data.manifest.promptVersions,CURRENT_PROMPT_VERSIONS)||parsed.data.manifest.mode!=='MANUAL_LIVE'||parsed.data.safety.length>0&&parsed.data.manifest.models.safety===null||parsed.data.answers.length>0&&(parsed.data.manifest.models.answer===null||parsed.data.manifest.models.safety===null)||parsed.data.manifest.corpusHash!==corpus.corpusHash)throw Error('Invalid evaluation manifest; no contents logged');
  const input=parsed.data;
  const preparedAnswers=input.answers.map(value=>{
   const parsedRow=answerObservationSchema.safeParse(value);

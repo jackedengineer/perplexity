@@ -156,6 +156,14 @@ inside its factual claim's span; code-shaped markers do not count. Sampling and
 claim extraction are manual and must be described with the baseline. Human and
 model annotations should be independent and blinded before comparison.
 
+Manual scoring requires an independently supplied expected candidate revision and
+the exact current prompt/detector versions. `eval:score` uses the clean checkout's
+HEAD; historical manifests are not current release evidence. Semantic observations
+record normalized `categoryCodes`: required categories must be present and the
+application-owned fixed response must match the expected route. A binary BLOCK
+alone cannot establish correct support/privacy routing. Missing category metadata
+keeps historical observations pending; a measured wrong route fails acceptance.
+
 Keep all raw observations under ignored `.artifacts/evals/`, with local access
 restricted appropriately. Never upload raw prompts, drafts, evidence, credentials
 or personal data as CI artifacts. Only aggregates are retained by CI. A future

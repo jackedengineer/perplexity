@@ -1,5 +1,6 @@
 import {realpath,stat,readFile,mkdir,writeFile} from 'node:fs/promises';
 import {resolve,relative,isAbsolute} from 'node:path';
+import {execFileSync} from 'node:child_process';
 import {expect,it} from 'vitest';
 import {scoreManualResults} from '../../evals/report';
 it('scores explicitly supplied local observations without provider work',async()=>{
@@ -12,7 +13,9 @@ it('scores explicitly supplied local observations without provider work',async()
   const bytes=await readFile(path);if(bytes.length>8_000_000)throw Error();
   value=JSON.parse(bytes.toString('utf8'));
  }catch{throw Error('Invalid local evaluation results file; no contents logged');}
- const result=await scoreManualResults(value,'evals/cases');
+ const revision=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+ if(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim())throw Error('Commit the candidate before scoring manual release evidence');
+ const result=await scoreManualResults(value,revision,'evals/cases');
  await mkdir('.artifacts/evals',{recursive:true});await writeFile('.artifacts/evals/manual-score.json',JSON.stringify(result,null,2)+'\n');
  expect(result.manifest.mode).toBe('MANUAL_LIVE');expect(result.releaseStatus).not.toBe('FAIL');
  process.stdout.write(JSON.stringify({event:'evaluation.manual_scored',safetyStatus:result.safety.releaseStatus,answerStatus:result.answers.releaseStatus,releaseStatus:result.releaseStatus})+'\n');
