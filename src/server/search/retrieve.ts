@@ -52,7 +52,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
           if (!review?.acceptedMessageId || review.policyVersion !== SAFETY_POLICY.version) throw new AdmissionError("SAFETY_UNAVAILABLE");
           const [message] = await tx.select().from(messages).where(and(eq(messages.id,review.acceptedMessageId),eq(messages.conversationId,run.conversationId)));
           const parts = z.tuple([z.strictObject({ type: z.literal("text"),text: z.string().min(1).max(4000) })]).safeParse(message?.parts);
-          if (!message?.approvedAt || message.role !== "USER" || message.kind !== "QUESTION" || 
+          if (!message?.approvedAt || message.role !== "USER" || message.kind !== "QUESTION" ||
             message.policyVersion !== SAFETY_POLICY.version || !parts.success) throw new AdmissionError("INVALID_INPUT");
           const [record]=await tx.select().from(runPlans).where(eq(runPlans.runId,runId));
           const plan=record?queryPlanSchema.parse(record.plan):null;

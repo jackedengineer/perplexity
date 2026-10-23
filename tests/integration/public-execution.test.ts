@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import { eq } from "drizzle-orm";
+import { eq,sql } from "drizzle-orm";
 import { submissionSchema } from "@/server/contracts/chat";
 import { beforeAll,beforeEach,afterAll,expect,it,vi } from "vitest";
 import * as schema from "@/db/schema";
@@ -154,4 +154,9 @@ it('an extraction transport outage preserves unknown usage and uses only the sea
  const p=providers();p.extract={extract:async()=>{throw Error('PRIVATE');}};
  expect((await run(p)).result.kind).toBe('COMPLETED');expect((await db.select().from(schema.sourcePassages))[0].contentKind).toBe('SEARCH_PASSAGE');
  expect((await db.select().from(schema.providerCalls)).find(c=>c.stage==='EXTRACT')).toMatchObject({status:'UNKNOWN',costMicroUsd:null});
+});
+
+it('database planning metadata rejects missing JSON action instead of accepting SQL UNKNOWN',async()=>{
+ await run(providers());const [plan]=await db.select().from(schema.runPlans);await db.delete(schema.runPlans);
+ await expect(db.insert(schema.runPlans).values({...plan,plan:sql`'{}'::jsonb`})).rejects.toMatchObject({cause:{code:'23514'}});
 });

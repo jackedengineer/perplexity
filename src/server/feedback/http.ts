@@ -4,7 +4,7 @@ import {AdmissionError} from '@/server/runs/errors';
 import {createPublicError} from '@/server/contracts/errors';
 import type {createFeedbackRepository} from './repository';
 async function read(request:Request){
- if(request.headers.get('content-type')?.split(';')[0].trim()!=='application/json')throw new AdmissionError('UNSUPPORTED_MEDIA_TYPE');
+ if(request.headers.get('content-type')?.split(';')[0].trim().toLowerCase()!=='application/json')throw new AdmissionError('UNSUPPORTED_MEDIA_TYPE');
  if(Number(request.headers.get('content-length'))>512)throw new AdmissionError('TOO_LARGE');
  const reader=request.body?.getReader();if(!reader)throw new AdmissionError('MALFORMED_JSON');
  let expired=false,size=0;const chunks:Uint8Array[]=[];

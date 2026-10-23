@@ -11,5 +11,5 @@ export const runPlans=pgTable('run_plans',{
 },t=>[
  foreignKey({columns:[t.runId,t.conversationId],foreignColumns:[runs.id,runs.conversationId],name:'plan_owned_run_fk'}).onDelete('cascade'),
  foreignKey({columns:[t.messageId,t.conversationId,t.messageRole],foreignColumns:[messages.id,messages.conversationId,messages.role],name:'plan_owned_message_fk'}).onDelete('cascade'),
- check('plan_metadata_valid',sql`${t.attemptVersion}>0 AND ${t.messageRole}='USER' AND ${t.version} IN ('planner-v1','planner-v2','planner-v3') AND ${t.originalHash} ~ '^[a-f0-9]{64}$' AND jsonb_typeof(${t.plan})='object' AND ${t.plan}->>'action' IN ('ANSWER','CLARIFY') AND jsonb_typeof(${t.contextIds})='array' AND jsonb_array_length(${t.contextIds})<=6`),
+ check('plan_metadata_valid',sql`${t.attemptVersion}>0 AND ${t.messageRole}='USER' AND ${t.version} IN ('planner-v1','planner-v2','planner-v3') AND ${t.originalHash} ~ '^[a-f0-9]{64}$' AND jsonb_typeof(${t.plan})='object' AND coalesce(${t.plan}->>'action','') IN ('ANSWER','CLARIFY') AND jsonb_typeof(${t.contextIds})='array' AND jsonb_array_length(${t.contextIds})<=6`),
 ]);

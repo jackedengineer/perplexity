@@ -99,6 +99,13 @@
       "when": 1792752433450,
       "tag": "0013_light_nekra",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792753484672,
+      "tag": "0014_silly_bedlam",
+      "breakpoints": true
     }
   ]
 }
