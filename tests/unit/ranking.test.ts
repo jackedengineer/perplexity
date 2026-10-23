@@ -30,3 +30,10 @@ it('does not invent a domain preference from a framework name',async()=>{
  expect(explicitPreferredDomains('Compare Neon and Supabase for Next.js')).toEqual([]);
  expect(explicitPreferredDomains('Use site:neon.tech and https://supabase.com/docs')).toEqual(['neon.tech','supabase.com']);
 });
+it('rejects unusable titles before the top-five cut so valid lower candidates survive',()=>{
+ const bad=Array.from({length:5},(_,i)=>source(`https://bad.org/${i}`,'Neon pricing '+i,{title:'Neon pricing '.repeat(30),score:1}));
+ const valid=source('https://neon.tech/pricing','Neon pricing is available.',{title:'Neon pricing'});
+ const ranked=rankEvidenceResults([...bad,valid],'Neon pricing',now);
+ expect(ranked.map(r=>r.url)).toEqual([valid.url]);
+ expect(buildEvidence(crypto.randomUUID(),ranked,now).sources).toHaveLength(1);
+});

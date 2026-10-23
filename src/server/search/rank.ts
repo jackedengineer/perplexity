@@ -19,7 +19,7 @@ export function rankEvidenceResults(results:RankedResult[],query:string,now:Date
  const wanted=new Set(terms(query)),seenUrls=new Set<string>(),seenText=new Set<string>();
  const candidates=results.slice(0,10).flatMap((row,index)=>{
   const url=canonicalSourceUrl(row.url);
-  if(!url||!safeEvidenceText(row.title)||!safeRawEvidenceText(row.content))return [];
+  if(!url||row.title.length>300||!safeEvidenceText(row.title)||!safeRawEvidenceText(row.content))return [];
   const selected=relevantWindow(row.content,wanted),fingerprint=terms(selected.text).join(' ');
   if(!selected.text)return [];
   const date=Date.parse(row.published_date??''),knownDate=Number.isFinite(date)&&date<=now.getTime(),age=knownDate?now.getTime()-date:Infinity;
