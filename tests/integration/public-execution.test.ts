@@ -90,9 +90,9 @@ it('preserves the day search filter for an explicit Hindi today request',async()
 it('carries a valid maximum multibyte submission into the planner and persists its version',async()=>{
  person=await seedCompletion(db,50000n,'界'.repeat(4000),2);identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};
  const p=providers(),plan=vi.fn().mockResolvedValue({plan:{action:'CLARIFY',question:'Which topic do you mean?',reasonCode:'MISSING_ENTITY'},usage:knownUsage});p.planner={modelId:'test/planner',plan};
- await run(p);expect(plan).toHaveBeenCalledOnce();
+ expect((await run(p)).result.kind).toBe('COMPLETED');expect(plan).toHaveBeenCalledOnce();
  expect(plan.mock.calls[0][0].original.text).toBe(person.request.message.text);
- expect((await db.select().from(schema.runPlans))[0].version).toBe('planner-v4');
+ expect((await db.select().from(schema.runPlans))[0].version).toBe('planner-v5');
 });
 it('commits an output-approved clarification without any search or answer dispatch and reloads it',async()=>{
  await ambiguous();
