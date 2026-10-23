@@ -6,8 +6,8 @@ const config = { apiKey: "synthetic-key-only",modelId: "test/answer",provider: "
 const evidence = () => buildEvidence(randomUUID(),[{ title: "Rainbows",url: "https://example.org/rainbows",content: "Water refracts sunlight.",score: 0.9 }],new Date());
 const input = () => ({ question: "Why do rainbows form?",evidence: evidence() });
 const options = () => ({ signal: new AbortController().signal,deadlineAt: new Date(Date.now()+45000) });
-const response = (text = "Water refracts sunlight [S1].",reason = "stop") => Response.json({ id: "synthetic",model: "test/answer",created: 1,
-  choices: [{ index: 0,finish_reason: reason,message: { role: "assistant",content: text,reasoning: "PRIVATE REASONING" } }],
+const response = (text = "Water refracts sunlight.",reason = "stop",sourceIds = ["S1"]) => Response.json({ id: "synthetic",model: "test/answer",created: 1,
+  choices: [{ index: 0,finish_reason: reason,message: { role: "assistant",content: JSON.stringify({paragraphs:[{text,sourceIds}]}),reasoning: "PRIVATE REASONING" } }],
   usage: { prompt_tokens: 100,completion_tokens: 10,total_tokens: 110,cost: 0.0000123 } });
 it.each(["openai/gpt-4.1-nano","openai/gpt-4.1-mini"])("avoids unsupported reasoning parameters for %s while preserving spend/privacy controls",async(modelId)=>{
   const fetcher=vi.fn<typeof fetch>().mockResolvedValue(response());
@@ -19,7 +19,7 @@ it.each(["openai/gpt-4.1-nano","openai/gpt-4.1-mini"])("avoids unsupported reaso
 it("uses the AI SDK with one bounded, private, tool-free OpenRouter call",async()=>{
   const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response());
   const result = await createAnswerProvider(config,fetcher).generate(input(),options());
-  expect(result.text).toBe("Water refracts sunlight [S1]."); expect(JSON.stringify(result,(_key,value)=>typeof value === "bigint" ? String(value) : value)).not.toContain("PRIVATE REASONING");
+  expect(result.text).toBe("Water refracts sunlight. [S1]"); expect(JSON.stringify(result,(_key,value)=>typeof value === "bigint" ? String(value) : value)).not.toContain("PRIVATE REASONING");
   const [url,init] = fetcher.mock.calls[0]; expect(String(url)).toBe("https://openrouter.ai/api/v1/chat/completions");
   const body = JSON.parse(String(init?.body)); expect(body).toMatchObject({ model: "test/answer",max_tokens: 1200,
     provider: { only: ["test-provider"],allow_fallbacks: false,data_collection: "deny",zdr: true } });
@@ -57,4 +57,18 @@ it("cancels a non-cooperative SDK request under the original deadline",async()=>
   const fetcher = vi.fn<typeof fetch>(()=>new Promise(()=>{}));
   await expect(createAnswerProvider(config,fetcher).generate(input(),{ ...options(),deadlineAt: new Date(Date.now()+20) })).rejects.toThrow("Answer unavailable");
   expect(fetcher).toHaveBeenCalledOnce();
+});
+
+it("requires selected source IDs in structured output and retains usage on rejection",async()=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(response("A private draft.","stop",["S9"]));
+ const provider=createAnswerProvider(config,fetcher);
+ await expect(provider.generate(input(),options())).rejects.toThrow("Answer unavailable");
+ expect(provider.usage?.()?.costMicroUsd).toBe(13n);expect(fetcher).toHaveBeenCalledOnce();
+});
+it("sends a strict structured schema restricted to this evidence registry",async()=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(response());
+ await createAnswerProvider(config,fetcher).generate(input(),options());
+ const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body));
+ expect(body.response_format).toMatchObject({type:"json_schema",json_schema:{strict:true}});
+ expect(JSON.stringify(body.response_format.json_schema.schema)).toContain('"enum":["S1"]');
 });

@@ -24,7 +24,7 @@ export async function loadCorpus(root='evals/cases'){
 export async function evaluateOffline(sourceRevision:string,root?:string,sourceDirty=true){
  const corpus=await loadCorpus(root),safetyRows=await runOfflineSafety(corpus.safety),citations=runFrozenCitationChecks(corpus.answers);
  const safety=scoreSafety(corpus.safety,safetyRows),answers=scoreAnswers(corpus.answers.filter(c=>c.expectedCitationValid),[]);
- const manifest=manifestSchema.parse({schemaVersion:1,sourceRevision,sourceDirty,corpusHash:corpus.corpusHash,policyVersion:'v1',mode:'OFFLINE',judge:null,models:{safety:null,answer:null},promptVersions:{input:'input-v1',query:'input-v1',evidence:'evidence-v1',output:'output-v1',answer:'answer-v1',detector:'input-v1'}});
+ const manifest=manifestSchema.parse({schemaVersion:1,sourceRevision,sourceDirty,corpusHash:corpus.corpusHash,policyVersion:'v1',mode:'OFFLINE',judge:null,models:{safety:null,answer:null},promptVersions:{input:'input-v1',query:'input-v1',evidence:'evidence-v1',output:'output-v1',answer:'answer-v2',detector:'input-v1'}});
  return {manifest,profile:corpus.profile,safety,answers,frozenCitations:rate(citations.filter(r=>r.valid===r.expected).length,citations.length),
   criticalMismatches:safetyRows.filter(r=>r.decision!==corpus.safety.find(c=>c.id===r.id)!.expected).map(r=>r.id),
   citationMismatches:citations.filter(r=>r.valid!==r.expected).map(r=>r.id),
