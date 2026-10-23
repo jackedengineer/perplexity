@@ -4,13 +4,14 @@
 -- name: run_outcomes
 SELECT policy_version, catalog_version, price_version, count(*)::integer AS admitted,
  count(*) FILTER (WHERE status='COMPLETED')::integer AS completed,
+ count(*) FILTER (WHERE status='NEEDS_CLARIFICATION')::integer AS clarifications,
  count(*) FILTER (WHERE status='BLOCKED')::integer AS policy_refusals,
  count(*) FILTER (WHERE status='CANCELLED')::integer AS cancelled,
  count(*) FILTER (WHERE status='FAILED')::integer AS failed,
  count(*) FILTER (WHERE status='TIMED_OUT')::integer AS timed_out,
- count(*) FILTER (WHERE status IN ('COMPLETED','FAILED','TIMED_OUT'))::integer AS availability_denominator,
+ count(*) FILTER (WHERE status IN ('COMPLETED','NEEDS_CLARIFICATION','FAILED','TIMED_OUT'))::integer AS availability_denominator,
  count(*) FILTER (WHERE status IN ('FAILED','TIMED_OUT'))::numeric
- / nullif(count(*) FILTER (WHERE status IN ('COMPLETED','FAILED','TIMED_OUT')),0) AS failure_rate
+ / nullif(count(*) FILTER (WHERE status IN ('COMPLETED','NEEDS_CLARIFICATION','FAILED','TIMED_OUT')),0) AS failure_rate
 FROM runs WHERE created_at >= clock_timestamp()-interval '24 hours'
 GROUP BY policy_version,catalog_version,price_version;
 

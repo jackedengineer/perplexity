@@ -77,6 +77,12 @@ it('executes the operator query set with honest failure, latency, cost and feedb
  expect(reports.false_refusal_feedback[0]).toMatchObject({coverage:'OWNER_REPORTS_ONLY',false_refusal_rate:null,labeled_cases:null});
  expect(JSON.stringify(reports)).not.toMatch(/PRIVATE_|Why do rainbows|weather.gov|sessionId|payloadHmac/);
 });
+it('counts approved clarification terminals separately in the availability denominator',async()=>{
+ person=await seedCompletion(db,50000n,'Is it better?',2);
+ const p=providers();p.planner={modelId:'test/planner',plan:async()=>({plan:{action:'CLARIFY',question:'Which product do you mean?',reasonCode:'MISSING_ENTITY'},usage:knownUsage})};
+ expect((await run(p)).result.kind).toBe('COMPLETED');
+ expect((await operatorReports()).run_outcomes[0]).toMatchObject({completed:0,clarifications:1,availability_denominator:1,failure_rate:'0.00000000000000000000'});
+});
 it('operator cost totals include reconciled receipts once and reveal missing settlement',async()=>{
  await run();const [search]=await db.select().from(schema.providerCalls).where(eq(schema.providerCalls.stage,'SEARCH'));
  await db.insert(schema.providerUsageResolutions).values({runId:person.runId,callId:search.id,costMicroUsd:300n,kind:'PROVIDER_RECEIPT',evidenceHash:'b'.repeat(64)});
