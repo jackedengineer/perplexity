@@ -22,3 +22,7 @@ export function parseSafetyModel(env: Record<string,string | undefined>): Safety
 export function parseAnswerModel(env: Record<string,string | undefined>): SafetyModelConfig | undefined {
   return parseSafetyModel({ ...env,MODEL_SAFETY: env.MODEL_ANSWER,SAFETY_OPENROUTER_PROVIDER: env.ANSWER_OPENROUTER_PROVIDER });
 }
+export function parsePlannerModel(env:Record<string,string|undefined>):SafetyModelConfig|undefined{
+ const parsed=configSchema.safeParse({apiKey:env.OPENROUTER_API_KEY,modelId:env.MODEL_PLANNER,provider:env.PLANNER_OPENROUTER_PROVIDER});
+ return parsed.success?Object.freeze(parsed.data):undefined;
+}
