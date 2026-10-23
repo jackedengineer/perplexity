@@ -21,6 +21,12 @@ jobs:
       - run: npm install --global pnpm@10.34.5 --ignore-scripts
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm check
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: offline-evaluation-summary
+          path: .artifacts/evals/offline.json
+          retention-days: 7
       - run: pnpm audit --prod --audit-level=high
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium

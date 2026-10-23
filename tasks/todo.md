@@ -203,10 +203,12 @@ Verification: [research operations](../docs/operations.md). False-refusal covera
 
 ### T21 — Evaluate answer quality and safety coverage
 
-- [ ] Expand toward 100+ labeled cases including allowed sensitive/defensive topics, harmful intent, obfuscation, multilingual input, indirect injection and safety-service failure.
-- [ ] Report supported factual claims, citation coverage, refusal false positives/negatives, model-judge calibration, end-to-end cost and latency with denominators; add critical deterministic guard regressions to CI.
+- [x] Expand toward 100+ labeled cases including allowed sensitive/defensive topics, harmful intent, obfuscation, multilingual input, indirect injection and safety-service failure.
+- [x] Report supported factual claims, citation coverage, refusal false positives/negatives, model-judge calibration, end-to-end cost and latency with denominators; add critical deterministic guard regressions to CI.
 - [ ] Verify: measured baseline and acceptance criteria are recorded; no harmful completion in the finite critical suite; all critical guard/access/retry tests pass without portraying this as universal safety proof.
 - Dependencies: T20. Files: `evals/cases/answers.jsonl`, `evals/cases/safety.jsonl`, `evals/score-answers.ts`, `evals/score-safety.ts`, `evals/README.md`.
+
+T21 implementation: [evaluation protocol](../evals/README.md). The 138 safety labels are authored synthetic expectations, not independent human review. The offline runner executes 66 detector/service/output-contract cases and 24 frozen citation cases without provider work. Semantic safety, human-supported claims, live cost/latency and judge calibration remain explicitly pending; the verification checkbox stays open until that baseline exists. T12–T17 remain open. No paid tests or production changes are included.
 
 ### T22 — Implement conversation deletion and retention
 
