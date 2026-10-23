@@ -125,7 +125,7 @@ for(const scenario of ["input-block","output-block","invalid-citation","search-f
       if(scenario==="search-failure"||scenario==="search-deadline")expect(calls.some(call=>call.stage==="ANSWER")).toBe(false);
       if(scenario==="search-deadline"){
         expect(run.status).toBe('TIMED_OUT');expect(calls.find(call=>call.stage==='SEARCH')?.status).toBe('UNKNOWN');
-        expect(bytes).toContain('DEADLINE_EXCEEDED');
+        expect(bytes).toContain('Research exceeded its time limit. Please start a new search.');
         await expect(page.locator('.research-failure [role=alert]')).toContainText('Research exceeded its time limit');
       }
       const history=await context.request.get(`/api/conversations/${submitted.conversationId}/messages`);expect(history.status()).toBe(200);
