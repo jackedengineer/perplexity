@@ -80,6 +80,10 @@ Twenty metadata API samples have median/max ms: list 221/225, detail 295/296,
 history 296/298, missing run 238/255. These are local lab timings with development
 Neon, not field INP or hosted performance. The production audit still reports
 one moderate tooling advisory and no high/critical advisories.
+Forty restricted-role development-Neon checks across admission, input safety,
+retrieval, completion, recovery and budgets also pass. TLS/24-table/restricted-grant
+verification passes, and a fresh scan finds no configured secret values in tracked
+files or any of the 22 generated static files.
 
 ## Original candidate configuration and spending
 

@@ -3,8 +3,10 @@
 Setup date: 22 October 2026. Application revision: `5157f88` (merged T11).
 **Public launch remains on hold.** The initial setup left paid testing pending. On
 23 October the seller funded OpenRouter and authorized live testing. The live
-sample is recorded in [OpenRouter verification](openrouter-live-verification.md);
-it does not meet the launch gate. No Vercel deployment was created.
+samples are recorded in [OpenRouter verification](openrouter-live-verification.md).
+The repaired candidate passes all 72 semantic and 13 answer/citation cases, but
+independent human review, clarification handling and operational gates remain
+pending. No Vercel deployment was created. See [release checks](release-checklist.md).
 
 ## Created resources
 

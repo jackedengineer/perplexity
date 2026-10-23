@@ -3,7 +3,10 @@
 T20 answers four operational questions: why a run stopped, where time went, how
 much provider usage is known or still held, and which safety boundary made a
 decision. It adds no provider calls, retries, database writes or database round
-trips. Paid-provider verification and production deployment remain pending.
+trips. The [capped live verification](openrouter-live-verification.md) now records
+actual provider results; full release acceptance and production deployment remain
+pending. The [release checks](release-checklist.md) distinguish passed technical
+checks from unfinished operational and hosted checks.
 
 ## Signals and correlation
 
