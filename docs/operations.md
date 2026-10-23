@@ -3,7 +3,10 @@
 T20 answers four operational questions: why a run stopped, where time went, how
 much provider usage is known or still held, and which safety boundary made a
 decision. It adds no provider calls, retries, database writes or database round
-trips. Paid-provider verification and production deployment remain pending.
+trips. The [capped live verification](openrouter-live-verification.md) now records
+actual provider results; full release acceptance and production deployment remain
+pending. The [release checks](release-checklist.md) distinguish passed technical
+checks from unfinished operational and hosted checks.
 
 ## Signals and correlation
 
@@ -116,7 +119,7 @@ The named reports provide:
   are excluded. Citation/pre-classifier failures are visible
   in stage traces; this report is not a count of all deterministic guard executions.
 - `false_refusal_feedback`: explicit NOT_COLLECTED_T17 coverage with null rates and
-  denominators. T17 feedback collection and T21 human-labeled evaluations are open;
+  denominators. T17 feedback collection and T21's human/live evaluation baseline are open;
   a refusal count alone cannot establish a false-refusal rate. Once labeled,
   report confirmed false refusals / labeled benign requests, plus sample size,
   policy/model versions and reviewer agreement. Never treat missing feedback as 0%.

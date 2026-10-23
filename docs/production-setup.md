@@ -1,15 +1,18 @@
 # Production setup and verification
 
 Setup date: 22 October 2026. Application revision: `5157f88` (merged T11).
-**Public launch remains on hold.** The seller approved capped credential creation
-and subsequently chose to leave paid-model verification pending rather than add
-OpenRouter credits. No Vercel project or deployment was created.
+**Public launch remains on hold.** The initial setup left paid testing pending. On
+23 October the seller funded OpenRouter and authorized live testing. The live
+samples are recorded in [OpenRouter verification](openrouter-live-verification.md).
+The repaired candidate passes all 72 semantic and 13 answer/citation cases, but
+independent human review, clarification handling and operational gates remain
+pending. No Vercel deployment was created. See [release checks](release-checklist.md).
 
 ## Created resources
 
 | Resource | Configuration | Verification |
 | --- | --- | --- |
-| OpenRouter | Dedicated `Perplex production launch` key; $1 total, non-resetting limit; expires 29 October 2026 | Key API confirms limit and expiration. Credits API reports $0 purchased credits and $0.00947775 prior usage; dashboard rounds available balance to −$0.01. No paid inference attempted. |
+| OpenRouter | Dedicated `Perplex production launch` key; $1 total, non-resetting limit; expires 29 October 2026 | Initial setup verified limit/expiration and an unfunded balance. On 23 October the funded browser balance was $4.99; a subsequently observed $2 key limit was restored to $1. Live verification is recorded below. |
 | Tavily | Dedicated `Perplex launch verification` development key; 25 credits/month; pay-as-you-go left off | Edit dialog confirms the cap. One real basic search passes the existing application adapter. |
 | Neon | Separate `perplex-production` free project; `weathered-lab-26287676`; Singapore AWS; Postgres 18.6; database `perplex`; default branch `production` | Seven reviewed migrations applied; all 21 expected tables and runtime permissions verified over authenticated TLS. |
 | Application secrets | Independent production auth secret and versioned intent-HMAC key; operator namespace `research-production` | Generated locally; development values were not reused. No user/operator allowance was provisioned. |
@@ -63,8 +66,9 @@ rotation](https://neon.com/docs/manage/roles#reset-a-password).
 
 Vercel has received no secrets. When deployment is ready, install only server-side
 runtime settings. Never upload `DATABASE_URL_DIRECT` or an entire maintenance env
-file. Google credentials, the confirmed `BETTER_AUTH_URL`, and evaluated
-model/provider assignments remain absent from the production file. Do not guess
+file. Google credentials and the confirmed `BETTER_AUTH_URL` remain absent. Candidate
+model/provider assignments were configured on 23 October; live quality approval
+remains pending. See [the measured verification](openrouter-live-verification.md). Do not guess
 these values or weaken the existing ZDR, no-fallback, structured-output or price
 requirements to make a provider call succeed.
 
@@ -86,8 +90,10 @@ Do not describe this account as production-enabled or activate a paid plan witho
 a separate decision.
 
 The actual local browser submission shows the fixed “Research is not available
-right now” state with no answer or sources released. Paid model quality, safety,
-answer latency and full live research streaming remain **unverified**. Existing
+right now” state with no answer or sources released. At initial setup, paid quality, safety, answer latency and live research were
+unverified. The 23 October [live sample](openrouter-live-verification.md) now
+records actual provider and browser evidence; public-launch acceptance remains
+**pending**, including independent human quality review. Existing
 provider-double browser/performance evidence remains in [the T11 launch review](launch-review.md).
 Local evidence screenshots are in ignored `.artifacts/launch-setup/`; they are not
 public artifacts and must be inspected for credentials before any sharing.
@@ -115,10 +121,10 @@ verification.
 
 Resume in this order:
 
-1. Fund OpenRouter if paid testing is desired, keeping the approved $1 key cap and
-   auto-top-up off. Replace/renew the verification key if its seven-day validity
-   has elapsed. Evaluate explicit eligible model/provider pairs before enabling
-   research; provision only intended test user/operator allowances.
+1. Keep the approved $1 key cap and auto-top-up off. Funding and the first live
+   sample are complete; resolve the recorded failures before enabling public
+   research. Replace/renew the key if its seven-day validity has elapsed, and
+   provision only intended test user/operator allowances.
 2. Run bounded live input/query/evidence/output safety and answer/citation cases;
    record costs, latency, denominators and failure behavior. An API key existing
    does not establish model suitability or account funding.

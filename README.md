@@ -98,7 +98,8 @@ See [guarded answers](docs/guarded-answers.md) for stage caps, immutable approva
 ## Verification
 
 ```sh
-pnpm check                  # lint, generated route types, strict TS, 363 tests
+pnpm check                  # lint, generated route types, strict TS and tests
+pnpm eval:offline           # finite guard/citation checks; aggregate report, no provider calls
 pnpm build                  # production build; no credentials needed to build
 pnpm exec playwright install chromium
 pnpm test:e2e               # 8 public desktop/mobile checks; starts the built app
@@ -117,6 +118,12 @@ pnpm perf:check --private   # OPT-IN synthetic identity; 5 samples/private route
 Stop `pnpm dev` before browser checks so they exercise the production build. Public tests need no live credentials; CI supplies isolated dummy configuration. Integration tests run migrations and auth against PGlite's isolated PostgreSQL engine. The opt-in Neon suites create synthetic identities and isolated budget namespaces in the configured development database and remove them during cleanup; never point them at production. Admission tests use privileged fixture provisioning and the restricted runtime role for all admission operations, with four independently held PostgreSQL backends. No live suite reads a real user's cookies, automates Google passwords or calls paid AI/search providers.
 
 CI installs from the frozen lockfile with dependency scripts disabled, then runs lint/types/tests, production dependency audit, build and browser checks. Actions are pinned to verified commit SHAs. The GitHub remote is `jackedengineer/perplexity`; pull requests trigger the quality workflow. Live Neon tests remain explicitly opt-in and are excluded from default CI. Branch protection and deployed-preview verification remain outstanding.
+
+T21's [evaluation protocol](evals/README.md) separates the 138 authored safety cases
+and 24 frozen citation fixtures from human-reviewed model quality. Offline CI
+retains only aggregate results for seven days. `pnpm eval:score` imports explicitly
+supplied local observations; it cannot call providers. Human/live quality, judge
+calibration and paid-provider measurements remain pending.
 
 See [the foundation verification record](docs/foundation-verification.md), [private conversation verification](docs/private-conversations-verification.md), [admission verification](docs/run-admission.md), [input gate verification](docs/input-safety.md), [retrieval verification](docs/retrieval.md) and [guarded answer verification](docs/guarded-answers.md) for evidence and limits. The complete app is not ready for public launch: live provider/model evaluation, production reconciliation/recovery activation, deletion/export and CSP/deployment hardening remain release work.
 

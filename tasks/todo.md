@@ -203,10 +203,12 @@ Verification: [research operations](../docs/operations.md). False-refusal covera
 
 ### T21 — Evaluate answer quality and safety coverage
 
-- [ ] Expand toward 100+ labeled cases including allowed sensitive/defensive topics, harmful intent, obfuscation, multilingual input, indirect injection and safety-service failure.
-- [ ] Report supported factual claims, citation coverage, refusal false positives/negatives, model-judge calibration, end-to-end cost and latency with denominators; add critical deterministic guard regressions to CI.
+- [x] Expand toward 100+ labeled cases including allowed sensitive/defensive topics, harmful intent, obfuscation, multilingual input, indirect injection and safety-service failure.
+- [x] Report supported factual claims, citation coverage, refusal false positives/negatives, model-judge calibration, end-to-end cost and latency with denominators; add critical deterministic guard regressions to CI.
 - [ ] Verify: measured baseline and acceptance criteria are recorded; no harmful completion in the finite critical suite; all critical guard/access/retry tests pass without portraying this as universal safety proof.
 - Dependencies: T20. Files: `evals/cases/answers.jsonl`, `evals/cases/safety.jsonl`, `evals/score-answers.ts`, `evals/score-safety.ts`, `evals/README.md`.
+
+T21 implementation: [evaluation protocol](../evals/README.md). The 138 safety labels are authored synthetic expectations, not independent human review. The offline runner executes 66 detector/service/output-contract cases and 24 frozen citation cases without provider work. The [first authorized paid sample](../docs/openrouter-live-verification.md) now records all 72 semantic cases and 16 answer cases, but 18 semantic checks were unavailable and independent human labels, completion/support review and judge calibration remain pending. A real browser answer with four citations survives reload; a separate live draft failed citation validation and was withheld. The immutable `b101d4f` rerun fixes those technical failures: 72/72 semantic decisions match expectations with zero outages and 13/13 answer cases pass citation/output validation. The real MDN browser retest also succeeds. The unchanged scorer remains PENDING for independent human review and one missing T12 clarification disposition and one failed no-evidence output check. The [current-review fixes](../docs/t21-review-fixes.md) add category-aware scoring, candidate binding, strict one-block cited paragraphs and a newer complete sample: 13/13 answers and 2/2 no-evidence replies pass, with one unavailable semantic check and human/clarification acceptance still pending. The verification checkbox stays open. T12–T17 remain open, and no public deployment or production database changes were made.
 
 ### T22 — Implement conversation deletion and retention
 

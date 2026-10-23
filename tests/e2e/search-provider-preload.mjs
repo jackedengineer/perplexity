@@ -5,11 +5,8 @@ if(new URL(process.env.DATABASE_URL??"http://missing").hostname!=="ep-sweet-nigh
 const originalFetch=globalThis.fetch;
 const answer=[
   "A rainbow appears when sunlight interacts with water droplets in the air. The drops **refract, reflect, and disperse** the light, separating it into the colors we see [S1].",
-  "## What happens inside a raindrop",
-  "1. **Refraction:** Light changes direction when it enters the water [S1].\n2. **Dispersion:** Different wavelengths bend by different amounts [S2].\n3. **Internal reflection:** Light reflects from the back of the droplet [S1].\n4. **Refraction again:** The light bends once more as it leaves the drop [S2].",
-  "## Why it looks like an arc",
+  "**Refraction:** Light changes direction when it enters the water [S1]. **Dispersion:** Different wavelengths bend by different amounts [S2]. **Internal reflection:** Light reflects from the back of the droplet [S1]. **Refraction again:** The light bends once more as it leaves the drop [S2].",
   "With the Sun behind you and rain ahead, the brightest rays reach your eyes at about **42 degrees** from the direction opposite the Sun. Many drops contribute light along the same cone, which appears as an arc [S2].",
-  "## A different rainbow for everyone",
   "Your eyes receive light from a particular set of droplets. Someone standing beside you receives light from a different set, so each observer sees their own rainbow [S3].",
 ].join("\n\n");
 function record(stage,scenario){appendFileSync(".artifacts/t11-provider-calls.jsonl",JSON.stringify({stage,scenario})+"\n");}
@@ -38,7 +35,7 @@ globalThis.fetch=async(input,init)=>{
     if(init?.signal?.aborted)abort();else init?.signal?.addEventListener("abort",abort,{once:true});
   });
   const blocked=scenario==="input-block"||(output&&scenario==="output-block");
-  const text=body.model==="test/answer"?(scenario==="t18-cancel"?"T18_PRIVATE_LATE_DRAFT [S1].":scenario==="output-block"?"UNREVIEWED_PRIVATE_DRAFT [S1].":scenario==="invalid-citation"?"UNREVIEWED_PRIVATE_DRAFT [S9].":answer):JSON.stringify({decision:blocked?"BLOCK":"ALLOW",categoryCodes:blocked?["FRAUD"]:[],policyVersion:"v1",retryable:null});
-  return Response.json({id:"synthetic-t11",model:body.model,created:1,choices:[{index:0,finish_reason:"stop",message:{role:"assistant",content:text,reasoning:"PRIVATE_REASONING_MUST_NOT_LEAK"}}],usage:{prompt_tokens:100,completion_tokens:100,total_tokens:200,cost:.0001}});
+  const text=body.model==="test/answer"?(scenario==="t18-cancel"?"T18_PRIVATE_LATE_DRAFT [S1].":scenario==="output-block"?"UNREVIEWED_PRIVATE_DRAFT [S1].":scenario==="invalid-citation"?"UNREVIEWED_PRIVATE_DRAFT [S9].":answer):JSON.stringify({classification:blocked?["FRAUD"]:"ALLOW",policyVersion:"v1"});
+  return Response.json({id:"synthetic-t11",model:body.model,created:1,choices:[{index:0,finish_reason:"stop",message:{role:"assistant",content:body.model==="test/answer"?JSON.stringify({paragraphs:text.split("\n\n").map(text=>({text:text.replace(/\[S[1-9]\]/gu,""),sourceIds:[...new Set([...text.matchAll(/\[(S[1-9])\]/gu)].map(match=>match[1]))].length?[...new Set([...text.matchAll(/\[(S[1-9])\]/gu)].map(match=>match[1]))]:["S1"]}))}):text,reasoning:"PRIVATE_REASONING_MUST_NOT_LEAK"}}],usage:{prompt_tokens:100,completion_tokens:100,total_tokens:200,cost:.0001}});
 };
 
