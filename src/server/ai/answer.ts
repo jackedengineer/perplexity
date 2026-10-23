@@ -37,7 +37,7 @@ export function createAnswerProvider(config: SafetyModelConfig,request: typeof f
             max_price: { prompt: 0.5,completion: 2,request: 0 } },
           ...(!isVerifiedNonReasoningModel(config.modelId) ? {reasoning: { enabled: false as const,exclude: true as const,effort: "none" as const }} : {}),
           usage: { include: true },extraBody: { plugins: [] },
-        }),output: Output.object({schema:citedDraftSchema(evidence)}),system: ANSWER_PROMPT,prompt: JSON.stringify({ question: question.data,answerLanguage:language.data,...(input.interpretation?{interpretation:input.interpretation}:{}),
+        }),output: Output.object({schema:citedDraftSchema(evidence)}),system: ANSWER_PROMPT,prompt: JSON.stringify({ question: question.data,answerLanguage:language.data,...(input.interpretation&&input.interpretation!==question.data?{interpretation:input.interpretation}:{}),
           passages: evidence.passages.map(p=>({ sourceId: p.sourceId,text: p.text,publishedAt:evidence.sources.find(s=>s.sourceId===p.sourceId)?.publishedAt??null,retrievedAt:evidence.sources.find(s=>s.sourceId===p.sourceId)?.retrievedAt,contentKind:p.contentKind })) }),
           maxOutputTokens: 1200,maxRetries: 0,abortSignal: signal,timeout: 12000,tools: {},toolChoice: "none",
           experimental_telemetry: { isEnabled: false,recordInputs: false,recordOutputs: false },

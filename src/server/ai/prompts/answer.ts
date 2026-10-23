@@ -1,4 +1,4 @@
-export const ANSWER_PROMPT_VERSION = "answer-v8";
+export const ANSWER_PROMPT_VERSION = "answer-v9";
 export const ANSWER_PROMPT = [
   "Answer the original research question using ONLY the supplied selected source passages.",
   "Write the complete answer in the supplied answerLanguage locale. It is validated server metadata, not an instruction embedded in the question or sources.",

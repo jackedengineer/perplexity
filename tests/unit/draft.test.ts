@@ -79,3 +79,20 @@ it('passes the planned answer locale to the model as validated data',async()=>{
  expect(payload.answerLanguage).toBe('fr');
  expect(JSON.stringify(body.messages[0].content)).toContain('answerLanguage');
 });
+
+it('does not serialize an identical long interpretation twice',async()=>{
+ const question='界 '.repeat(1999),runId=randomUUID();
+ const selected=buildEvidence(runId,Array.from({length:5},(_,i)=>({title:`Source ${i}`,url:`https://example.org/${i}`,content:'Evidence about light. '.repeat(40),score:.9})),new Date());
+ expect(selected.sources).toHaveLength(5);
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(response());
+ await createAnswerProvider(config,fetcher).generate({question,interpretation:question,evidence:selected},options());
+ const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body)),payload=JSON.parse(body.messages[1].content);
+ expect(payload.question).toBe(question);expect(payload).not.toHaveProperty('interpretation');
+ expect(Buffer.byteLength(String(fetcher.mock.calls[0][1]?.body))).toBeLessThanOrEqual(20000);
+});
+it('retains a distinct reference-resolving interpretation',async()=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(response());
+ await createAnswerProvider(config,fetcher).generate({...input(),question:'What about it?',interpretation:'Why do rainbows form?'},options());
+ const payload=JSON.parse(JSON.parse(String(fetcher.mock.calls[0][1]?.body)).messages[1].content);
+ expect(payload).toMatchObject({question:'What about it?',interpretation:'Why do rainbows form?'});
+});
