@@ -12,10 +12,13 @@ const answer=[
 function record(stage,scenario){appendFileSync(".artifacts/t11-provider-calls.jsonl",JSON.stringify({stage,scenario})+"\n");}
 globalThis.fetch=async(input,init)=>{
   const url=String(input instanceof Request?input.url:input);
-  if((url.includes("openrouter.ai")||url.includes("api.tavily.com"))&&url!=="https://openrouter.ai/api/v1/chat/completions"&&url!=="https://api.tavily.com/search")throw new Error("Fixture forbids unmatched provider request");
-  if(url!=="https://openrouter.ai/api/v1/chat/completions"&&url!=="https://api.tavily.com/search")return originalFetch(input,init);
+  if((url.includes("openrouter.ai")||url.includes("api.tavily.com"))&&url!=="https://openrouter.ai/api/v1/chat/completions"&&url!=="https://api.tavily.com/search"&&url!=="https://api.tavily.com/extract")throw new Error("Fixture forbids unmatched provider request");
+  if(url!=="https://openrouter.ai/api/v1/chat/completions"&&url!=="https://api.tavily.com/search"&&url!=="https://api.tavily.com/extract")return originalFetch(input,init);
   const body=JSON.parse(String(init?.body??"{}")),raw=JSON.stringify(body);
   const scenario=raw.includes("t19-safety-deadline")?"t19-safety-deadline":raw.includes("t19-deadline")?"t19-deadline":raw.includes("t18-cancel")?"t18-cancel":raw.includes("t11-input-block")?"input-block":raw.includes("t11-output-block")?"output-block":raw.includes("t11-invalid-citation")?"invalid-citation":raw.includes("t11-search-failure")?"search-failure":raw.includes("t11-no-evidence")?"no-evidence":"allowed";
+  if(url==='https://api.tavily.com/extract'){
+    record('extract',scenario);return Response.json({results:body.urls.map((url,index)=>({url,raw_content:index===0?'Water droplets refract incoming sunlight, reflect it internally and disperse its colors.':'Different colors emerge at different angles. The primary rainbow is about 42 degrees from the antisolar direction.'})),failed_results:[],usage:{credits:1}});
+  }
   if(url.includes("tavily")){
     record("search",scenario);
     if(scenario==="search-failure")return Response.json({error:"PRIVATE_UPSTREAM_MUST_NOT_LEAK"},{status:503});

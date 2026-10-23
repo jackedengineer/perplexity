@@ -53,7 +53,7 @@ export function createOpenRouterSafetyProvider(config: SafetyModelConfig, reques
         response_format: { type: "json_schema", json_schema: { name: "research_safety_v3", strict: true, schema: outputSchema } },
         messages: [{ role: "system", content: prompt },{ role: "user", content: JSON.stringify(input) }],
       });
-      if (Buffer.byteLength(body,"utf8") > 45_000) throw new SafetyProviderError("PROVIDER_UNAVAILABLE");
+      if (Buffer.byteLength(body,"utf8") > 20_000) throw new SafetyProviderError("PROVIDER_UNAVAILABLE");
       let response: Response;
       try {
         response = await request("https://openrouter.ai/api/v1/chat/completions",{

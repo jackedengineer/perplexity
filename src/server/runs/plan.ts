@@ -19,7 +19,7 @@ export async function planRun(db:AdmissionDatabase,subject:string,runId:string,s
   return {run,input:plannerInputSchema.parse({original:{id:message.id,text:message.parts[0].text},context,now:now.toISOString(),timezone:submission.timezone??'UTC',locale:submission.locale??null})};
  });
  let plan;
- try{plan=validatePlan((await provider.plan(loaded.input,{signal,deadlineAt:loaded.run.deadlineAt})).plan,loaded.input);}
+ try{plan=validatePlan((await provider.plan(loaded.input,{signal,deadlineAt:loaded.run.deadlineAt})).plan,loaded.input,loaded.run.accountingVersion===2?2:1);}
  catch(error){if(error instanceof AdmissionError)throw error;plan=standaloneFallback(loaded.input);if(!plan)throw new AdmissionError('PROVIDER_UNAVAILABLE');}
  await db.transaction(async tx=>{
   const {run,conversation,now}=await lockOwnedRun(tx,subject,runId);

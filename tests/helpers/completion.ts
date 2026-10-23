@@ -1,3 +1,4 @@
+import {eq} from 'drizzle-orm';
 import { randomUUID } from "node:crypto";
 import * as schema from "@/db/schema";
 import type { AdmissionDatabase } from "@/server/runs/usage";
@@ -12,7 +13,7 @@ export const allow = { decision: "ALLOW",categoryCodes: [],policyVersion: "v1" }
 export const knownUsage = { costMicroUsd: 100n,inputTokens: 10,outputTokens: 5,actualModel: "test/safety" };
 export const fakeSafety = () => ({ modelId: "test/safety",classify: async()=>allow,usage: ()=>knownUsage });
 export const keys = { activeKeyId: "test-v1",keys: { "test-v1": "a".repeat(64) } };
-export async function seedCompletion(db: AdmissionDatabase,reserve = 50000n,text="Why do rainbows form?") {
+export async function seedCompletion(db: AdmissionDatabase,reserve = 50000n,text="Why do rainbows form?",accountingVersion=1) {
   const subject = randomUUID(),namespace = `completion-${randomUUID()}`;
   await db.insert(schema.user).values({ id: subject,name: "Synthetic completion",email: `${subject}@example.test` });
   const [profile] = await db.insert(schema.appUsers).values({ authSubject: subject }).returning();
@@ -25,6 +26,9 @@ export async function seedCompletion(db: AdmissionDatabase,reserve = 50000n,text
   const request = { conversationId: conversation.id,clientRequestId: randomUUID(),expectedRevision: 0,mode: "FAST",modelKey: "fast-default",message: { text } };
   const admitted = await createRunAdmission(db,keys,{ ...FREE_ADMISSION_POLICY,operatorBudgetKey: namespace,providerReserveMicroUsd: reserve }).admit(subject,request);
   if (admitted.kind !== "ADMITTED") throw new Error("Synthetic admission failed");
+  // Existing completion/settlement regression fixtures exercise the historical v1 snapshot.
+  // New public execution suites explicitly select v2.
+  await db.update(schema.runs).set({accountingVersion}).where(eq(schema.runs.id,admitted.run.id));
   return { subject,profile,conversation,request,operatorBudgetKey:namespace,runId: admitted.run.id };
 }
 export async function prepareCompletion(db: AdmissionDatabase,person: { subject: string;runId: string;request: unknown },hmacKeys: unknown = keys,empty = false) {

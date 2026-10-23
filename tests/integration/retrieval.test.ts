@@ -36,6 +36,8 @@ beforeEach(async()=>{
   const request = { conversationId: conversation.id,clientRequestId: randomUUID(),expectedRevision: 0,mode: "FAST",modelKey: "fast-default",message: { text: "Why do rainbows form?" } };
   const admitted = await createRunAdmission(db,keys,policy).admit(subject,request);
   if (admitted.kind !== "ADMITTED") throw new Error("Fixture admission failed"); runId = admitted.run.id;
+  // Historical T07 profile regression; new v2 planning/extraction is tested separately.
+  await db.update(schema.runs).set({accountingVersion:1}).where(eq(schema.runs.id,runId));
   expect((await createMessageAcceptance(db,keys,createInputGate(classifier())).accept(subject,runId,request,signal())).kind).toBe("ACCEPTED");
 });
 afterAll(()=>pg.close());
@@ -157,7 +159,7 @@ it("restricted SQL role enforces reviewed insertion and immutable evidence",asyn
 });
 it("database rejects contradictory outcomes, unreviewed ready records and budget overrides",async()=>{
   const base = { runId,attemptVersion: 1,policyVersion: "v1",detectorVersion: "evidence-v1",modelId: "test/safety",status: "STARTED",createdAt: new Date(),expiresAt: new Date(Date.now()+86400000) };
-  for (const invalid of [{ status: "READY" },{ status: "NO_EVIDENCE" },{ searchCredits: 2 },{ attemptVersion: 0 },
+  for (const invalid of [{ status: "READY" },{ status: "NO_EVIDENCE" },{ searchCredits: 3 },{ attemptVersion: 0 },
     { queryVerdict: "UNKNOWN" },{ evidenceVerdict: "UNKNOWN" },{ expiresAt: new Date(0) }]) {
     await expect(db.insert(schema.runRetrievals).values({ ...base,...invalid })).rejects.toMatchObject({ cause: { code: "23514" } });
   }

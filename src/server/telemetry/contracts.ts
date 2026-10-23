@@ -5,11 +5,11 @@ import {INPUT_REASONS} from '@/server/safety/provider';
 import {safetyCategorySchema} from '@/server/safety/policy';
 const publicCodes=Object.keys(PUBLIC_ERRORS) as [keyof typeof PUBLIC_ERRORS,...(keyof typeof PUBLIC_ERRORS)[]];
 export const outcomeSchema=z.enum([...publicCodes,'ERROR','SUCCEEDED','UNKNOWN','SKIPPED','ALLOW','BLOCK','UNAVAILABLE','APPROVED','ACCEPTED','READY','NO_EVIDENCE','COMMITTED','ALREADY_COMMITTED','COMPLETED','ADMITTED']);
-export const stageSchema=z.enum(['http.request','http.identity','http.request_limit','http.validation','http.configuration','http.admission','http.delivery','http.status','run.execute','input.accept','planning','retrieval','answer.complete','safety.input','safety.query','safety.evidence','safety.output','search','answer.draft','citations','output.release','persistence.commit','persistence.fail']);
+export const stageSchema=z.enum(['http.request','http.identity','http.request_limit','http.validation','http.configuration','http.admission','http.delivery','http.status','run.execute','input.accept','planning','retrieval','answer.complete','safety.input','safety.query','safety.evidence','safety.output','search','extract','answer.draft','citations','output.release','persistence.commit','persistence.fail']);
 export type TelemetryStage=z.infer<typeof stageSchema>;
 const count=z.int().min(0).max(1_000_000),money=z.string().regex(/^\d{1,16}$/u);
 // One request retains at most seven provider observations; run totals can exceed a call's token limit.
-const aggregateTokens=z.int().min(0).max(7_000_000);
+const aggregateTokens=z.int().min(0).max(10_000_000);
 const version=z.string().regex(/^[a-zA-Z0-9._-]{1,64}$/u);
 export const runMetadataSchema=z.object({runId:z.uuid(),policyVersion:version.optional(),catalogVersion:version.optional(),priceVersion:version.optional(),entitlementVersion:version.optional(),accountingVersion:z.int().min(0).max(100).optional(),estimatedUpperBoundMicroUsd:money.optional(),estimateKind:z.literal('RESERVATION_CEILING').optional()});
 // Strip unknown keys. Neither errors nor request/provider objects are serializable fields.
@@ -18,7 +18,7 @@ export const telemetryFieldsSchema=z.object({
  reason:z.enum([...INPUT_REASONS,'CITATION_INVALID','INVALID_PACKAGE']).optional(),categoryCodes:z.array(safetyCategorySchema).max(11).optional(),
  promptVersion:version.optional(),detectorVersion:version.optional(),
  modelId:modelIdSchema.optional(),actualModelMatch:z.enum(['MATCH','OTHER','UNAVAILABLE']).optional(),
- providerCallId:z.uuid().optional(),providerStage:z.enum(['PLANNER','INPUT_SAFETY','QUERY_SAFETY','SEARCH','EVIDENCE_SAFETY','ANSWER','OUTPUT_SAFETY']).optional(),
+ providerCallId:z.uuid().optional(),providerStage:z.enum(['PLANNER','INPUT_SAFETY','QUERY_SAFETY','QUERY_SECOND','SEARCH','SEARCH_SECOND','EXTRACT','EVIDENCE_SAFETY','ANSWER','OUTPUT_SAFETY']).optional(),
  inputTokens:aggregateTokens.nullable().optional(),outputTokens:aggregateTokens.nullable().optional(),searchCredits:count.nullable().optional(),
  knownCostMicroUsd:money.optional(),estimatedUpperBoundMicroUsd:money.optional(),heldMicroUsd:money.optional(),bookedMicroUsd:money.optional(),
  costState:z.enum(['KNOWN','PARTIAL','UNKNOWN']).optional(),estimateKind:z.literal('RESERVATION_CEILING').optional(),unknownCalls:count.optional(),

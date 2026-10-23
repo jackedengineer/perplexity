@@ -14,7 +14,7 @@ import {SafetyProviderError} from '@/server/safety/provider';
 const pg = new PGlite(),db = drizzle(pg,{schema});
 let person: Awaited<ReturnType<typeof seedCompletion>>,identity: {user:{id:string};sessionId:string};
 beforeAll(async()=>{const journal=JSON.parse(await readFile("drizzle/meta/_journal.json","utf8"));for(const e of journal.entries)await pg.exec(await readFile(`drizzle/${e.tag}.sql`,"utf8"));});
-beforeEach(async()=>{await db.delete(schema.user);await db.delete(schema.operatorUsageBuckets);person=await seedCompletion(db);identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};});
+beforeEach(async()=>{await db.delete(schema.user);await db.delete(schema.operatorUsageBuckets);person=await seedCompletion(db,50000n,"Why do rainbows form?",2);identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};});
 afterAll(()=>pg.close());
 function providers(): ExecutionProviders {
   return {planner:fakePlanner(),input:fakeSafety(),query:fakeSafety(),evidence:fakeSafety(),output:fakeSafety(),
@@ -113,7 +113,7 @@ it('planner outage falls back to an exact standalone original but cannot guess a
  const p=providers();p.planner={modelId:'test/planner',plan:async()=>{throw Error('PRIVATE');}};
  expect((await run(p)).result.kind).toBe('COMPLETED');
  const [plan]=await db.select().from(schema.runPlans);expect(plan.plan).toMatchObject({action:'ANSWER',standaloneQuestion:person.request.message.text});
- person=await seedCompletion(db,50000n,'Is it better?');identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};
+ person=await seedCompletion(db,50000n,'Is it better?',2);identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};
  const p2=providers();p2.planner=p.planner;
  expect((await run(p2)).result).toMatchObject({kind:'DENIED',code:'PROVIDER_UNAVAILABLE'});expect(p2.search.search).not.toHaveBeenCalled();
 });
@@ -124,4 +124,30 @@ it('a follow-up cannot bypass safety because the preceding assistant turn was ap
  const admitted=await createRunAdmission(db,keys,{...FREE_ADMISSION_POLICY,operatorBudgetKey:person.operatorBudgetKey}).admit(person.subject,request);if(admitted.kind!=='ADMITTED')throw Error('Admission failed');
  expect(await createRunExecution(db,keys,p).execute(identity,admitted.run,submissionSchema.parse(request),new AbortController().signal,()=>{})).toMatchObject({kind:'DENIED',code:'INPUT_BLOCKED'});
  expect(spy).not.toHaveBeenCalled();expect(p.search.search).not.toHaveBeenCalled();
+});
+it('guards both planned queries before parallel search and persists only inspected extracted excerpts',async()=>{
+ const p=providers(),base=p.planner.plan;
+ p.planner={...p.planner,plan:async(input,options)=>{const result=await base(input,options);if(result.plan.action==='ANSWER')result.plan.retrieval.queries=['rainbows','rainbows form'];return result;}};
+ p.extract={extract:vi.fn().mockImplementation(async(urls:string[])=>({pages:[{url:urls[0],content:'Rainbow light bends in water. Extracted evidence.',retrievedAt:new Date().toISOString()}],failedUrls:[],rejectedUrls:[],credits:1}))};
+ expect((await run(p)).result.kind).toBe('COMPLETED');expect(p.search.search).toHaveBeenCalledTimes(2);expect(p.extract.extract).toHaveBeenCalledOnce();
+ expect((await db.select().from(schema.sourcePassages))[0]).toMatchObject({contentKind:'EXTRACTED_PAGE',text:'Rainbow light bends in water. Extracted evidence.'});
+ const calls=await db.select().from(schema.providerCalls);expect(calls).toHaveLength(10);expect(calls.every(c=>c.budgetVersion===2)).toBe(true);
+ expect(calls.reduce((n,c)=>n+c.capMicroUsd,0n)).toBe(49750n);expect((await db.select().from(schema.runRetrievals))[0].searchCredits).toBe(2);
+});
+it('an unsafe second query stops both searches and extraction',async()=>{
+ const p=providers(),base=p.planner.plan;
+ p.planner={...p.planner,plan:async(input,options)=>{const result=await base(input,options);if(result.plan.action==='ANSWER')result.plan.retrieval.queries=['rainbows','rainbows form'];return result;}};
+ let checks=0;p.query={...fakeSafety(),classify:async()=>++checks===2?{decision:'BLOCK',categoryCodes:['FRAUD'],policyVersion:'v1'}:{decision:'ALLOW',categoryCodes:[],policyVersion:'v1'}};
+ expect((await run(p)).result).toMatchObject({kind:'DENIED',code:'INPUT_BLOCKED'});expect(p.search.search).not.toHaveBeenCalled();expect(p.answer.generate).not.toHaveBeenCalled();
+});
+it('partial extraction failure retains honest search passages; rejected pages cannot reuse snippets',async()=>{
+ const p=providers();p.extract={extract:async()=>({pages:[],failedUrls:[],rejectedUrls:['https://weather.gov/rainbow'],credits:1})};
+ expect((await run(p)).result.kind).toBe('COMPLETED');expect(p.answer.generate).not.toHaveBeenCalled();
+ expect((await createAnswerDelivery(db).load(identity,person.runId)).answer?.answer.kind).toBe('NO_EVIDENCE');
+ expect(await db.select().from(schema.sourcePassages)).toHaveLength(0);
+});
+it('an extraction transport outage preserves unknown usage and uses only the search passage',async()=>{
+ const p=providers();p.extract={extract:async()=>{throw Error('PRIVATE');}};
+ expect((await run(p)).result.kind).toBe('COMPLETED');expect((await db.select().from(schema.sourcePassages))[0].contentKind).toBe('SEARCH_PASSAGE');
+ expect((await db.select().from(schema.providerCalls)).find(c=>c.stage==='EXTRACT')).toMatchObject({status:'UNKNOWN',costMicroUsd:null});
 });

@@ -27,7 +27,7 @@ export function createPlannerProvider(config:SafetyModelConfig,request:typeof fe
     const meta=result.providerMetadata?.openrouter?.usage,reported=providerUsage({cost:meta&&typeof meta==='object'&&'cost'in meta?meta.cost:undefined,prompt_tokens:result.usage.inputTokens,completion_tokens:result.usage.outputTokens},result.response.modelId);
     usage={...reported,costMicroUsd:reported.costMicroUsd??usage?.costMicroUsd??null};
     if(result.finishReason!=='stop'||result.toolCalls.length)throw new PlanningError();
-    return {plan:validatePlan(result.output.plan,canonical),usage};
+    return {plan:validatePlan(result.output.plan,canonical,2),usage};
    });
   }catch{throw new PlanningError();}
  }};

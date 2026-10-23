@@ -7,6 +7,7 @@ import type { ApprovedPayload } from "@/server/contracts/answer";
 const instant = (name: string) => timestamp(name,{ withTimezone: true,precision: 3 });
 export const providerCalls = pgTable("provider_calls",{
   id: uuid("id").primaryKey().defaultRandom(),runId: uuid("run_id").notNull().references(()=>runs.id,{ onDelete: "cascade" }),
+  budgetVersion:integer("budget_version").notNull().default(1),
   stage: varchar("stage",{ length: 24 }).notNull(),attemptVersion: integer("attempt_version").notNull(),
   requestedModel: varchar("requested_model",{ length: 128 }).notNull(),actualModel: varchar("actual_model",{ length: 128 }),
   capMicroUsd: bigint("cap_micro_usd",{ mode: "bigint" }).notNull(),status: varchar("status",{ length: 16 }).notNull(),
@@ -16,8 +17,8 @@ export const providerCalls = pgTable("provider_calls",{
   uniqueIndex("provider_id_run_unique").on(t.id,t.runId),
   uniqueIndex("provider_run_stage_unique").on(t.runId,t.stage),
   check("provider_attempt_valid",sql`${t.attemptVersion} > 0 AND length(trim(${t.requestedModel})) > 0 AND ${t.status} IN ('STARTED','SUCCEEDED','UNKNOWN','SKIPPED')`),
-  check("provider_cap_valid",sql`${t.capMicroUsd} > 0 AND ${t.capMicroUsd} = CASE ${t.stage} WHEN 'PLANNER' THEN 2000 WHEN 'INPUT_SAFETY' THEN 5000 WHEN 'QUERY_SAFETY' THEN 5000 WHEN 'SEARCH' THEN 8000 WHEN 'EVIDENCE_SAFETY' THEN 5000 WHEN 'ANSWER' THEN 20000 WHEN 'OUTPUT_SAFETY' THEN 5000 ELSE -1 END`),
-  check("provider_usage_valid",sql`(${t.costMicroUsd} IS NULL OR ${t.costMicroUsd} >= 0) AND (${t.inputTokens} IS NULL OR ${t.inputTokens} BETWEEN 0 AND 1000000) AND (${t.outputTokens} IS NULL OR ${t.outputTokens} BETWEEN 0 AND 1000000) AND (${t.searchCredits} IS NULL OR ${t.searchCredits} = 1)`),
+  check("provider_cap_valid",sql`${t.capMicroUsd} > 0 AND ${t.capMicroUsd} = CASE WHEN ${t.budgetVersion}=1 THEN CASE ${t.stage} WHEN 'PLANNER' THEN 2000 WHEN 'INPUT_SAFETY' THEN 5000 WHEN 'QUERY_SAFETY' THEN 5000 WHEN 'SEARCH' THEN 8000 WHEN 'EVIDENCE_SAFETY' THEN 5000 WHEN 'ANSWER' THEN 20000 WHEN 'OUTPUT_SAFETY' THEN 5000 ELSE -1 END WHEN ${t.budgetVersion}=2 THEN CASE ${t.stage} WHEN 'PLANNER' THEN 2000 WHEN 'INPUT_SAFETY' THEN 2250 WHEN 'QUERY_SAFETY' THEN 2250 WHEN 'QUERY_SECOND' THEN 2250 WHEN 'SEARCH' THEN 8000 WHEN 'SEARCH_SECOND' THEN 8000 WHEN 'EXTRACT' THEN 8000 WHEN 'EVIDENCE_SAFETY' THEN 2250 WHEN 'ANSWER' THEN 12500 WHEN 'OUTPUT_SAFETY' THEN 2250 ELSE -1 END ELSE -1 END`),
+  check("provider_usage_valid",sql`(${t.costMicroUsd} IS NULL OR ${t.costMicroUsd} >= 0) AND (${t.inputTokens} IS NULL OR ${t.inputTokens} BETWEEN 0 AND 1000000) AND (${t.outputTokens} IS NULL OR ${t.outputTokens} BETWEEN 0 AND 1000000) AND (${t.searchCredits} IS NULL OR (${t.stage}='EXTRACT' AND ${t.searchCredits} BETWEEN 0 AND 1 OR ${t.stage} IN ('SEARCH','SEARCH_SECOND') AND ${t.searchCredits}=1))`),
   check("provider_lifecycle_valid",sql`(${t.status} = 'STARTED' AND ${t.finishedAt} IS NULL AND ${t.costMicroUsd} IS NULL) OR (${t.status} <> 'STARTED' AND ${t.finishedAt} IS NOT NULL AND ${t.finishedAt} >= ${t.startedAt} AND (${t.status} <> 'SKIPPED' OR ${t.costMicroUsd} IS NOT DISTINCT FROM 0))`),
 ]);
 export const outputReviews = pgTable("output_safety_reviews",{

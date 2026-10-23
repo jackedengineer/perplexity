@@ -6,10 +6,10 @@ import { AdmissionError } from "./errors";
 import type { ProviderUsage } from "@/server/ai/usage";
 import { SafetyProviderError,type SafetyProvider } from "@/server/safety/provider";
 import type { SearchProvider } from "@/server/search/tavily";
-import {providerDeadline,STAGE_LIMITS,type ProviderStage} from './budgets';
+import {providerDeadline,stageLimits,type ProviderStage} from './budgets';
 import {recordProviderObservation,traceStage} from '@/server/telemetry/trace';
 const noUsage:ProviderUsage={costMicroUsd:0n,inputTokens:0,outputTokens:0,actualModel:null};
-const phases = { PLANNER: "PLANNING", INPUT_SAFETY: "CHECKING_INPUT",QUERY_SAFETY: "SEARCHING",SEARCH: "SEARCHING",EVIDENCE_SAFETY: "PREPARING_EVIDENCE",ANSWER: "GENERATING",OUTPUT_SAFETY: "CHECKING_OUTPUT" };
+const phases = { PLANNER: "PLANNING",QUERY_SECOND:"SEARCHING",SEARCH_SECOND:"SEARCHING",EXTRACT:"PREPARING_EVIDENCE", INPUT_SAFETY: "CHECKING_INPUT",QUERY_SAFETY: "SEARCHING",SEARCH: "SEARCHING",EVIDENCE_SAFETY: "PREPARING_EVIDENCE",ANSWER: "GENERATING",OUTPUT_SAFETY: "CHECKING_OUTPUT" };
 export function createProviderCalls(db: AdmissionDatabase,subject: string,runId: string) {
   return {
     async begin(stage: ProviderStage,requestedModel: string,signal?:AbortSignal) {
@@ -17,20 +17,21 @@ export function createProviderCalls(db: AdmissionDatabase,subject: string,runId:
       if(signal?.aborted)throw new AdmissionError('CONFLICT');
       const claim=await db.transaction(async(tx)=>{
         const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
-        if (run.accountingVersion !== 1) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
+        const limits=stageLimits(run.accountingVersion,stage);
+        if (!limits) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
         if(run.deadlineAt<=now)throw new AdmissionError('DEADLINE_EXCEEDED');
         if (signal?.aborted || run.status !== phases[stage] || run.attemptVersion!==1 || conversation.revision!==run.admittedRevision) throw new AdmissionError("CONFLICT");
         const [{ total,overages,repeats }] = await tx.select({repeats:sql<number>`count(*) filter (where ${providerCalls.stage}=${stage})::integer`,overages: sql<number>`count(*) filter (where ${providerCalls.costMicroUsd} > ${providerCalls.capMicroUsd})::integer`,total: sql<string>`coalesce(sum(${providerCalls.capMicroUsd}),0)::text` }).from(providerCalls).where(eq(providerCalls.runId,runId));
         if(repeats>0)throw new AdmissionError('RUN_IN_PROGRESS');
-        if (overages > 0 || BigInt(total)+STAGE_LIMITS[stage].capMicroUsd > run.providerReserveMicroUsd) throw new AdmissionError("BUDGET_EXCEEDED");
-        const [call] = await tx.insert(providerCalls).values({ runId,stage,requestedModel,attemptVersion: run.attemptVersion,
-          capMicroUsd: STAGE_LIMITS[stage].capMicroUsd,status: "STARTED",startedAt: now }).returning({ id: providerCalls.id });
-        return {id:call.id,deadlineAt:run.deadlineAt,remainingMs:Math.min(STAGE_LIMITS[stage].maxDurationMs,run.deadlineAt.getTime()-now.getTime()),observedAt};
+        if (overages > 0 || BigInt(total)+limits.capMicroUsd > run.providerReserveMicroUsd) throw new AdmissionError("BUDGET_EXCEEDED");
+        const [call] = await tx.insert(providerCalls).values({ runId,stage,budgetVersion:run.accountingVersion,requestedModel,attemptVersion: run.attemptVersion,
+          capMicroUsd: limits.capMicroUsd,status: "STARTED",startedAt: now }).returning({ id: providerCalls.id });
+        return {id:call.id,deadlineAt:run.deadlineAt,remainingMs:Math.min(limits.maxDurationMs,run.deadlineAt.getTime()-now.getTime()),observedAt};
       });
       recordProviderObservation({providerCallId:claim.id,providerStage:stage,modelId:/^[a-z0-9-]+\/[A-Za-z0-9._:-]+$/u.test(requestedModel)?requestedModel:undefined,outcome:"UNKNOWN",costState:"UNKNOWN",inputTokens:null,outputTokens:null,searchCredits:null},true);
       return claim;
     },
-    async finish(id: string,status: "SUCCEEDED" | "UNKNOWN" | "SKIPPED",usage?: ProviderUsage,searchCredits?: 1) {
+    async finish(id: string,status: "SUCCEEDED" | "UNKNOWN" | "SKIPPED",usage?: ProviderUsage,searchCredits?: 0|1) {
       // A paid result may arrive after cancellation/fencing; record its cost without authorizing continuation.
       const owned = db.select({ id: runs.id }).from(runs).innerJoin(appUsers,eq(appUsers.id,runs.userId))
         .where(and(eq(runs.id,runId),eq(appUsers.authSubject,subject)));
@@ -42,7 +43,7 @@ export function createProviderCalls(db: AdmissionDatabase,subject: string,runId:
     },
   };
 }
-export function recordSafetyProvider(calls: ReturnType<typeof createProviderCalls>,stage: "INPUT_SAFETY" | "QUERY_SAFETY" | "EVIDENCE_SAFETY" | "OUTPUT_SAFETY",provider: SafetyProvider): SafetyProvider {
+export function recordSafetyProvider(calls: ReturnType<typeof createProviderCalls>,stage: "INPUT_SAFETY" | "QUERY_SAFETY" | "QUERY_SECOND" | "EVIDENCE_SAFETY" | "OUTPUT_SAFETY",provider: SafetyProvider): SafetyProvider {
   return { modelId: provider.modelId,usage: provider.usage,
     async classify(input,signal) {
       const claim = await calls.begin(stage,provider.modelId,signal),id=claim.id,budget=providerDeadline(claim,signal);
@@ -58,13 +59,13 @@ export function recordSafetyProvider(calls: ReturnType<typeof createProviderCall
     },
   };
 }
-export function recordSearchProvider(calls: ReturnType<typeof createProviderCalls>,provider: SearchProvider): SearchProvider {
+export function recordSearchProvider(calls: ReturnType<typeof createProviderCalls>,provider: SearchProvider,stage:"SEARCH"|"SEARCH_SECOND"="SEARCH"): SearchProvider {
   return { async search(query,options) {
     return traceStage("search",async()=>{
-    const claim = await calls.begin("SEARCH","tavily/basic",options.signal),id=claim.id,budget=providerDeadline(claim,options.signal);
+    const claim = await calls.begin(stage,"tavily/basic",options.signal),id=claim.id,budget=providerDeadline(claim,options.signal);
     try {
       if(budget.signal.aborted){await calls.finish(id,'SKIPPED',noUsage);throw new AdmissionError('DEADLINE_EXCEEDED');}
-      const response = await provider.search(query,{signal:budget.signal,deadlineAt:claim.deadlineAt});await calls.finish(id,"SUCCEEDED",undefined,response.credits);
+      const response = await provider.search(query,{...options,signal:budget.signal,deadlineAt:claim.deadlineAt});await calls.finish(id,"SUCCEEDED",undefined,response.credits);
       if(budget.signal.aborted)throw new AdmissionError('DEADLINE_EXCEEDED');return response;
     }
     catch { try { await calls.finish(id,"UNKNOWN"); } catch { /* Preserve unknown reservation. */ } throw new AdmissionError(budget.expired?"DEADLINE_EXCEEDED":options.signal.aborted?"CONFLICT":"PROVIDER_UNAVAILABLE"); }
@@ -82,4 +83,14 @@ export function recordPlannerProvider(calls:ReturnType<typeof createProviderCall
    if(budget.signal.aborted)throw new Error('Deadline');return result;
   }catch(error){try{await calls.finish(claim.id,'UNKNOWN',provider.usage?.());}catch{}throw error;}finally{budget.stop();}
  }};
+}
+export function recordExtractProvider(calls:ReturnType<typeof createProviderCalls>,provider:import('@/server/search/extract').ExtractProvider):import('@/server/search/extract').ExtractProvider{
+ return {async extract(urls,options){return traceStage('extract',async()=>{
+  const claim=await calls.begin('EXTRACT','tavily/extract-basic',options.signal),budget=providerDeadline(claim,options.signal);
+  try{
+   if(budget.signal.aborted){await calls.finish(claim.id,'SKIPPED',noUsage);throw new AdmissionError('DEADLINE_EXCEEDED');}
+   const result=await provider.extract(urls,{signal:budget.signal,deadlineAt:claim.deadlineAt});await calls.finish(claim.id,'SUCCEEDED',undefined,result.credits);
+   if(budget.signal.aborted)throw new AdmissionError('DEADLINE_EXCEEDED');return result;
+  }catch{try{await calls.finish(claim.id,'UNKNOWN');}catch{}throw new AdmissionError(budget.expired?'DEADLINE_EXCEEDED':options.signal.aborted?'CONFLICT':'PROVIDER_UNAVAILABLE');}finally{budget.stop();}
+ });}};
 }

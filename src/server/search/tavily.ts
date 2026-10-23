@@ -7,8 +7,10 @@ const responseSchema = z.object({ results: z.array(resultSchema).max(RETRIEVAL_L
   usage: z.object({ credits: z.literal(1) }) });
 export type SearchResult = z.infer<typeof resultSchema>;
 export type SearchResponse = { results: SearchResult[]; credits: 1 };
-export interface SearchProvider { search(query: unknown, options: RetrievalOptions): Promise<SearchResponse> }
-async function readResponse(response: Response, signal: AbortSignal) {
+export const searchFiltersSchema=z.strictObject({freshness:z.enum(["ANY","RECENT","SPECIFIC_RANGE"]),startDate:z.iso.date().nullable(),endDate:z.iso.date().nullable(),preferredDomains:z.array(z.string().regex(/^[a-z0-9.-]+$/u)).max(3)});
+export type SearchOptions=RetrievalOptions&{filters?:z.infer<typeof searchFiltersSchema>};
+export interface SearchProvider { search(query: unknown, options: SearchOptions): Promise<SearchResponse> }
+export async function readSearchResponse(response: Response, signal: AbortSignal) {
   const reader = response.body?.getReader();
   if (!reader) throw new RetrievalError();
   const chunks: Uint8Array[] = []; let length = 0;
@@ -35,11 +37,14 @@ export function createTavilySearch(apiKey: string, request: typeof fetch = fetch
     async search(query,options) {
       const parsed = searchQuerySchema.safeParse(query);
       if (!parsed.success) throw new RetrievalError("INVALID_INPUT");
+      const filters=options.filters?searchFiltersSchema.parse(options.filters):undefined;
+      if(filters&&(filters.freshness==='SPECIFIC_RANGE'?(!filters.startDate||!filters.endDate||filters.startDate>filters.endDate):filters.startDate!==null||filters.endDate!==null))throw new RetrievalError('INVALID_INPUT');
       return boundedSearch(options,async(signal)=>{
         const response = await request("https://api.tavily.com/search",{
           method: "POST",headers: { Authorization: `Bearer ${apiKey}`,"Content-Type": "application/json" },
           redirect: "error",credentials: "omit",cache: "no-store",signal,
           body: JSON.stringify({ query: parsed.data,topic: "general",search_depth: "basic",max_results: 5,chunks_per_source: 3,
+            ...(filters?{include_published_date:true,...(filters.freshness==='RECENT'?{time_range:'month'}:{}),...(filters.freshness==='SPECIFIC_RANGE'?{start_date:filters.startDate,end_date:filters.endDate,filter_by_published_date:true}:{}),...(filters.preferredDomains.length?{include_domains:filters.preferredDomains,include_domains_mode:'prefer'}:{})}:{}),
             auto_parameters: false,include_answer: false,include_raw_content: false,include_images: false,
             include_favicon: false,include_usage: true }),
         });
@@ -47,7 +52,7 @@ export function createTavilySearch(apiKey: string, request: typeof fetch = fetch
         if (!response.ok || response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
           void response.body?.cancel().catch(()=>undefined); throw new RetrievalError();
         }
-        const decoded = responseSchema.parse(await readResponse(response,signal));
+        const decoded = responseSchema.parse(await readSearchResponse(response,signal));
         // Do not retain the provider's echoed query, answer, images or diagnostic prose.
         return { results: decoded.results,credits: decoded.usage.credits };
       });

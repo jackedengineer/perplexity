@@ -79,16 +79,16 @@ WITH observed AS (
    OR p.cost_micro_usd<c.cost_micro_usd)::integer AS unknown_calls,
   count(*) FILTER (WHERE p.cost_micro_usd<c.cost_micro_usd OR greatest(c.cost_micro_usd,p.cost_micro_usd)>c.cap_micro_usd)::integer AS anomalies,
   sum(c.input_tokens)::integer AS input_tokens,sum(c.output_tokens)::integer AS output_tokens,
-  CASE WHEN count(*) FILTER (WHERE c.stage='SEARCH' AND c.status<>'SKIPPED' AND c.search_credits IS NULL)>0 THEN NULL
-   ELSE coalesce(sum(c.search_credits) FILTER (WHERE c.stage='SEARCH' AND c.status<>'SKIPPED'),0)::integer END AS search_credits,
-  count(*) FILTER (WHERE c.stage='SEARCH' AND c.status<>'SKIPPED' AND c.search_credits IS NULL)::integer AS unknown_search_credits
+  CASE WHEN count(*) FILTER (WHERE c.stage IN ('SEARCH','SEARCH_SECOND','EXTRACT') AND c.status<>'SKIPPED' AND c.search_credits IS NULL)>0 THEN NULL
+   ELSE coalesce(sum(c.search_credits) FILTER (WHERE c.stage IN ('SEARCH','SEARCH_SECOND','EXTRACT') AND c.status<>'SKIPPED'),0)::integer END AS search_credits,
+  count(*) FILTER (WHERE c.stage IN ('SEARCH','SEARCH_SECOND','EXTRACT') AND c.status<>'SKIPPED' AND c.search_credits IS NULL)::integer AS unknown_search_credits
  FROM provider_calls c LEFT JOIN provider_usage_resolutions p ON p.call_id=c.id
  GROUP BY c.run_id
 ), adjustments AS (
  SELECT run_id,sum(charged_micro_usd) AS charged FROM run_reconciliations GROUP BY run_id
 )
 SELECT r.id AS run_id,r.status,r.price_version,r.policy_version,r.accounting_version,
- CASE WHEN r.accounting_version<>1 THEN 'UNKNOWN_LEGACY'
+ CASE WHEN r.accounting_version NOT IN (1,2) THEN 'UNKNOWN_LEGACY'
   WHEN r.status IN ('RECEIVED','CHECKING_INPUT','PLANNING','SEARCHING','PREPARING_EVIDENCE','GENERATING','CHECKING_OUTPUT') THEN 'IN_PROGRESS'
   WHEN coalesce(o.unknown_calls,0)>0 THEN CASE WHEN coalesce(o.known,0)>0 THEN 'PARTIAL' ELSE 'UNKNOWN' END ELSE 'KNOWN' END AS cost_state,
  r.provider_reserve_micro_usd::text AS reserved_ceiling_micro_usd,
@@ -96,8 +96,8 @@ SELECT r.id AS run_id,r.status,r.price_version,r.policy_version,r.accounting_ver
  (s.known_provider_micro_usd+coalesce(a.charged,0))::text AS booked_micro_usd,
  coalesce(last_adjustment.remaining_held_micro_usd,s.held_provider_micro_usd,u.provider_reserve_micro_usd)::text AS held_micro_usd,
  s.credits_charged AS answer_credits,o.input_tokens,o.output_tokens,
- CASE WHEN r.accounting_version<>1 THEN NULL WHEN o.run_id IS NULL THEN 0 ELSE o.search_credits END AS search_credits,
- CASE WHEN r.accounting_version<>1 THEN NULL ELSE coalesce(o.unknown_search_credits,0) END AS unknown_search_credits
+ CASE WHEN r.accounting_version NOT IN (1,2) THEN NULL WHEN o.run_id IS NULL THEN 0 ELSE o.search_credits END AS search_credits,
+ CASE WHEN r.accounting_version NOT IN (1,2) THEN NULL ELSE coalesce(o.unknown_search_credits,0) END AS unknown_search_credits
 FROM runs r JOIN usage_reservations u ON u.run_id=r.id
 LEFT JOIN observed o ON o.run_id=r.id LEFT JOIN run_settlements s ON s.run_id=r.id
 LEFT JOIN adjustments a ON a.run_id=r.id

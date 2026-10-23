@@ -11,7 +11,7 @@ import type { AnswerProvider } from "@/server/ai/answer";
 import type { SafetyProvider } from "@/server/safety/provider";
 import type { SearchProvider } from "@/server/search/tavily";
 import { createMessageAcceptance } from "./accept-message";
-import { createProviderCalls,recordPlannerProvider,recordSafetyProvider,recordSearchProvider } from "./provider-calls";
+import { createProviderCalls,recordPlannerProvider,recordExtractProvider,recordSafetyProvider,recordSearchProvider } from "./provider-calls";
 import { createInputGate } from "@/server/safety/input";
 import { createEvidenceGate } from "@/server/safety/evidence";
 import { createRetrieval } from "@/server/search/retrieve";
@@ -23,7 +23,7 @@ import type {PlannerProvider} from '@/server/ai/planner-provider';
 import {planRun} from './plan';
 import {clarifyRun} from './clarify';
 type Admitted = Exclude<AdmissionResult,{kind: "DENIED"}>["run"];
-export type ExecutionProviders = { planner:PlannerProvider;input: SafetyProvider;query: SafetyProvider;evidence: SafetyProvider;output: SafetyProvider;answer: AnswerProvider;search: SearchProvider };
+export type ExecutionProviders = { extract?:import("@/server/search/extract").ExtractProvider;planner:PlannerProvider;input: SafetyProvider;query: SafetyProvider;evidence: SafetyProvider;output: SafetyProvider;answer: AnswerProvider;search: SearchProvider };
 export function createRunExecution(db: AdmissionDatabase,keys: unknown,providers: ExecutionProviders) {
   return { async execute(identity: ChatIdentity,run: Admitted,input: SubmitQuery,signal: AbortSignal,onStage: (stage: PublicStage)=>void) {
     bindRunTelemetry({runId:run.id});
@@ -51,7 +51,7 @@ export function createRunExecution(db: AdmissionDatabase,keys: unknown,providers
         onStage('SAVING_ANSWER');return {kind:'COMPLETED'} as const;
       }
       onStage("SEARCHING");
-      const retrieval = createRetrieval(db,{ modelId: providers.query.modelId,search: recordSearchProvider(calls,providers.search),
+      const retrieval = createRetrieval(db,{...(providers.extract?{extract:recordExtractProvider(calls,providers.extract)}:{}),searchSecond:recordSearchProvider(calls,providers.search,"SEARCH_SECOND"),querySecondGate:createInputGate(recordSafetyProvider(calls,"QUERY_SECOND",providers.query),"safety.query"),modelId: providers.query.modelId,search: recordSearchProvider(calls,providers.search),
         queryGate: createInputGate(recordSafetyProvider(calls,"QUERY_SAFETY",providers.query),"safety.query"),evidenceGate: createEvidenceGate(recordSafetyProvider(calls,"EVIDENCE_SAFETY",providers.evidence)) });
       const retrieved = await traceStage("retrieval",()=>retrieval.retrieve(subject,run.id,signal));
       if (retrieved.kind !== "READY" && retrieved.kind !== "NO_EVIDENCE") throw new AdmissionError(retrieved.kind === "DENIED" ? retrieved.code : "RUN_IN_PROGRESS");

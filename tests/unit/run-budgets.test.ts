@@ -19,7 +19,7 @@ it('propagates caller cancellation and always clears the stage timer',()=>{
  incoming.abort('PRIVATE REASON');expect(budget.signal.aborted).toBe(true);expect(String(budget.signal.reason)).not.toContain('PRIVATE');budget.stop();expect(vi.getTimerCount()).toBe(0);
 });
 it('bounds the single-attempt FAST profile within its reserved monetary envelope',()=>{
- expect(Object.values(STAGE_LIMITS).reduce((sum,s)=>sum+s.capMicroUsd,0n)).toBe(50000n);
+ expect(Object.values(STAGE_LIMITS).reduce((sum,s)=>sum+s.capMicroUsd,0n)).toBe(49750n);
  expect(Object.values(STAGE_LIMITS).every(s=>s.maxDurationMs>0&&s.maxDurationMs<=12000)).toBe(true);
 });
 it('distinguishes its own expiry from caller cancellation even if a provider ignores abort',async()=>{

@@ -18,7 +18,7 @@ import type {TelemetryEvent} from '@/server/telemetry/contracts';
 const pg=new PGlite(),db=drizzle(pg,{schema});
 let person:Awaited<ReturnType<typeof seedCompletion>>;
 beforeAll(async()=>{const journal=JSON.parse(await readFile('drizzle/meta/_journal.json','utf8'));for(const e of journal.entries)await pg.exec(await readFile(`drizzle/${e.tag}.sql`,'utf8'));});
-beforeEach(async()=>{await db.delete(schema.user);await db.delete(schema.operatorUsageBuckets);person=await seedCompletion(db);});
+beforeEach(async()=>{await db.delete(schema.user);await db.delete(schema.operatorUsageBuckets);person=await seedCompletion(db,50000n,"Why do rainbows form?",2);});
 afterAll(()=>pg.close());
 function providers():ExecutionProviders{return {planner:fakePlanner(),input:fakeSafety(),query:fakeSafety(),evidence:fakeSafety(),output:fakeSafety(),
  answer:{modelId:'test/answer',generate:async()=>({text:'PRIVATE_DRAFT Light bends in droplets [S1].',usage:knownUsage})},
@@ -36,7 +36,7 @@ it('captures every paid stage and safety decision without question, draft, evide
   expect(events.some(e=>e.stage===stage&&e.phase==='END'&&Number.isFinite(e.durationMs))).toBe(true);
  }
  const summary=events.find(e=>e.event==='research.run_usage');
- expect(summary).toMatchObject({requestId,runId:person.runId,policyVersion:'v1',catalogVersion:'fast-v1',priceVersion:'standard-v1',entitlementVersion:'test-v1',accountingVersion:1,
+ expect(summary).toMatchObject({requestId,runId:person.runId,policyVersion:'v1',catalogVersion:'fast-v1',priceVersion:'standard-v1',entitlementVersion:'test-v1',accountingVersion:2,
   knownCostMicroUsd:'600',costState:'PARTIAL',unknownCalls:1,inputTokens:60,outputTokens:30,searchCredits:1,estimatedUpperBoundMicroUsd:'50000',estimateKind:'RESERVATION_CEILING'});
  expect(JSON.stringify(events)).not.toMatch(/PRIVATE_|Why do rainbows|weather.gov|synthetic-subject|payloadHmac|keys|sessionId/);
 });
@@ -84,7 +84,7 @@ it('operator cost totals include reconciled receipts once and reveal missing set
  const reports=await operatorReports();
  expect(reports.costs[0]).toMatchObject({known_micro_usd:'900',booked_micro_usd:'900',held_micro_usd:'0',unknown_calls:0});
  expect(reports.reservations).toHaveLength(0);
- const other=await seedCompletion(db);
+ const other=await seedCompletion(db,50000n,"Why do rainbows form?",2);
  await db.update(schema.runs).set({createdAt:new Date(Date.now()-120000),deadlineAt:new Date(Date.now()-1000)}).where(eq(schema.runs.id,other.runId));
  expect((await operatorReports()).reservations).toEqual(expect.arrayContaining([expect.objectContaining({run_id:other.runId,reason:'EXPIRED_ACTIVE'})]));
 });

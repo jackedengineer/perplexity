@@ -3,6 +3,7 @@ import { isIP } from "node:net";
 import { evidencePackageSchema, sourceUrlSchema, type EvidencePackage } from "@/server/contracts/pipeline";
 import { questionTextSchema } from "@/server/contracts/chat";
 import { inspectInput } from "@/server/safety/deterministic";
+import type {RankedResult} from "./rank";
 import type { SearchResult } from "./tavily";
 import { RETRIEVAL_LIMITS } from "./limits";
 
@@ -31,7 +32,7 @@ function excerpt(text: string) {
   for (const character of text) { if (result.length+character.length > RETRIEVAL_LIMITS.passageCharacters) break; result += character; }
   return result;
 }
-export function buildEvidence(runId: string, results: SearchResult[], now: Date): EvidencePackage {
+export function buildEvidence(runId: string, results: (SearchResult&Pick<RankedResult,'contentKind'|'retrievedAt'>)[], now: Date): EvidencePackage {
   const evidence: EvidencePackage = { runId,sources: [],passages: [] }, seen = new Set<string>();
   for (const result of results.slice(0,RETRIEVAL_LIMITS.results)) {
     const url = canonicalSourceUrl(result.url);
@@ -41,8 +42,8 @@ export function buildEvidence(runId: string, results: SearchResult[], now: Date)
     const sourceId = `S${evidence.sources.length+1}`;
     const published = result.published_date ? Date.parse(result.published_date) : NaN;
     const source = { sourceId,url,title: result.title,publishedAt: Number.isFinite(published) ? new Date(published).toISOString() : null,
-      retrievedAt: now.toISOString(),sourceRank: evidence.sources.length+1 };
-    const text = excerpt(result.content), passage = { passageId: randomUUID(),sourceId,text,contentKind: "SEARCH_PASSAGE" as const,contentHash: hashPassage(text) };
+      retrievedAt: result.retrievedAt??now.toISOString(),sourceRank: evidence.sources.length+1 };
+    const text = excerpt(result.content), passage = { passageId: randomUUID(),sourceId,text,contentKind: result.contentKind??"SEARCH_PASSAGE" as const,contentHash: hashPassage(text) };
     const candidate = { runId,sources: [...evidence.sources,source],passages: [...evidence.passages,passage] };
     if (Buffer.byteLength(JSON.stringify(candidate),"utf8") > RETRIEVAL_LIMITS.evidenceBytes) continue;
     evidence.sources.push(source); evidence.passages.push(passage); seen.add(url);

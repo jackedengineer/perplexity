@@ -9,6 +9,7 @@ import { createAnswerProvider } from "@/server/ai/answer";
 import { createOpenRouterSafetyProvider } from "@/server/safety/openrouter";
 import { EVIDENCE_SAFETY_PROMPT } from "@/server/safety/evidence";
 import { OUTPUT_SAFETY_PROMPT } from "@/server/safety/output";
+import {createTavilyExtract} from "@/server/search/extract";
 import { createTavilySearch } from "@/server/search/tavily";
 import { createRunAdmission } from "@/server/runs/admit";
 import { parseAdmissionEnvironment,parseAdmissionPolicyEnvironment } from "@/server/runs/env";
@@ -28,7 +29,7 @@ export const chatHttp = createChatHttp({
       const searchKey=z.string().min(16).max(512).regex(/^[A-Za-z0-9._-]+$/u).safeParse(process.env.TAVILY_API_KEY);
       if(!planner||!safety||!answer||!searchKey.success)throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
       return createRunExecution(db,keys,{
-        planner:createPlannerProvider(planner),input:createOpenRouterSafetyProvider(safety),query:createOpenRouterSafetyProvider(safety),
+        extract:createTavilyExtract(searchKey.data),planner:createPlannerProvider(planner),input:createOpenRouterSafetyProvider(safety),query:createOpenRouterSafetyProvider(safety),
         evidence:createOpenRouterSafetyProvider(safety,fetch,EVIDENCE_SAFETY_PROMPT),output:createOpenRouterSafetyProvider(safety,fetch,OUTPUT_SAFETY_PROMPT),
         answer:createAnswerProvider(answer),search:createTavilySearch(searchKey.data),
       });
