@@ -1,12 +1,87 @@
 # OpenRouter live verification — 23 October 2026
 
-**Release decision: HOLD.** Funding is available and a real browser research
-request completes, but the live sample does not meet the existing launch gate.
+**Release decision: HOLD.** The classifier and citation fixes pass the complete
+technical rerun below. Independent human review, clarification handling and the
+remaining operational/deployment gates still prevent release acceptance.
 No Vercel deployment or public rollout was performed. This record supersedes the
 older statement that all paid testing is pending; independent human quality and
 policy-label review remain pending.
 
-## Configuration and spending
+## Repaired candidate — immutable full rerun
+
+Revision `b101d4f` was committed before the run and verified unchanged with a clean
+tracked tree afterward. The corpus hash is unchanged. Safety now uses
+`mistralai/mistral-small-3.2-24b-instruct` on the explicit `deepinfra/fp8` ZDR
+endpoint (0.075 / 0.20 USD per million input/output tokens); answers retain
+`openai/gpt-4.1-mini` on Azure. Routing/privacy/price caps, token limits, deadlines,
+no fallback and no retries remain enforced. The candidate endpoint was checked
+against OpenRouter’s public model-endpoint and ZDR catalogs before dispatch.
+
+The classifier returns one `classification` enum plus policy version instead of
+independently generating decision, categories and retryability. The server maps
+that atomic value to the unchanged policy-v1 verdict contract. Unknown, legacy,
+filtered, truncated and malformed output still fails closed. Input prompt v3
+clarifies that current first-person self-harm distress selects fixed supportive
+content; evidence/output prompts are v2. Verified non-reasoning models omit
+unsupported reasoning controls without permitting provider reasoning elsewhere.
+
+Private answer prompt v2 uses AI SDK `Output.object` with bounded paragraphs and
+source-ID enums drawn from the selected evidence. The server renders markers
+from those IDs, then applies the existing citation/Markdown and whole-response
+safety gates. It never guesses missing citations or exposes an unapproved draft.
+Billed receipts are captured before SDK schema rejection as well as on success.
+
+| Full rerun measurement | Result |
+| --- | --- |
+| Critical offline boundaries | 66 / 66 pass |
+| Semantic safety | 72 / 72 observed; 36 expected ALLOW and 36 expected stops correct |
+| Classifier outages / observed false refusals / missed stops | 0 / 72; 0 / 36; 0 / 36 |
+| Answer coverage / syntactically invalid citations | 13 / 13; 0 |
+| No-evidence disposition | 1 / 1 |
+| Clarification disposition | 0 / 2; planner T12 remains unimplemented |
+| Independent reviewed labels/completions/claims | 0; pending |
+| Semantic latency | p50 1,256 ms; p95 2,333 ms; n=72 |
+| Answer-case latency | p50 3,325 ms; p95 7,793 ms; n=16 including non-answer cases |
+| Recorded model cost | 3,754 + 3,672 = 7,426 micro-USD; no missing receipts |
+
+The unchanged scorer reports **PENDING**, not PASS: syntactically valid source
+IDs do not establish factual support. No sampled quality or harmful-completion
+rate is claimed without independent review. This finite corpus does not prove
+universal model safety or future provider availability. All 99 HTTP requests
+returned 200, with no selected retries replacing failures. The preceding second
+run is retained as diagnostic only because source files changed while it finished;
+its clean-start manifest is not immutable-execution evidence. The original first
+run below is preserved, rather than rewritten as a success.
+
+The previously failing MDN reader question was resubmitted through the real
+browser, Tavily and the repaired models. All four classifiers allowed it, the
+structured draft validated, and four source URLs rendered and survived reload.
+The browser console had no warnings/errors. First public progress arrived at
+6,043 ms and approved delivery at 32,102 ms; the run execution took 30,091 ms.
+This single observation is not an end-to-end p95. Database verification found
+six provider calls, one settlement, five user credits charged, 1,369 micro-USD
+known model cost and one Tavily credit. The remaining 48,631 micro-USD stays held
+because Tavily USD cost is unknown. Reload did not dispatch another provider call.
+
+Authenticated key metadata at 08:23:14 UTC showed **$0.02948 total used**,
+**$0.97052 remaining**, a **$1 non-resetting cap**, and the unchanged expiry.
+The browser account balance was $4.97; auto-top-up remained inactive. Raw results
+are local-only in `.artifacts/live-openrouter/third-run/`, with browser accounting,
+screenshots and key metadata alongside. No raw corpus, answers or credentials
+are published as CI artifacts.
+
+Regression verification: lint/types, 526 tests in 55 files and the production build
+pass. Eight public and eight guarded desktop/mobile browser cases pass, including
+approved citations/reload/ownership, input/output refusal and search failure.
+The guarded regressions use provider doubles, separate from the paid observation.
+Eighteen fresh private navigation profiles pass the unchanged 2,500 ms LCP,
+0.1 CLS and 200,000-byte JS budgets: max LCP 712 ms, CLS 0 and JS 193,719 bytes.
+Twenty metadata API samples have median/max ms: list 221/225, detail 295/296,
+history 296/298, missing run 238/255. These are local lab timings with development
+Neon, not field INP or hosted performance. The production audit still reports
+one moderate tooling advisory and no high/critical advisories.
+
+## Original candidate configuration and spending
 
 The browser showed $4.99 available after a $5 credit purchase. Auto-top-up was
 inactive. The dedicated launch key had been changed to $2; it was reduced to the

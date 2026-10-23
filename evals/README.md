@@ -1,9 +1,9 @@
 # Answer quality and safety evaluation (T21)
 
 This is an offline evaluation harness, not evidence that a model is safe or that
-its factual answers meet launch criteria. The first authorized paid sample is
+its factual answers meet launch criteria. The authorized paid samples are
 recorded in [live verification](../docs/openrouter-live-verification.md); it remains
-below the launch gate, with independent human review pending. The application
+below the full launch gate, with independent human review and clarification handling pending. The application
 still enforces all four safety boundaries and holds
 private drafts until citation validation, output approval and atomic persistence.
 
