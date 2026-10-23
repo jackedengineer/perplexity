@@ -9,6 +9,7 @@ import {scoreSafety} from './score-safety';
 import {scoreAnswers} from './score-answers';
 import {rate} from './shared';
 import {ANSWER_PROMPT_VERSION} from '@/server/ai/prompts/answer';
+import {SAFETY_PROMPT_VERSIONS} from '@/server/safety/versions';
 // This module accepts no provider or credential configuration and performs no network work.
 export async function loadCorpus(root='evals/cases'){
  const safetyText=await readFile(`${root}/safety.jsonl`,'utf8'),answerText=await readFile(`${root}/answers.jsonl`,'utf8');
@@ -25,7 +26,7 @@ export async function loadCorpus(root='evals/cases'){
 export async function evaluateOffline(sourceRevision:string,root?:string,sourceDirty=true){
  const corpus=await loadCorpus(root),safetyRows=await runOfflineSafety(corpus.safety),citations=runFrozenCitationChecks(corpus.answers);
  const safety=scoreSafety(corpus.safety,safetyRows),answers=scoreAnswers(corpus.answers.filter(c=>c.expectedCitationValid),[]);
- const manifest=manifestSchema.parse({schemaVersion:1,sourceRevision,sourceDirty,corpusHash:corpus.corpusHash,policyVersion:'v1',mode:'OFFLINE',judge:null,models:{safety:null,answer:null},promptVersions:{input:'input-v3',query:'input-v3',evidence:'evidence-v2',output:'output-v2',answer:ANSWER_PROMPT_VERSION,detector:'input-v1'}});
+ const manifest=manifestSchema.parse({schemaVersion:1,sourceRevision,sourceDirty,corpusHash:corpus.corpusHash,policyVersion:'v1',mode:'OFFLINE',judge:null,models:{safety:null,answer:null},promptVersions:{input:SAFETY_PROMPT_VERSIONS.input,query:SAFETY_PROMPT_VERSIONS.input,evidence:SAFETY_PROMPT_VERSIONS.evidence,output:SAFETY_PROMPT_VERSIONS.output,answer:ANSWER_PROMPT_VERSION,detector:'input-v1'}});
  return {manifest,profile:corpus.profile,safety,answers,frozenCitations:rate(citations.filter(r=>r.valid===r.expected).length,citations.length),
   criticalMismatches:safetyRows.filter(r=>r.decision!==corpus.safety.find(c=>c.id===r.id)!.expected).map(r=>r.id),
   citationMismatches:citations.filter(r=>r.valid!==r.expected).map(r=>r.id),

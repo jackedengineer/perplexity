@@ -42,7 +42,7 @@ it("uses one isolated, tool-free, nonstreaming strict-schema request with fixed 
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
 it("maps consistent BLOCK/UNAVAILABLE wire objects and discards reasoning fields", async () => {
-  for (const verdict of [{ classification: "FRAUD", policyVersion: "v1" },
+  for (const verdict of [{ classification: ["FRAUD"], policyVersion: "v1" },
     { classification: "UNAVAILABLE", policyVersion: "v1" }]) {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json(envelope(JSON.stringify(verdict),"stop",{ reasoning: "PRIVATE REASONING" })));
     const result = await createOpenRouterSafetyProvider(config(),fetcher).classify(input,new AbortController().signal);
@@ -115,6 +115,21 @@ it("rejects ambiguous legacy verdicts instead of repairing ALLOW/category contra
 });
 
 it.each(safetyCategorySchema.options)("maps the single %s category to a policy stop",async(category)=>{
- const fetcher=vi.fn<typeof fetch>().mockResolvedValue(json(envelope(JSON.stringify({classification:category,policyVersion:"v1"}))));
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(json(envelope(JSON.stringify({classification:[category],policyVersion:"v1"}))));
  expect(await createOpenRouterSafetyProvider(config(),fetcher).classify(input,new AbortController().signal)).toEqual({decision:"BLOCK",categoryCodes:[category],policyVersion:"v1"});
+});
+it('preserves every overlapping stop category so fixed support precedence stays server-owned',async()=>{
+ const {resolveSafetyDecision}=await import('@/server/safety/responses');
+ for(const categories of [['VIOLENCE','SELF_HARM_DISTRESS'],['FRAUD','ACCIDENTAL_SECRET'],['SELF_HARM_INSTRUCTIONS','PRIVATE_DATA','VIOLENCE']]){
+  const fetcher=vi.fn<typeof fetch>().mockResolvedValue(json(envelope(JSON.stringify({classification:categories,policyVersion:'v1'}))));
+  const verdict=await createOpenRouterSafetyProvider(config(),fetcher).classify(input,new AbortController().signal);
+  expect(verdict).toEqual({decision:'BLOCK',categoryCodes:categories,policyVersion:'v1'});
+  expect(resolveSafetyDecision(verdict)).toMatchObject({response:{code:categories.includes('ACCIDENTAL_SECRET')?'REDACT_SECRET':'SUPPORT'}});
+ }
+});
+it('rejects empty, duplicate, mixed ALLOW/category and legacy scalar-category verdicts',async()=>{
+ for(const classification of [[],['FRAUD','FRAUD'],['ALLOW','FRAUD'],['UNAVAILABLE','VIOLENCE'],'FRAUD']){
+  const fetcher=vi.fn<typeof fetch>().mockResolvedValue(json(envelope(JSON.stringify({classification,policyVersion:'v1'}))));
+  await expect(createOpenRouterSafetyProvider(config(),fetcher).classify(input,new AbortController().signal)).rejects.toMatchObject({reason:'MALFORMED_OUTPUT'});
+ }
 });

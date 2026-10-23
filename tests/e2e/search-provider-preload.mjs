@@ -35,7 +35,7 @@ globalThis.fetch=async(input,init)=>{
     if(init?.signal?.aborted)abort();else init?.signal?.addEventListener("abort",abort,{once:true});
   });
   const blocked=scenario==="input-block"||(output&&scenario==="output-block");
-  const text=body.model==="test/answer"?(scenario==="t18-cancel"?"T18_PRIVATE_LATE_DRAFT [S1].":scenario==="output-block"?"UNREVIEWED_PRIVATE_DRAFT [S1].":scenario==="invalid-citation"?"UNREVIEWED_PRIVATE_DRAFT [S9].":answer):JSON.stringify({classification:blocked?"FRAUD":"ALLOW",policyVersion:"v1"});
+  const text=body.model==="test/answer"?(scenario==="t18-cancel"?"T18_PRIVATE_LATE_DRAFT [S1].":scenario==="output-block"?"UNREVIEWED_PRIVATE_DRAFT [S1].":scenario==="invalid-citation"?"UNREVIEWED_PRIVATE_DRAFT [S9].":answer):JSON.stringify({classification:blocked?["FRAUD"]:"ALLOW",policyVersion:"v1"});
   return Response.json({id:"synthetic-t11",model:body.model,created:1,choices:[{index:0,finish_reason:"stop",message:{role:"assistant",content:body.model==="test/answer"?JSON.stringify({paragraphs:text.split("\n\n").map(text=>({text:text.replace(/\[S[1-9]\]/gu,""),sourceIds:[...new Set([...text.matchAll(/\[(S[1-9])\]/gu)].map(match=>match[1]))].length?[...new Set([...text.matchAll(/\[(S[1-9])\]/gu)].map(match=>match[1]))]:["S1"]}))}):text,reasoning:"PRIVATE_REASONING_MUST_NOT_LEAK"}}],usage:{prompt_tokens:100,completion_tokens:100,total_tokens:200,cost:.0001}});
 };
 

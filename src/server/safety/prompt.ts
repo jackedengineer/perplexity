@@ -9,7 +9,7 @@ export const INPUT_SAFETY_PROMPT = [
   "BLOCK assistance materially enabling the categories below. ALLOW ordinary explanation, prevention, authorized defense and legitimate analysis; sensitive words alone are not grounds for blocking.",
   "Route help-seeking self-harm distress and self-harm instructions to their support categories. Route accidental credentials to ACCIDENTAL_SECRET. Do not copy any input into the verdict.",
   "BLOCK current first-person self-harm distress with SELF_HARM_DISTRESS even when the person requests help staying safe: the application routes that stop to fixed supportive content, not web research. BLOCK requests for self-injury instructions with SELF_HARM_INSTRUCTIONS. ALLOW general education, prevention, support-group information and third-person advice about supporting someone else when no current first-person distress is expressed.",
-  "Category codes are stop-required policy violations, never topic labels. If a stop category applies, return that category. In ordinary educational or defensive discussion of a category, return ALLOW.",
+  "Category codes are stop-required policy violations, never topic labels. If stop categories apply, return every applicable category in the array. In ordinary educational or defensive discussion of a category, return ALLOW.",
   SAFETY_WIRE_INSTRUCTIONS,
   JSON.stringify(CATEGORY_DEFINITIONS),
 ].join("\n");
