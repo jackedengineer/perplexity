@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { expect,it,vi } from "vitest";
+import { createOpenRouterSafetyProvider,SAFETY_REQUEST_BYTES } from "@/server/safety/openrouter";
+import { createInputGate } from "@/server/safety/input";
+import { OUTPUT_SAFETY_PROMPT } from "@/server/safety/output";
 import { buildEvidence } from "@/server/search/evidence";
 import { createReleaseGate,isApprovedResponse,NO_EVIDENCE_TEXT } from "@/server/safety/release";
 const allow = { decision: "ALLOW",categoryCodes: [],policyVersion: "v1" };
@@ -136,4 +139,20 @@ it("provider diagnostics cannot escape through the output failure result",async(
   const provider = model();provider.classify.mockRejectedValue(new Error("PRIVATE answer and key"));
   const result = await createReleaseGate(provider).approve(input(),options());
   expect(result.kind).toBe("DENIED");expect(JSON.stringify(result)).not.toContain("PRIVATE");
+});
+
+it.each(['ALLOW','BLOCK'] as const)('inspects all five long source records within the cost ceiling before %s',async decision=>{
+ const value=input();value.question='Explain light. '.repeat(266);
+ value.evidence=buildEvidence(value.runId,Array.from({length:5},(_,i)=>({title:`Source ${i} `+'t'.repeat(200),url:`https://example.org/${i}/`+'u'.repeat(850),content:'Light is refracted.',score:.9})),new Date());
+ expect(value.evidence.sources).toHaveLength(5);expect(Buffer.byteLength(JSON.stringify(value.evidence))).toBeLessThanOrEqual(7500);
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(Response.json({choices:[{finish_reason:'stop',message:{role:'assistant',content:JSON.stringify({classification:decision==='ALLOW'?'ALLOW':['FRAUD'],policyVersion:'v1'})}}]}));
+ const provider=createOpenRouterSafetyProvider({apiKey:'synthetic-key-only',modelId:'test/output',provider:'test-provider'},fetcher,OUTPUT_SAFETY_PROMPT);
+ const result=await createReleaseGate(provider).approve(value,options());expect(result.kind).toBe(decision==='ALLOW'?'APPROVED':'DENIED');
+ expect(fetcher).toHaveBeenCalledOnce();const wire=String(fetcher.mock.calls[0][1]?.body),packet=JSON.parse(JSON.parse(wire).messages[1].content);
+ expect(Buffer.byteLength(wire)).toBeLessThanOrEqual(SAFETY_REQUEST_BYTES);expect(Math.ceil(Buffer.byteLength(wire)*.1+384*.4)).toBeLessThanOrEqual(2250);
+ expect(JSON.parse(packet.context[0].text).originalQuestion).toBe(value.question);
+ expect(wire).not.toMatch(/passageIds|contentHashes/);
+ expect((await createInputGate(model()).evaluate(packet,options())).reason).toBe('INVALID_INPUT');
+ for(const source of value.evidence.sources)expect(packet.context.some((turn:{text:string})=>{const supplied=JSON.parse(turn.text);return supplied.url===source.url&&supplied.title===source.title;})).toBe(true);
+ if(result.kind==='APPROVED'){expect(result.response.sources).toHaveLength(1);expect(result.response.additionalSources).toHaveLength(4);}
 });

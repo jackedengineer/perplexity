@@ -32,7 +32,8 @@ export function createReleaseGate(provider: SafetyProvider | undefined) {
       const additionalSources=input.evidence.sources.filter(s=>!sources.some(c=>c.sourceId===s.sourceId)).map((s,i)=>visibleSourceFor(input.evidence,s.sourceId,sources.length+i+1));
       const verdict = await gate.evaluate({ text: input.markdown,context: [
         { role: "USER",text: JSON.stringify({ originalQuestion: input.question,responseKind:input.kind }) },
-        ...[...sources,...additionalSources].map(source=>({ role: "ASSISTANT",text: JSON.stringify(source) })),
+        ...[...sources,...additionalSources].map(source=>({ role: "ASSISTANT",text: JSON.stringify({sourceId:source.sourceId,number:source.number,url:source.url,title:source.title,
+          publishedAt:source.publishedAt,retrievedAt:source.retrievedAt,contentKind:source.contentKind,supportStatus:source.supportStatus}) })),
       ] },options);
       const decision = resolveSafetyDecision(verdict.verdict);
       if (decision.decision !== "ALLOW") return deny(decision.decision === "BLOCK" ? "OUTPUT_BLOCKED" : verdict.reason === "TIMEOUT" ? "DEADLINE_EXCEEDED" : "SAFETY_UNAVAILABLE",decision.response);
