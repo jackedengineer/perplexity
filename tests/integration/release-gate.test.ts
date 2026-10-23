@@ -47,7 +47,7 @@ it.each(["[S1](https://evil.org)", "[S1][ref]\n\n[ref]: https://evil.org", "Wate
   const provider = model(),result = await createReleaseGate(provider).approve({ ...input(),markdown },options());
   expect(result.kind).toBe("DENIED"); expect(provider.classify).not.toHaveBeenCalled();
 });
-it("numbers repeated citations by first appearance and publishes only cited sources",async()=>{
+it("numbers repeated citations by first appearance and separately approves additional sources",async()=>{
   const value = input(); value.evidence = buildEvidence(value.runId,[
     { title: "One",url: "https://example.org/one",content: "First source",score: 0.9 },
     { title: "Two",url: "https://example.org/two",content: "Second source",score: 0.8 },
@@ -55,7 +55,7 @@ it("numbers repeated citations by first appearance and publishes only cited sour
   ],new Date()); value.markdown = "Second [S2], first [S1], second again [S2].";
   const result = await createReleaseGate(model()).approve(value,options()); if (result.kind !== "APPROVED") throw new Error("Expected approval");
   expect(result.response.sources.map(s=>[s.sourceId,s.number])).toEqual([["S2",1],["S1",2]]);
-  expect(JSON.stringify(result.response)).not.toContain("Unused");
+  expect(result.response.additionalSources).toMatchObject([{sourceId:"S3",title:"Unused"}]);
 });
 it("bounds clarification text and rejects unsafe extra fields before classification",async()=>{
   const provider = model(),value = input();value.evidence.sources=[];value.evidence.passages=[];

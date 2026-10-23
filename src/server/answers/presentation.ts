@@ -8,10 +8,11 @@ const containers = new Set(["paragraph","heading","strong","emphasis","blockquot
 // Compile once on the server; the client needs no Markdown parser or HTML interpreter.
 export function presentAnswer(value: unknown) {
   const payload = approvedPayloadSchema.parse(value);
-  const sources = payload.sources.map(source=>{
+  function displaySource(source:(typeof payload.sources)[number]){
     if (canonicalSourceUrl(source.url) !== source.url || !safeEvidenceText(source.title)) throw new Error("Invalid approved source");
-    return { sourceId: source.sourceId,number: source.number,url: source.url,title: source.title,domain: new URL(source.url).hostname.replace(/^www\./u,""),supportStatus: source.supportStatus };
-  });
+    return { sourceId: source.sourceId,number: source.number,url: source.url,title: source.title,domain: new URL(source.url).hostname.replace(/^www\./u,""),supportStatus: source.supportStatus,...(source.retrievedAt?{retrievedAt:source.retrievedAt,publishedAt:source.publishedAt,contentKind:source.contentKind}:{}) };
+  }
+  const sources=payload.sources.map(displaySource),additionalSources=payload.additionalSources?.map(displaySource);
   let count = 0;
   function compile(node: MarkdownNode,depth: number): AnswerNode[] {
     if (++count > 2000 || depth > 24) throw new Error("Invalid approved document");
@@ -33,5 +34,5 @@ export function presentAnswer(value: unknown) {
       ...(node.type === "list" ? { ordered: Boolean(node.ordered),...(node.ordered&&typeof node.start==="number"&&node.start!==1?{start:node.start}:{}) } : {}),children: (node.children ?? []).flatMap(child=>compile(child,depth+1)) }];
   }
   const root = unified().use(remarkParse).parse(payload.markdown);
-  return publicAnswerView.parse({ kind: payload.kind,sources,document: root.children.flatMap(child=>compile(child,0)) });
+  return publicAnswerView.parse({ kind: payload.kind,sources,...(additionalSources?{additionalSources}:{}),document: root.children.flatMap(child=>compile(child,0)) });
 }

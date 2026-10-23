@@ -47,11 +47,11 @@ export function createFinalization(db: AdmissionDatabase) {
         const sources = await tx.select().from(runSources).where(eq(runSources.runId,run.id)).limit(6);
         const passages = await tx.select().from(sourcePassages).where(eq(sourcePassages.runId,run.id)).limit(6);
         const messageId = randomUUID(),citations = [];
-        for (const source of value.sources) {
+        for (const source of [...value.sources,...value.additionalSources??[]]) {
           const stored = sources.find(s=>s.sourceKey === source.sourceId),passage = passages.find(p=>p.id === source.passageIds[0]);
           if (!stored || !passage || stored.id !== passage.sourceId || stored.url !== source.url || stored.title !== source.title ||
-            (stored.publishedAt?.toISOString() ?? null) !== source.publishedAt || passage.contentHash !== source.contentHashes[0]) throw new AdmissionError("CONFLICT");
-          citations.push({ runId: run.id,messageId,sourceId: stored.id,passageId: passage.id,number: source.number,supportStatus: "NOT_CHECKED" });
+            (stored.publishedAt?.toISOString() ?? null) !== source.publishedAt || passage.contentHash !== source.contentHashes[0] || (source.retrievedAt!==undefined&&stored.retrievedAt.toISOString()!==source.retrievedAt) || (source.contentKind!==undefined&&source.contentKind!==passage.contentKind)) throw new AdmissionError("CONFLICT");
+          if(value.sources.some(c=>c.sourceId===source.sourceId))citations.push({ runId: run.id,messageId,sourceId: stored.id,passageId: passage.id,number: source.number,supportStatus: "NOT_CHECKED" });
         }
         await tx.insert(outputReviews).values({ runId: run.id,conversationId: conversation.id,attemptVersion: run.attemptVersion,decision: "ALLOW",policyVersion: value.policyVersion,
           messageId,bodyHash: serialized.bodyHash,payloadHash: serialized.payloadHash,payload: serialized.payload,createdAt: now });

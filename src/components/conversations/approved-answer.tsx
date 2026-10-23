@@ -73,17 +73,23 @@ export function SourcesPanel({ answer,open,onToggle }: { answer: PublicAnswer | 
     return()=>{query.removeEventListener("change",sync);window.removeEventListener("keydown",escape);dialog?.close();};
   },[open,onToggle]);
   if (!answer?.sources.length) return null;
+  const total=answer.sources.length+(answer.additionalSources?.length??0);
+  function cards(sources:PublicAnswer['sources'],cited:boolean){return sources.map(source=><a key={source.sourceId} className="source-card" href={source.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">
+    <span className="source-monogram" aria-hidden="true">{source.domain[0].toUpperCase()}</span><div><span className="source-domain">{source.domain}<span className="source-number">{cited?source.number:'Retrieved'}</span></span><h3>{source.title}</h3>
+    {source.retrievedAt&&<small className="source-evidence-meta">{source.contentKind==='EXTRACTED_PAGE'?'Page excerpt':'Search snippet'} · {source.publishedAt?`Published ${source.publishedAt.slice(0,10)}`:'Publication date unavailable'}<br/>Retrieved {source.retrievedAt.slice(0,10)}</small>}
+    </div><Icon name="external" size={13}/>
+  </a>);}
   const list=<div className="source-list">
-      {answer.sources.map(source=><a key={source.sourceId} className="source-card" href={source.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">
-        <span className="source-monogram" aria-hidden="true">{source.domain[0].toUpperCase()}</span><div><span className="source-domain">{source.domain}<span className="source-number">{source.number}</span></span><h3>{source.title}</h3></div><Icon name="external" size={13} />
-      </a>)}
-      <p className="source-support-note">Citations identify the sources used. Factual support hasn’t been independently checked.</p>
-    </div>;
+    {Boolean(answer.additionalSources?.length)&&<h3 className="source-group-title">Cited in the answer</h3>}
+    {cards(answer.sources,true)}
+    {Boolean(answer.additionalSources?.length)&&<><h3 className="source-group-title">Additional retrieved sources</h3><p className="source-support-note">Reviewed for display; these sources were not cited in the answer.</p>{cards(answer.additionalSources!,false)}</>}
+    <p className="source-support-note">Citations identify the sources used. Factual support hasn’t been independently checked.</p>
+  </div>;
   return <aside className={`answer-sources ${open ? "sources-open" : ""}`} aria-label="Answer sources">
-    <button className="sources-toggle" onClick={onToggle} aria-expanded={open} aria-controls="approved-source-list">Sources<span className="toolbar-spacer" /><span className="source-total">{answer.sources.length}</span><Icon name={open ? "down" : "chevron"} size={14} /></button>
+    <button className="sources-toggle" onClick={onToggle} aria-expanded={open} aria-controls="approved-source-list">Sources<span className="toolbar-spacer" /><span className="source-total">{total}</span><Icon name={open ? "down" : "chevron"} size={14} /></button>
     <div id="approved-source-list" className="desktop-source-list" hidden={!open}>{list}</div>
     <dialog ref={mobile} className="mobile-sources-dialog" aria-label="Answer sources" onCancel={event=>{event.preventDefault();onToggle();}} onClick={event=>{if(event.target===event.currentTarget){const box=event.currentTarget.getBoundingClientRect();if(event.clientY<box.top||event.clientY>box.bottom||event.clientX<box.left||event.clientX>box.right)onToggle();}}}>
-      <div className="mobile-sources-heading"><h2>Sources <span>{answer.sources.length}</span></h2><button className="research-icon-button" aria-label="Close sources" onClick={onToggle}><Icon name="close"/></button></div>
+      <div className="mobile-sources-heading"><h2>Sources <span>{total}</span></h2><button className="research-icon-button" aria-label="Close sources" onClick={onToggle}><Icon name="close"/></button></div>
       {list}
     </dialog>
   </aside>;

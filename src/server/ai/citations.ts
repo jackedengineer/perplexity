@@ -5,7 +5,7 @@ import { canonicalSourceUrl,validateEvidence } from "@/server/search/evidence";
 import { inspectInput } from "@/server/safety/deterministic";
 import { questionTextSchema } from "@/server/contracts/chat";
 export type VisibleSource = { sourceId: string;number: number;url: string;title: string;publishedAt: string | null;
-  passageIds: string[];contentHashes: string[];supportStatus: "NOT_CHECKED" };
+  passageIds: string[];contentHashes: string[];supportStatus: "NOT_CHECKED";retrievedAt?:string;contentKind?:"SEARCH_PASSAGE"|"EXTRACTED_PAGE" };
 type Node = { type: string;value?: string;children?: Node[] };
 const allowedNodes = new Set(["root","paragraph","text","heading","emphasis","strong","delete","blockquote","list","listItem","code","inlineCode","break","thematicBreak"]);
 export function validateCitations(markdown: string,evidence: EvidencePackage,required: boolean): VisibleSource[] {
@@ -30,11 +30,10 @@ export function validateCitations(markdown: string,evidence: EvidencePackage,req
   }
   visit(unified().use(remarkParse).parse(markdown),0);
   if ((required && ids.length === 0) || (!required && ids.length !== 0)) throw new Error("Invalid citation count");
-  return ids.map((id,index)=>{
-    const source = evidence.sources.find(s=>s.sourceId === id);
-    if (!source || canonicalSourceUrl(source.url) !== source.url) throw new Error("Unsafe source");
-    const passages = evidence.passages.filter(p=>p.sourceId === id);
-    return { sourceId: id,number: index+1,url: source.url,title: source.title,publishedAt: source.publishedAt,
-      passageIds: passages.map(p=>p.passageId),contentHashes: passages.map(p=>p.contentHash),supportStatus: "NOT_CHECKED" };
-  });
+  return ids.map((id,index)=>visibleSourceFor(evidence,id,index+1));
+}
+export function visibleSourceFor(evidence:EvidencePackage,id:string,number:number):VisibleSource{
+ const source=evidence.sources.find(s=>s.sourceId===id),passages=evidence.passages.filter(p=>p.sourceId===id);
+ if(!source||canonicalSourceUrl(source.url)!==source.url||passages.length!==1)throw new Error('Unsafe source');
+ return {sourceId:id,number,url:source.url,title:source.title,publishedAt:source.publishedAt,passageIds:passages.map(p=>p.passageId),contentHashes:passages.map(p=>p.contentHash),supportStatus:'NOT_CHECKED',retrievedAt:source.retrievedAt,contentKind:passages[0].contentKind};
 }

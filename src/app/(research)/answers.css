@@ -108,3 +108,5 @@
 .mobile-sources-heading .research-icon-button { min-height: 44px; }
 
 @media (max-width: 767px) { .answer-topbar .private-label { display: none; } .answer-topbar .private-pill { flex-shrink: 0; padding: 0 8px; } .answer-topbar .thread-tab, .answer-tab-button { flex-shrink: 0; } }
+.source-group-title { margin: 18px 4px 6px; color: #d5dce1; font: 500 12px/18px Arial, Helvetica, sans-serif; }
+.source-evidence-meta { display: block; margin-top: 5px; color: #acb6bc; font: 400 11px/17px Arial, Helvetica, sans-serif; }
