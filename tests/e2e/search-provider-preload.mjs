@@ -5,11 +5,8 @@ if(new URL(process.env.DATABASE_URL??"http://missing").hostname!=="ep-sweet-nigh
 const originalFetch=globalThis.fetch;
 const answer=[
   "A rainbow appears when sunlight interacts with water droplets in the air. The drops **refract, reflect, and disperse** the light, separating it into the colors we see [S1].",
-  "## What happens inside a raindrop",
-  "1. **Refraction:** Light changes direction when it enters the water [S1].\n2. **Dispersion:** Different wavelengths bend by different amounts [S2].\n3. **Internal reflection:** Light reflects from the back of the droplet [S1].\n4. **Refraction again:** The light bends once more as it leaves the drop [S2].",
-  "## Why it looks like an arc",
+  "**Refraction:** Light changes direction when it enters the water [S1]. **Dispersion:** Different wavelengths bend by different amounts [S2]. **Internal reflection:** Light reflects from the back of the droplet [S1]. **Refraction again:** The light bends once more as it leaves the drop [S2].",
   "With the Sun behind you and rain ahead, the brightest rays reach your eyes at about **42 degrees** from the direction opposite the Sun. Many drops contribute light along the same cone, which appears as an arc [S2].",
-  "## A different rainbow for everyone",
   "Your eyes receive light from a particular set of droplets. Someone standing beside you receives light from a different set, so each observer sees their own rainbow [S3].",
 ].join("\n\n");
 function record(stage,scenario){appendFileSync(".artifacts/t11-provider-calls.jsonl",JSON.stringify({stage,scenario})+"\n");}

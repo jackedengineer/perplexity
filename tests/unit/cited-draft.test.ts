@@ -17,3 +17,9 @@ it('preserves existing safe Markdown limits and rejects unsafe or oversized outp
  expect(()=>renderCitedDraft({paragraphs:Array.from({length:8},()=>({text:'x'.repeat(600),sourceIds:['S1']}))},evidence())).toThrow();
  expect(()=>renderCitedDraft({paragraphs:[{text:'A fact.',sourceIds:['S1']}]},{...evidence(),sources:[]})).toThrow();
 });
+it('rejects multiple Markdown blocks and list items before attaching paragraph citations',()=>{
+ for(const text of ['First claim.\n\nSecond claim.','First claim.\n# Second claim','- First claim\n- Second claim','> First claim\n\n> Second claim']){
+  expect(()=>renderCitedDraft({paragraphs:[{text,sourceIds:['S1']}]},evidence())).toThrow();
+ }
+ expect(renderCitedDraft({paragraphs:[{text:'A **single** paragraph with `code`\nand a soft line break.',sourceIds:['S1']}]},evidence())).toContain('[S1]');
+});
