@@ -114,3 +114,51 @@ it.each([['OUTPUT_BLOCKED','policy'],['PROVIDER_UNAVAILABLE','infrastructure'],[
  expect(f.dependencies.log).toHaveBeenLastCalledWith(expect.objectContaining({event:'chat.execution',outcome:code,category}));
  expect(f.backend.load).not.toHaveBeenCalled();
 });
+it('correlates server-only spans and approved delivery without reflecting client diagnostics',async()=>{
+ const capture=vi.spyOn(console,'info').mockImplementation(()=>{});
+ try{
+  const f=fixture();f.question.message.text='PRIVATE_USER_QUESTION';
+  const response=await f.http.post(f.request(f.question,{'x-request-id':'PRIVATE_CLIENT_ID',traceparent:'PRIVATE_TRACE_PARENT'}));
+  const bytes=await response.text(),events=capture.mock.calls.map(args=>JSON.parse(String(args[0])));
+  expect(events.length).toBeGreaterThan(0);expect(events.every(e=>e.requestId===response.headers.get('x-request-id'))).toBe(true);
+  expect(events.find(e=>e.stage==='http.delivery'&&e.phase==='END')).toMatchObject({outcome:'COMPLETED',runId:f.run.id});
+  expect(events.find(e=>e.event==='research.approved_delivery')).toMatchObject({runId:f.run.id,stage:'http.delivery',outcome:'COMPLETED'});
+  expect(JSON.stringify(events)).not.toMatch(/PRIVATE_|Light bends|weather.gov|sessionId/);
+  expect(bytes).not.toMatch(/research.span|traceId|knownCostMicroUsd/);
+ }finally{capture.mockRestore();}
+});
+it.each(['sync','async'])('a broken %s request logger cannot change admission or approved delivery',async mode=>{
+ const f=fixture();f.dependencies.log.mockImplementation(()=>{if(mode==='async')return Promise.reject(Error('PRIVATE logger'));throw Error('PRIVATE logger');});
+ const response=await f.http.post(f.request());expect(response.status).toBe(200);expect(await response.text()).toContain('Light bends');
+ expect(f.backend.execute).toHaveBeenCalledOnce();
+});
+it('identifies configuration failure before admission without recording raw settings',async()=>{
+ const capture=vi.spyOn(console,'info').mockImplementation(()=>{}),f=fixture();
+ vi.spyOn(f.dependencies,'backend').mockImplementation(()=>{throw new AdmissionError('CONFIGURATION_UNAVAILABLE');});
+ try{
+  expect((await f.http.post(f.request())).status).toBe(503);
+  expect(capture.mock.calls.map(args=>JSON.parse(String(args[0]))).find(e=>e.stage==='http.configuration'&&e.phase==='END')).toMatchObject({outcome:'CONFIGURATION_UNAVAILABLE'});
+  expect(f.backend.admit).not.toHaveBeenCalled();expect(f.backend.execute).not.toHaveBeenCalled();
+ }finally{capture.mockRestore();}
+});
+it('records a missing identity as an access failure before admission',async()=>{
+ const capture=vi.spyOn(console,'info').mockImplementation(()=>{}),f=fixture();f.dependencies.identity.mockResolvedValue(null);
+ try{
+  expect((await f.http.post(f.request())).status).toBe(401);
+  expect(capture.mock.calls.map(args=>JSON.parse(String(args[0]))).find(e=>e.stage==='http.identity'&&e.phase==='END')).toMatchObject({outcome:'UNAUTHENTICATED'});
+  expect(f.backend.admit).not.toHaveBeenCalled();
+ }finally{capture.mockRestore();}
+});
+it('does not report approved delivery if the SDK cannot enqueue the approved payload',async()=>{
+ const capture=vi.spyOn(console,'info').mockImplementation(()=>{}),enqueue=ReadableStreamDefaultController.prototype.enqueue;
+ const broken=vi.spyOn(ReadableStreamDefaultController.prototype,'enqueue').mockImplementation(function(this:ReadableStreamDefaultController<unknown>,chunk:unknown){
+  if(chunk&&typeof chunk==='object'&&'type' in chunk&&chunk.type==='data-answer')throw Error('PRIVATE closed writer');
+  return enqueue.call(this,chunk);
+ });
+ try{
+  const f=fixture(),response=await f.http.post(f.request());await response.text();
+  const events=capture.mock.calls.map(args=>JSON.parse(String(args[0])));
+  expect(events.some(e=>e.event==='research.approved_delivery')).toBe(false);
+  expect(JSON.stringify(events)).not.toContain('PRIVATE');
+ }finally{broken.mockRestore();capture.mockRestore();}
+});

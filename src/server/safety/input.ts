@@ -1,12 +1,17 @@
+import {traceStage,recordTelemetry} from '@/server/telemetry/trace';
+import type {TelemetryStage} from '@/server/telemetry/contracts';
 import { guardVerdictSchema, SAFETY_POLICY, type GuardVerdict } from "./policy";
 import { inspectInput } from "./deterministic";
 import { INPUT_DETECTOR_VERSION, safetyInputSchema, SafetyProviderError, type InputReason, type SafetyProvider } from "./provider";
 
 export type InputCheck = { verdict: GuardVerdict; reason: InputReason; detectorVersion: typeof INPUT_DETECTOR_VERSION;
   modelId: string | null; durationMs: number };
-export function createInputGate(provider: SafetyProvider | undefined) {
+type SafetyStage=Extract<TelemetryStage,`safety.${string}`>;
+export function createInputGate(provider: SafetyProvider | undefined,stage:SafetyStage="safety.input") {
+  const promptVersion={"safety.input":"input-v1","safety.query":"input-v1","safety.evidence":"evidence-v1","safety.output":"output-v1"}[stage];
   return {
     async evaluate(value: unknown, options: { signal: AbortSignal; deadlineAt: Date }): Promise<InputCheck> {
+      return traceStage(stage,async()=>{
       const started = performance.now();
       let modelId: string | null = null;
       const result = (verdict: GuardVerdict, reason: InputReason): InputCheck => ({ verdict, reason,
@@ -51,6 +56,11 @@ export function createInputGate(provider: SafetyProvider | undefined) {
         clearTimeout(timer); options.signal.removeEventListener("abort",abort);
         if (stopWaiting) controller.signal.removeEventListener("abort",stopWaiting);
       }
+      },check=>{
+        const fields={outcome:check.verdict.decision,reason:check.reason,detectorVersion:check.detectorVersion,promptVersion,modelId:check.modelId??undefined,
+          categoryCodes:check.verdict.decision==='BLOCK'?check.verdict.categoryCodes:[]};
+        recordTelemetry('research.safety',fields);return fields;
+      });
     },
   };
 }

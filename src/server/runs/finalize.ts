@@ -1,3 +1,4 @@
+import {traceStage} from '@/server/telemetry/trace';
 import { randomUUID } from "node:crypto";
 import { and,eq,gt,sql } from "drizzle-orm";
 import { z } from "zod";
@@ -20,6 +21,7 @@ export async function lockCompletionSession(tx: AdmissionTransaction,subject: st
 export function createFinalization(db: AdmissionDatabase) {
   return {
     async commit(subject: string,sessionId: string,value: unknown,signal: AbortSignal): Promise<Finalization> {
+      return traceStage("persistence.commit",async()=>{
       if (!isApprovedResponse(value)) return { kind: "DENIED",code: "OUTPUT_BLOCKED" };
       try { return await db.transaction(async(tx): Promise<Finalization>=>{
         const current = await lockCompletionSession(tx,subject,sessionId),{ run,conversation,now } = await lockOwnedRun(tx,subject,value.runId);
@@ -61,8 +63,10 @@ export function createFinalization(db: AdmissionDatabase) {
         if (!changed.length || signal.aborted) throw new AdmissionError("CONFLICT");
         return { kind: "COMMITTED",runId: run.id,messageId };
       }); } catch (error) { return { kind: "DENIED",code: error instanceof AdmissionError ? error.code : "PROVIDER_UNAVAILABLE" }; }
+      });
     },
     async fail(subject: string,runId: string,code: PublicErrorCode,fence?: { attemptVersion: number;revision: number },cancelled = false): Promise<Finalization> {
+      return traceStage("persistence.fail",async()=>{
       if (!z.uuid().safeParse(runId).success) return { kind: "DENIED",code: "NOT_FOUND" };
       try { return await db.transaction(async(tx): Promise<Finalization>=>{
         const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
@@ -71,6 +75,7 @@ export function createFinalization(db: AdmissionDatabase) {
         await settleFailureLocked(tx,run,now,outcome,cancelled);
         return { kind: "DENIED",code:outcome };
       }); } catch (error) { return { kind: "DENIED",code: error instanceof AdmissionError ? error.code : "PROVIDER_UNAVAILABLE" }; }
+      });
     },
   };
 }

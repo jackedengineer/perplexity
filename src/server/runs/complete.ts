@@ -1,3 +1,5 @@
+import {ANSWER_PROMPT_VERSION} from '@/server/ai/prompts/answer';
+import {traceStage} from '@/server/telemetry/trace';
 import { z } from "zod";
 import type { PublicStage } from "@/server/contracts/progress";
 import { and,eq } from "drizzle-orm";
@@ -49,7 +51,7 @@ export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { ans
       let draft;
       try {
         if(budget.signal.aborted){await calls.finish(callId,'SKIPPED',{costMicroUsd:0n,inputTokens:0,outputTokens:0,actualModel:null});throw new AdmissionError('DEADLINE_EXCEEDED');}
-        draft = await generatePrivateDraft({ question: loaded.question,evidence },dependencies.answer,{ signal:budget.signal,deadlineAt:claim.deadlineAt });
+        draft = await traceStage("answer.draft",()=>generatePrivateDraft({ question: loaded.question,evidence },dependencies.answer,{ signal:budget.signal,deadlineAt:claim.deadlineAt }),()=>({promptVersion:ANSWER_PROMPT_VERSION}));
         await calls.finish(callId,draft.kind === "NO_EVIDENCE" ? "SKIPPED" : "SUCCEEDED",draft.usage);
         if(budget.signal.aborted)throw new AdmissionError('DEADLINE_EXCEEDED');
       } catch {
@@ -62,8 +64,8 @@ export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { ans
         await tx.update(runs).set({ status: "CHECKING_OUTPUT",updatedAt: now }).where(eq(runs.id,runId));
       });
       onStage?.("CHECKING_ANSWER");
-      const result = await createReleaseGate(recordSafetyProvider(calls,"OUTPUT_SAFETY",dependencies.output)).approve({ runId,attemptVersion: loaded.run.attemptVersion,
-        revision: loaded.run.admittedRevision,kind: draft.kind,question: loaded.question,markdown: draft.text,evidence },{ signal,deadlineAt: loaded.run.deadlineAt });
+      const result = await traceStage("output.release",()=>createReleaseGate(recordSafetyProvider(calls,"OUTPUT_SAFETY",dependencies.output)).approve({ runId,attemptVersion: loaded.run.attemptVersion,
+        revision: loaded.run.admittedRevision,kind: draft.kind,question: loaded.question,markdown: draft.text,evidence },{ signal,deadlineAt: loaded.run.deadlineAt }));
       if (result.kind === "DENIED") return finalization.fail(subject,runId,result.code,ownedAttempt,signal.aborted);
       onStage?.("SAVING_ANSWER");
       return await finalization.commit(subject,sessionId,result.response,signal);

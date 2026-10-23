@@ -28,6 +28,8 @@
     "test:input:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/input-gate-neon.test.ts",
     "test:retrieval:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/retrieval-neon.test.ts",
     "test:budgets:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/budgets-neon.test.ts",
+    "test:telemetry:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/telemetry-neon.test.ts",
+    "test:telemetry:evidence": "LIVE_TELEMETRY_EVIDENCE=1 vitest run --config vitest.neon.config.ts tests/live/telemetry-evidence.test.ts",
     "test:recovery:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/recovery-neon.test.ts",
     "test:completion:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/completion-neon.test.ts"
   },
@@ -35,6 +37,7 @@
     "@ai-sdk/react": "4.0.152",
     "@better-auth/drizzle-adapter": "1.7.12",
     "@openrouter/ai-sdk-provider": "3.1.0",
+    "@opentelemetry/api": "1.9.0",
     "ai": "7.0.148",
     "better-auth": "1.7.12",
     "drizzle-orm": "0.45.4",
