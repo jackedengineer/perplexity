@@ -98,7 +98,7 @@ test("a public question shows guarded progress, committed citations and exact re
     if(requests.length&&info.status!=="passed"){const value=requests[0] as {clientRequestId:string};const [run]=await f.owner.select().from(schema.runs).where(eq(schema.runs.clientRequestId,value.clientRequestId));if(run){console.info({state:run.status,ageMs:Date.now()-run.createdAt.getTime()});console.info((await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id))).map(c=>({stage:c.stage,status:c.status,durationMs:c.finishedAt?c.finishedAt.getTime()-c.startedAt.getTime():null})));}}
     await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
 });
-for(const scenario of ["input-block","output-block","invalid-citation","search-failure","no-evidence"] as const){
+for(const scenario of ["input-block","output-block","invalid-citation","search-failure","search-deadline","no-evidence"] as const){
   test(`public ${scenario} keeps private content out of the stream and history`,async({page,context},info)=>{
     const identity=await identityFixture(context),f=createNeonFixture();let buckets:string[]=[];
     const errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));await observeChatWire(page);
@@ -122,7 +122,12 @@ for(const scenario of ["input-block","output-block","invalid-citation","search-f
       }
       if(scenario==="input-block"){expect(calls.map(call=>call.stage)).toEqual(["INPUT_SAFETY"]);expect(bytes).not.toContain('"type":"data-stage"');}
       if(scenario==="invalid-citation")expect(calls.some(call=>call.stage==="OUTPUT_SAFETY")).toBe(false);
-      if(scenario==="search-failure")expect(calls.some(call=>call.stage==="ANSWER")).toBe(false);
+      if(scenario==="search-failure"||scenario==="search-deadline")expect(calls.some(call=>call.stage==="ANSWER")).toBe(false);
+      if(scenario==="search-deadline"){
+        expect(run.status).toBe('TIMED_OUT');expect(calls.find(call=>call.stage==='SEARCH')?.status).toBe('UNKNOWN');
+        expect(bytes).toContain('DEADLINE_EXCEEDED');
+        await expect(page.locator('.research-failure [role=alert]')).toContainText('Research exceeded its time limit');
+      }
       const history=await context.request.get(`/api/conversations/${submitted.conversationId}/messages`);expect(history.status()).toBe(200);
       expect(await history.text()).not.toMatch(/UNREVIEWED_PRIVATE_DRAFT|PRIVATE_REASONING_MUST_NOT_LEAK|PRIVATE_UPSTREAM_MUST_NOT_LEAK/);
       if(scenario==="input-block")expect((await history.json()).items).toEqual([]);

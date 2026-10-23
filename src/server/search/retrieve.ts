@@ -85,7 +85,11 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
         const filters=plan?{freshness:plan.retrieval.freshness,...(plan.retrieval.freshness==='RECENT'?{timeRange:freshnessTimeRange(plan.standaloneQuestion)??freshnessTimeRange(prepared.original)??'month'}:{}),startDate:plan.retrieval.startDate,endDate:plan.retrieval.endDate,preferredDomains:explicitPreferredDomains(prepared.original)}:undefined;
         const responses=await Promise.allSettled(queries.map((query,index)=>(index===0?search:dependencies.searchSecond!).search(query,{...options,...(filters?{filters}:{})})));
         const successful=responses.flatMap(r=>r.status==='fulfilled'?[r.value]:[]);
-        if(!successful.length)throw new RetrievalError();
+        if(!successful.length){
+          if(signal.aborted)throw new AdmissionError('CONFLICT');
+          const allTimedOut=responses.every(r=>r.status==='rejected'&&(r.reason instanceof AdmissionError||r.reason instanceof RetrievalError)&&r.reason.code==='DEADLINE_EXCEEDED');
+          throw new RetrievalError(allTimedOut?'DEADLINE_EXCEEDED':'PROVIDER_UNAVAILABLE');
+        }
         const response={results:successful.flatMap(r=>r.results),credits:successful.reduce((sum,r)=>sum+r.credits,0)};searchCredits=response.credits;
         await db.transaction(async(tx)=>{
           const { now } = await checkpoint(tx,subject,runId,prepared.run,stage,signal);

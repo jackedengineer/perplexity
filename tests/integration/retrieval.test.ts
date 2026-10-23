@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
+import { createHash,randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { eq } from "drizzle-orm";
@@ -11,6 +11,7 @@ import { createInputGate } from "@/server/safety/input";
 import { createEvidenceGate } from "@/server/safety/evidence";
 import { hashPassage } from "@/server/search/evidence";
 import { createRetrieval } from "@/server/search/retrieve";
+import { AdmissionError } from "@/server/runs/errors";
 import { FREE_ADMISSION_POLICY } from "@/server/runs/policy";
 const pg = new PGlite(), db = drizzle(pg,{ schema });
 const keys = { activeKeyId: "test-v1",keys: { "test-v1": "a".repeat(64) } };
@@ -191,4 +192,25 @@ it('records TIMED_OUT when retrieval aborts at the database deadline',async()=>{
  expect((await p.service.retrieve(subject,runId,controller.signal)).kind).toBe('DENIED');
  expect((await db.select().from(schema.runs))[0].status).toBe('TIMED_OUT');
  expect(await db.select().from(schema.sourcePassages)).toHaveLength(0);
+});
+
+it('preserves an exhausted search stage deadline before the absolute run deadline',async()=>{
+ const p=pipeline();p.search.search.mockRejectedValue(new AdmissionError('DEADLINE_EXCEEDED'));
+ expect(await p.service.retrieve(subject,runId,signal())).toEqual({kind:'DENIED',code:'DEADLINE_EXCEEDED'});
+ const [run]=await db.select().from(schema.runs);expect(run.status).toBe('TIMED_OUT');expect(run.deadlineAt.getTime()).toBeGreaterThan(Date.now());
+ expect(p.evidence.classify).not.toHaveBeenCalled();expect(p.search.search).toHaveBeenCalledOnce();
+});
+
+it.each(['all-timeouts','mixed-failure','partial-success'] as const)('preserves two-query %s semantics',async scenario=>{
+ const [run]=await db.select().from(schema.runs),[review]=await db.select().from(schema.inputSafetyReviews),[message]=await db.select().from(schema.messages);
+ const original=message.parts[0].text;
+ await db.insert(schema.runPlans).values({runId,conversationId:run.conversationId,messageId:review.acceptedMessageId!,attemptVersion:1,version:'planner-v5',createdAt:new Date(),contextIds:[],originalHash:createHash('sha256').update(original).digest('hex'),plan:{action:'ANSWER',standaloneQuestion:original,intent:'EXPLAIN',explicitConstraints:[],disclosedAssumptions:[],answerLanguage:'en',retrieval:{required:true,queries:['rainbows form','rainbows'],freshness:'ANY',startDate:null,endDate:null}}});
+ const first={search:vi.fn().mockRejectedValue(new AdmissionError('DEADLINE_EXCEEDED'))},second={search:vi.fn()};
+ if(scenario==='partial-success')second.search.mockResolvedValue({results:[{title:'Rainbows',url:'https://example.org/rainbows',content:'Water refracts light.',score:.9}],credits:1});
+ else second.search.mockRejectedValue(scenario==='all-timeouts'?new AdmissionError('DEADLINE_EXCEEDED'):new Error('PRIVATE upstream failure'));
+ const queryGate=createInputGate(classifier()),evidenceGate=createEvidenceGate(classifier());
+ const result=await createRetrieval(db,{modelId:'test/safety',search:first,searchSecond:second,queryGate,querySecondGate:queryGate,evidenceGate}).retrieve(subject,runId,signal());
+ expect(result).toMatchObject(scenario==='partial-success'?{kind:'READY'}:{kind:'DENIED',code:scenario==='all-timeouts'?'DEADLINE_EXCEEDED':'PROVIDER_UNAVAILABLE'});
+ expect((await db.select().from(schema.runs))[0].status).toBe(scenario==='partial-success'?'GENERATING':scenario==='all-timeouts'?'TIMED_OUT':'FAILED');
+ expect(first.search).toHaveBeenCalledOnce();expect(second.search).toHaveBeenCalledOnce();
 });

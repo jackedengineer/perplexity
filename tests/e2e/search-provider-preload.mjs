@@ -15,12 +15,16 @@ globalThis.fetch=async(input,init)=>{
   if((url.includes("openrouter.ai")||url.includes("api.tavily.com"))&&url!=="https://openrouter.ai/api/v1/chat/completions"&&url!=="https://api.tavily.com/search"&&url!=="https://api.tavily.com/extract")throw new Error("Fixture forbids unmatched provider request");
   if(url!=="https://openrouter.ai/api/v1/chat/completions"&&url!=="https://api.tavily.com/search"&&url!=="https://api.tavily.com/extract")return originalFetch(input,init);
   const body=JSON.parse(String(init?.body??"{}")),raw=JSON.stringify(body);
-  const scenario=JSON.stringify(body.messages?.slice(1)??body).includes("conflicting")?"conflicting":raw.includes("t19-safety-deadline")?"t19-safety-deadline":raw.includes("t19-deadline")?"t19-deadline":raw.includes("t18-cancel")?"t18-cancel":raw.includes("t11-input-block")?"input-block":raw.includes("t11-output-block")?"output-block":raw.includes("t11-invalid-citation")?"invalid-citation":raw.includes("t11-search-failure")?"search-failure":raw.includes("t11-no-evidence")?"no-evidence":"allowed";
+  const scenario=JSON.stringify(body.messages?.slice(1)??body).includes("conflicting")?"conflicting":raw.includes("t19-safety-deadline")?"t19-safety-deadline":raw.includes("t19-deadline")?"t19-deadline":raw.includes("t18-cancel")?"t18-cancel":raw.includes("t11-input-block")?"input-block":raw.includes("t11-output-block")?"output-block":raw.includes("t11-invalid-citation")?"invalid-citation":raw.includes("t11-search-deadline")?"search-deadline":raw.includes("t11-search-failure")?"search-failure":raw.includes("t11-no-evidence")?"no-evidence":"allowed";
   if(url==='https://api.tavily.com/extract'){
     record('extract',scenario);if(scenario==='conflicting')return Response.json({results:body.urls.map((url,index)=>({url,raw_content:index===0?'The conflicting source reports an amount of 20 units.':'The conflicting source reports an amount of 30 units.'})),failed_results:[],usage:{credits:1}});return Response.json({results:body.urls.map((url,index)=>({url,raw_content:index===0?'Rainbows form when water droplets refract incoming sunlight, reflect it internally and disperse its colors.':'Different colors emerge at different angles. The primary rainbow is about 42 degrees from the antisolar direction.'})),failed_results:[],usage:{credits:1}});
   }
   if(url.includes("tavily")){
     record("search",scenario);
+    if(scenario==="search-deadline")await new Promise((resolve,reject)=>{
+      const timer=setTimeout(resolve,9000),abort=()=>{clearTimeout(timer);reject(new Error("Synthetic search deadline"));};
+      if(init?.signal?.aborted)abort();else init?.signal?.addEventListener("abort",abort,{once:true});
+    });
     if(scenario==="search-failure")return Response.json({error:"PRIVATE_UPSTREAM_MUST_NOT_LEAK"},{status:503});
     if(scenario==="conflicting")return Response.json({usage:{credits:1},results:[{title:"Conflicting source A",url:"https://reports.example.org/conflicting/a",content:"The conflicting source reports an amount of 20 units.",score:.9,published_date:"2026-10-20"},{title:"Conflicting source B",url:"https://reports.example.org/conflicting/b",content:"The conflicting source reports an amount of 30 units.",score:.8,published_date:"2026-10-21"},{title:"Additional retrieved report",url:"https://reports.example.org/conflicting/c",content:"An additional source with broader context.",score:.7}]});
     return Response.json({usage:{credits:1},results:scenario==="no-evidence"?[]:[
