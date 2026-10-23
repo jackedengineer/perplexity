@@ -8,7 +8,7 @@ const wire = { decision: "ALLOW", categoryCodes: [], policyVersion: "v1", retrya
 const envelope = (content: unknown = JSON.stringify(wire), finish_reason = "stop", extra = {}) => ({ choices: [{ finish_reason,
   message: { role: "assistant", content, ...extra } }], usage: { prompt_tokens: 1, completion_tokens: 1 } });
 const json = (value: unknown) => new Response(JSON.stringify(value),{ headers: { "content-type": "application/json" } });
-it.each(["openai/gpt-4.1-nano","openai/gpt-4.1-mini"])("omits unsupported reasoning controls for %s without relaxing routing",async(modelId)=>{
+it.each(["openai/gpt-4.1-nano","openai/gpt-4.1-mini","mistralai/mistral-small-3.2-24b-instruct"])("omits unsupported reasoning controls for %s without relaxing routing",async(modelId)=>{
   const fetcher=vi.fn<typeof fetch>().mockResolvedValue(json(envelope()));
   await createOpenRouterSafetyProvider({...config(),modelId,provider:"azure"},fetcher).classify(input,new AbortController().signal);
   const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body));

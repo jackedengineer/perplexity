@@ -6,12 +6,12 @@ const configSchema = z.strictObject({
   provider: z.string().max(64).regex(/^[a-z0-9][a-z0-9.-]*(?:\/[a-z0-9.-]+)?$/u),
 });
 export type SafetyModelConfig = z.infer<typeof configSchema>;
-// These two non-reasoning models reject even disabled reasoning controls when
+// These verified non-reasoning models reject even disabled reasoning controls when
 // require_parameters is true. Verified against the OpenRouter endpoint catalog
 // and live Azure requests; unknown models retain explicit reasoning opt-out.
 // https://openrouter.ai/docs/guides/routing/provider-selection#requiring-providers-to-support-all-parameters
 export function isVerifiedNonReasoningModel(modelId: string): boolean {
-  return modelId === "openai/gpt-4.1-nano" || modelId === "openai/gpt-4.1-mini";
+  return modelId === "openai/gpt-4.1-nano" || modelId === "openai/gpt-4.1-mini" || modelId === "mistralai/mistral-small-3.2-24b-instruct";
 }
 // Lazy and fail-closed. No public/browser model selector can supply these settings.
 export function parseSafetyModel(env: Record<string,string | undefined>): SafetyModelConfig | undefined {
