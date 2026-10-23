@@ -123,6 +123,14 @@ for(const scenario of ["input-block","output-block","invalid-citation","search-f
       if(scenario==="input-block")expect((await history.json()).items).toEqual([]);
       expect(errors).toEqual([]);expect((await new AxeBuilder({page}).withTags(["wcag2a","wcag2aa","wcag21aa"]).analyze()).violations).toEqual([]);
       await page.screenshot({path:`.artifacts/t11-${scenario}-${info.project.name}.png`,fullPage:true});
+      if(scenario==='input-block'||scenario==='search-failure'){
+        // No reload: the failed admission already advanced the conversation revision.
+        const nextRequest=page.waitForRequest(request=>request.url().endsWith('/api/chat'));
+        await page.getByRole('textbox',{name:'Ask a question'}).fill('Why do rainbows form?');
+        await page.getByRole('button',{name:'Submit question'}).click();
+        expect((await nextRequest).postDataJSON().expectedRevision).toBe(run.admittedRevision);
+        await expect(page.locator('.answer-prose')).toContainText('A rainbow appears',{timeout:60000});
+      }
     }finally{await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
   });
 }

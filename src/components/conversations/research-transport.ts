@@ -13,10 +13,17 @@ const uuid=(value: string|null)=>value&&/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{1
 export function createResearchTransport(onUnauthenticated: ()=>void,request: typeof fetch = fetch,initialRunId:string|null=null) {
   // Event-driven transport state is deliberately independent of React's render state.
   let intent: SubmitQuery|null=null,runId: string|null=uuid(initialRunId);
+  let revision:number|null=null;
+  const recordRevision=(id:unknown,value:unknown)=>{
+    if(id!==runId||!runId||typeof value!=='number'||!Number.isSafeInteger(value)||value<0||value>2147483647)return false;
+    revision=Math.max(revision??0,value);return true;
+  };
   const transport=new DefaultChatTransport<ResearchMessage>({api:"/api/chat",credentials:"same-origin",
     prepareSendMessagesRequest:()=>{if(!intent)throw new Error("Question missing");return {body:intent};},
     fetch:async(url,options)=>{
-      const response=await request(url,options);runId=uuid(response.headers.get("x-run-id"))??runId;
+      const response=await request(url,options),identified=uuid(response.headers.get("x-run-id"));
+      if(identified){if(runId&&identified!==runId)throw new Error('Saved run mismatch');runId=identified;
+        const header=response.headers.get('x-run-revision');if(header!==null&&/^\d+$/u.test(header))recordRevision(runId,Number(header));}
       if(!response.ok){if(response.status===401)onUnauthenticated();const problem=await response.clone().json().catch(()=>null);throw new Error(safeResearchMessage(problem?.error?.message));}return response;
     },
   });return {transport,async cancel(){
@@ -26,6 +33,7 @@ export function createResearchTransport(onUnauthenticated: ()=>void,request: typ
     if(!response.ok)throw new Error("Cancellation could not be confirmed. Check the same request for its saved status.");
     const status=runStateView.parse(await response.json());
     if(status.runId!==runId||intent&&status.conversationId!==intent.conversationId)throw new Error("Saved run mismatch");
+    recordRevision(status.runId,status.revision);
     return status;
-  },getIntent:()=>intent,setIntent:(value: SubmitQuery)=>{intent=value;},getRunId:()=>runId};
+  },getIntent:()=>intent,setIntent:(value: SubmitQuery)=>{intent=value;},getRunId:()=>runId,getRevision:()=>revision,recordRevision};
 }

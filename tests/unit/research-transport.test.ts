@@ -27,3 +27,12 @@ it('bootstraps recovery without an original prompt and sends an empty durable ca
  expect(request.mock.calls[0]).toEqual([`/api/runs/${runId}/cancellation`,expect.objectContaining({method:'POST',credentials:'same-origin',cache:'no-store'})]);
  expect(request.mock.calls[0][1]?.body).toBeUndefined();
 });
+it('retains admitted revision metadata even when the HTTP request fails before streaming',async()=>{
+ const runId=randomUUID(),controller=createResearchTransport(vi.fn(),vi.fn<typeof fetch>().mockResolvedValue(Response.json({error:{message:'private'}},{status:503,headers:{'x-run-id':runId,'x-run-revision':'7'}})));
+ controller.setIntent({conversationId:randomUUID(),clientRequestId:randomUUID(),expectedRevision:6,message:{text:'Synthetic'},mode:'FAST',modelKey:'fast-default'});
+ await expect(controller.transport.sendMessages({chatId:randomUUID(),trigger:'submit-message',messageId:undefined,abortSignal:undefined,messages:[]})).rejects.toThrow();
+ expect(controller.getRevision()).toBe(7);
+ expect(controller.recordRevision(randomUUID(),8)).toBe(false);expect(controller.recordRevision(runId,-1)).toBe(false);
+ expect(controller.getRevision()).toBe(7);
+ expect(controller.recordRevision(runId,7)).toBe(true);
+});
