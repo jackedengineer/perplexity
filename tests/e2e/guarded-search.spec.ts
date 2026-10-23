@@ -177,9 +177,9 @@ test('conflicting reports keep separate citations and approved additional source
   await expect(page.locator('.answer-prose')).toContainText('The reports disagree',{timeout:60000});
   await expect(page.locator('.answer-prose a')).toHaveCount(2);await page.getByRole('button',{name:'Sources',exact:true}).click();
   const surface=info.project.name==='mobile'?page.getByRole('dialog',{name:'Answer sources'}):page.getByRole('complementary',{name:'Answer sources'});
-  await expect(surface.getByText('Additional retrieved sources',{exact:true})).toBeVisible();await expect(surface.getByRole('link')).toHaveCount(3);
-  await expect(surface.getByText(/Factual support hasn’t been independently checked/)).toBeVisible();
-  await expect(surface.getByText(/provider estimate/)).toHaveCount(2);
+  await expect(surface.getByRole('heading',{name:'Additional retrieved sources',exact:true})).toBeVisible();await expect(surface.getByRole('link')).toHaveCount(3);
+  await expect(surface.getByText(/Factual support hasn’t been independently checked/).filter({visible:true})).toBeVisible();
+  await expect(surface.getByText(/provider estimate/).filter({visible:true})).toHaveCount(2);
   await page.screenshot({path:`.artifacts/t16-conflicting-${info.project.name}.png`,fullPage:true});
   await page.reload();await expect(page.locator('.answer-prose')).toContainText('The reports disagree');
  }finally{await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
