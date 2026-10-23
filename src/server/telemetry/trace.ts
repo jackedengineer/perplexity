@@ -1,6 +1,6 @@
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {randomBytes} from 'node:crypto';
-import {trace,ROOT_CONTEXT,TraceFlags,SpanStatusCode,isSpanContextValid,type Attributes,type Context,type Span,type SpanContext} from '@opentelemetry/api';
+import {trace,ROOT_CONTEXT,SpanStatusCode,isSpanContextValid,type Attributes,type Context,type Span,type SpanContext} from '@opentelemetry/api';
 import {AdmissionError} from '@/server/runs/errors';
 import {telemetryEventSchema,telemetryFieldsSchema,runMetadataSchema,outcomeSchema,outcomeCategory,type TelemetryEvent,type TelemetryFields,type TelemetryStage} from './contracts';
 import {recordMetrics} from './metrics';
@@ -9,10 +9,9 @@ type zRun=ReturnType<typeof runMetadataSchema.parse>;
 const storage=new AsyncLocalStorage<Scope>();
 const hex=(bytes:number)=>randomBytes(bytes).toString('hex');
 const attributes=(fields:Record<string,unknown>):Attributes=>Object.fromEntries(Object.entries(fields).filter((entry):entry is [string,string|number|string[]]=>typeof entry[1]==='string'||typeof entry[1]==='number'||Array.isArray(entry[1])&&entry[1].every(v=>typeof v==='string')));
-export function withTelemetry<T>(requestId:string,work:()=>T,sink:(event:TelemetryEvent)=>void=event=>console.info(JSON.stringify(event))):T {
+export function withTelemetry<T>(requestId:string,work:()=>Promise<T>,sink:(event:TelemetryEvent)=>void=event=>console.info(JSON.stringify(event))):Promise<T> {
  const traceId=hex(16),spanId=hex(8);
- let apiContext=ROOT_CONTEXT;try{apiContext=trace.setSpanContext(ROOT_CONTEXT,{traceId,spanId,traceFlags:TraceFlags.SAMPLED});}catch{}
- return storage.run({requestId,traceId,spanId,apiContext,run:{},calls:new Map(),sink},work);
+ return storage.run({requestId,traceId,spanId,apiContext:ROOT_CONTEXT,run:{},calls:new Map(),sink},()=>traceStage('http.request',work));
 }
 export function bindRunTelemetry(value:unknown) {
  const current=storage.getStore(),parsed=runMetadataSchema.safeParse(value);
@@ -34,7 +33,7 @@ export function recordRunUsage() {
  const known=calls.reduce((n,c)=>n+BigInt(c.knownCostMicroUsd??'0'),0n),unknown=calls.filter(c=>c.costState!=='KNOWN').length;
  const tokens=(key:'inputTokens'|'outputTokens')=>models.some(c=>c[key]!=null)?models.reduce((n,c)=>n+(c[key]??0),0):models.length?null:0;
  recordTelemetry('research.run_usage',{knownCostMicroUsd:String(known),costState:unknown?known>0n?'PARTIAL':'UNKNOWN':'KNOWN',unknownCalls:unknown,inputTokens:tokens('inputTokens'),outputTokens:tokens('outputTokens'),
-  searchCredits:calls.some(c=>c.providerStage==='SEARCH'&&c.searchCredits==null)?null:calls.reduce((n,c)=>n+(c.searchCredits??0),0)});
+  searchCredits:calls.some(c=>c.providerStage==='SEARCH'&&c.outcome!=='SKIPPED'&&c.searchCredits==null)?null:calls.reduce((n,c)=>n+(c.searchCredits??0),0)});
 }
 export function recordTelemetry(event:TelemetryEvent['event'],value:unknown={}) {
  const current=storage.getStore();if(!current)return;

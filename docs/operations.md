@@ -11,6 +11,10 @@ The chat boundary generates a new request ID and private trace context. Client
 request IDs/trace headers do not choose diagnostic IDs. `X-Request-Id` and the
 owned `X-Run-Id` correlate a browser request to server logs. An idempotent replay
 has a fresh request ID and the same run ID; it does not execute another run.
+The exported `http.request` root has no external parent and ends when the handler
+returns its response. Streaming children may finish later; use `run.execute` and
+`http.delivery` for execution/delivery latency. Roots and children follow the
+[OpenTelemetry span API](https://opentelemetry.io/docs/languages/js/instrumentation/#create-spans).
 
 `research.span` JSON records START/END, span/parent IDs, stage, fixed outcome and
 monotonic duration in milliseconds. Stages cover identity, request allowance,

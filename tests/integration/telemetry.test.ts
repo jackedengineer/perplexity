@@ -97,3 +97,10 @@ it('keeps legacy accounting visibly unknown instead of presenting it as free usa
  await createFinalization(db).fail(person.subject,person.runId,'PROVIDER_UNAVAILABLE');
  expect((await operatorReports()).costs[0]).toMatchObject({cost_state:'UNKNOWN_LEGACY',held_micro_usd:'50000'});
 });
+it('operator reports distinguish no-dispatch searches from unknown dispatched credits',async()=>{
+ await run();
+ await db.update(schema.providerCalls).set({status:'SKIPPED',costMicroUsd:0n,searchCredits:null}).where(eq(schema.providerCalls.stage,'SEARCH'));
+ expect((await operatorReports()).costs[0]).toMatchObject({search_credits:0,unknown_search_credits:0,unknown_calls:0});
+ await db.update(schema.providerCalls).set({status:'UNKNOWN',costMicroUsd:null}).where(eq(schema.providerCalls.stage,'SEARCH'));
+ expect((await operatorReports()).costs[0]).toMatchObject({search_credits:null,unknown_search_credits:1,unknown_calls:1});
+});

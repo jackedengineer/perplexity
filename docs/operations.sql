@@ -78,8 +78,8 @@ WITH observed AS (
    OR p.cost_micro_usd<c.cost_micro_usd)::integer AS unknown_calls,
   count(*) FILTER (WHERE p.cost_micro_usd<c.cost_micro_usd OR greatest(c.cost_micro_usd,p.cost_micro_usd)>c.cap_micro_usd)::integer AS anomalies,
   sum(c.input_tokens)::integer AS input_tokens,sum(c.output_tokens)::integer AS output_tokens,
-  sum(c.search_credits)::integer AS search_credits,
-  count(*) FILTER (WHERE c.stage='SEARCH' AND c.search_credits IS NULL)::integer AS unknown_search_credits
+  sum(CASE WHEN c.stage='SEARCH' AND c.status='SKIPPED' THEN 0 ELSE c.search_credits END)::integer AS search_credits,
+  count(*) FILTER (WHERE c.stage='SEARCH' AND c.status<>'SKIPPED' AND c.search_credits IS NULL)::integer AS unknown_search_credits
  FROM provider_calls c LEFT JOIN provider_usage_resolutions p ON p.call_id=c.id
  GROUP BY c.run_id
 ), adjustments AS (

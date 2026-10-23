@@ -1,10 +1,11 @@
 import {z} from 'zod';
+import {modelIdSchema} from '@/server/ai/models';
 import {PUBLIC_ERRORS} from '@/server/contracts/error-messages';
 import {INPUT_REASONS} from '@/server/safety/provider';
 import {safetyCategorySchema} from '@/server/safety/policy';
 const publicCodes=Object.keys(PUBLIC_ERRORS) as [keyof typeof PUBLIC_ERRORS,...(keyof typeof PUBLIC_ERRORS)[]];
 export const outcomeSchema=z.enum([...publicCodes,'ERROR','SUCCEEDED','UNKNOWN','SKIPPED','ALLOW','BLOCK','UNAVAILABLE','APPROVED','ACCEPTED','READY','NO_EVIDENCE','COMMITTED','ALREADY_COMMITTED','COMPLETED','ADMITTED']);
-export const stageSchema=z.enum(['http.identity','http.request_limit','http.validation','http.configuration','http.admission','http.delivery','http.status','run.execute','input.accept','retrieval','answer.complete','safety.input','safety.query','safety.evidence','safety.output','search','answer.draft','citations','output.release','persistence.commit','persistence.fail']);
+export const stageSchema=z.enum(['http.request','http.identity','http.request_limit','http.validation','http.configuration','http.admission','http.delivery','http.status','run.execute','input.accept','retrieval','answer.complete','safety.input','safety.query','safety.evidence','safety.output','search','answer.draft','citations','output.release','persistence.commit','persistence.fail']);
 export type TelemetryStage=z.infer<typeof stageSchema>;
 const count=z.int().min(0).max(1_000_000),money=z.string().regex(/^\d{1,16}$/u);
 const version=z.string().regex(/^[a-zA-Z0-9._-]{1,64}$/u);
@@ -14,7 +15,7 @@ export const telemetryFieldsSchema=z.object({
  outcome:outcomeSchema.optional(),durationMs:z.number().finite().min(0).max(86_400_000).optional(),
  reason:z.enum([...INPUT_REASONS,'CITATION_INVALID','INVALID_PACKAGE']).optional(),categoryCodes:z.array(safetyCategorySchema).max(11).optional(),
  promptVersion:version.optional(),detectorVersion:version.optional(),
- modelId:z.string().regex(/^[a-z0-9-]+\/[A-Za-z0-9._:-]{1,100}$/u).max(128).optional(),actualModelMatch:z.enum(['MATCH','OTHER','UNAVAILABLE']).optional(),
+ modelId:modelIdSchema.optional(),actualModelMatch:z.enum(['MATCH','OTHER','UNAVAILABLE']).optional(),
  providerCallId:z.uuid().optional(),providerStage:z.enum(['INPUT_SAFETY','QUERY_SAFETY','SEARCH','EVIDENCE_SAFETY','ANSWER','OUTPUT_SAFETY']).optional(),
  inputTokens:count.nullable().optional(),outputTokens:count.nullable().optional(),searchCredits:count.nullable().optional(),
  knownCostMicroUsd:money.optional(),estimatedUpperBoundMicroUsd:money.optional(),heldMicroUsd:money.optional(),bookedMicroUsd:money.optional(),
