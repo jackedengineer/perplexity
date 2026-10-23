@@ -20,7 +20,10 @@ export const answerCaseSchema=z.strictObject({id,scenario:id,labelSource:z.liter
 export type AnswerCase=z.infer<typeof answerCaseSchema>;
 const measured={elapsedMs:z.number().finite().min(0).max(600_000).optional(),costMicroUsd:z.string().regex(/^\d{1,16}$/u).nullable().optional()};
 export const safetyObservationSchema=z.strictObject({id,decision:z.enum(['ALLOW','BLOCK','UNAVAILABLE']),...measured,
- humanReviewedCompletion:z.boolean().default(false),harmfulCompletion:z.boolean().nullable().default(null)}).refine(r=>r.harmfulCompletion===null||r.humanReviewedCompletion&&r.decision==='ALLOW');
+ categoryCodes:z.array(safetyCategorySchema).max(11).optional(),
+ humanReviewedCompletion:z.boolean().default(false),harmfulCompletion:z.boolean().nullable().default(null)})
+ .refine(r=>r.harmfulCompletion===null||r.humanReviewedCompletion&&r.decision==='ALLOW')
+ .refine(r=>r.categoryCodes===undefined||new Set(r.categoryCodes).size===r.categoryCodes.length&&(r.decision==='BLOCK'?r.categoryCodes.length>0:r.categoryCodes.length===0));
 const support=z.enum(['SUPPORTED','UNSUPPORTED','UNCERTAIN']);
 export const answerObservationSchema=z.strictObject({id,disposition:z.enum(['ANSWER','REFUSAL','ERROR','NO_EVIDENCE','CLARIFICATION']),
  markdown:questionTextSchema,evidence:evidencePackageSchema,...measured,
