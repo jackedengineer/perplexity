@@ -7,7 +7,7 @@ const responseSchema = z.object({ results: z.array(resultSchema).max(RETRIEVAL_L
   usage: z.object({ credits: z.literal(1) }) });
 export type SearchResult = z.infer<typeof resultSchema>;
 export type SearchResponse = { results: SearchResult[]; credits: 1 };
-export const searchFiltersSchema=z.strictObject({freshness:z.enum(["ANY","RECENT","SPECIFIC_RANGE"]),startDate:z.iso.date().nullable(),endDate:z.iso.date().nullable(),preferredDomains:z.array(z.string().regex(/^[a-z0-9.-]+$/u)).max(3)});
+export const searchFiltersSchema=z.strictObject({freshness:z.enum(["ANY","RECENT","SPECIFIC_RANGE"]),timeRange:z.enum(["day","week","month"]).optional(),startDate:z.iso.date().nullable(),endDate:z.iso.date().nullable(),preferredDomains:z.array(z.string().regex(/^[a-z0-9.-]+$/u)).max(3)});
 export type SearchOptions=RetrievalOptions&{filters?:z.infer<typeof searchFiltersSchema>};
 export interface SearchProvider { search(query: unknown, options: SearchOptions): Promise<SearchResponse> }
 export async function readSearchResponse(response: Response, signal: AbortSignal) {
@@ -44,7 +44,7 @@ export function createTavilySearch(apiKey: string, request: typeof fetch = fetch
           method: "POST",headers: { Authorization: `Bearer ${apiKey}`,"Content-Type": "application/json" },
           redirect: "error",credentials: "omit",cache: "no-store",signal,
           body: JSON.stringify({ query: parsed.data,topic: "general",search_depth: "basic",max_results: 5,chunks_per_source: 3,
-            ...(filters?{include_published_date:true,...(filters.freshness==='RECENT'?{time_range:'month'}:{}),...(filters.freshness==='SPECIFIC_RANGE'?{start_date:filters.startDate,end_date:filters.endDate,filter_by_published_date:true}:{}),...(filters.preferredDomains.length?{include_domains:filters.preferredDomains,include_domains_mode:'prefer'}:{})}:{}),
+            ...(filters?{include_published_date:true,...(filters.freshness==='RECENT'?{time_range:filters.timeRange??'month'}:{}),...(filters.freshness==='SPECIFIC_RANGE'?{start_date:filters.startDate,end_date:filters.endDate,filter_by_published_date:true}:{}),...(filters.preferredDomains.length?{include_domains:filters.preferredDomains,include_domains_mode:'prefer'}:{})}:{}),
             auto_parameters: false,include_answer: false,include_raw_content: false,include_images: false,
             include_favicon: false,include_usage: true }),
         });

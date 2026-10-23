@@ -22,7 +22,7 @@ export const telemetryFieldsSchema=z.object({
  inputTokens:aggregateTokens.nullable().optional(),outputTokens:aggregateTokens.nullable().optional(),searchCredits:count.nullable().optional(),
  knownCostMicroUsd:money.optional(),estimatedUpperBoundMicroUsd:money.optional(),heldMicroUsd:money.optional(),bookedMicroUsd:money.optional(),
  costState:z.enum(['KNOWN','PARTIAL','UNKNOWN']).optional(),estimateKind:z.literal('RESERVATION_CEILING').optional(),unknownCalls:count.optional(),
- answerCredits:count.optional(),sourceCount:count.optional(),discardedSources:count.optional(),returnedSources:count.optional(),
+ answerCredits:count.optional(),extractedSources:count.optional(),extractionFailures:count.optional(),sourceCount:count.optional(),discardedSources:count.optional(),returnedSources:count.optional(),
 });
 export const providerTelemetryFieldsSchema=telemetryFieldsSchema.extend({inputTokens:count.nullable().optional(),outputTokens:count.nullable().optional()});
 export type TelemetryFields=z.infer<typeof telemetryFieldsSchema>;

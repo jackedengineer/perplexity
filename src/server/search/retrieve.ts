@@ -78,7 +78,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
         }
         await db.transaction(tx=>checkpoint(tx,subject,runId,prepared.run,stage,signal));
         const plan=prepared.plan?.action==='ANSWER'?prepared.plan:null;
-        const filters=plan?{freshness:plan.retrieval.freshness,startDate:plan.retrieval.startDate,endDate:plan.retrieval.endDate,preferredDomains:explicitPreferredDomains(prepared.original)}:undefined;
+        const filters=plan?{freshness:plan.retrieval.freshness,...(plan.retrieval.freshness==='RECENT'?{timeRange: /\b(today|yesterday)\b/iu.test(prepared.original)?'day' as const:/\b(this week|last week)\b/iu.test(prepared.original)?'week' as const:'month' as const}:{}),startDate:plan.retrieval.startDate,endDate:plan.retrieval.endDate,preferredDomains:explicitPreferredDomains(prepared.original)}:undefined;
         const responses=await Promise.allSettled(queries.map((query,index)=>(index===0?search:dependencies.searchSecond!).search(query,{...options,...(filters?{filters}:{})})));
         const successful=responses.flatMap(r=>r.status==='fulfilled'?[r.value]:[]);
         if(!successful.length)throw new RetrievalError();
@@ -88,24 +88,27 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
           await tx.update(runs).set({ status: 'PREPARING_EVIDENCE',updatedAt: now }).where(eq(runs.id,runId));
         });
         stage = 'PREPARING_EVIDENCE';
+        let extractionFailures=0;
         let selected:RankedResult[]=plan?rankEvidenceResults(response.results,plan.standaloneQuestion,new Date(),filters):response.results;
         // Preserve enough of the absolute deadline for answer, output safety and persistence.
         if(dependencies.extract&&selected.length&&prepared.run.deadlineAt.getTime()-Date.now()>20000){
           await db.transaction(tx=>checkpoint(tx,subject,runId,prepared.run,stage,signal));
           try{
             const extracted=await dependencies.extract.extract(selected.slice(0,2).map(r=>r.url),options);
+            extractionFailures=extracted.failedUrls.length+extracted.rejectedUrls.length;
             selected=selected.filter(row=>!extracted.rejectedUrls.includes(row.url)).map(row=>{
               const page=extracted.pages.find(p=>p.url===row.url);
               return page?{...row,content:page.content,contentKind:'EXTRACTED_PAGE' as const,retrievedAt:page.retrievedAt}:row;
             });
             selected=rankEvidenceResults(selected,plan?.standaloneQuestion??prepared.original,new Date(),filters);
           }catch(error){
+            extractionFailures=Math.min(selected.length,2);
             if(signal.aborted||Date.now()>=prepared.run.deadlineAt.getTime())throw error;
             // Optional extraction outage retains the inspected search passages, never invented page text.
           }
         }
         const evidence = buildEvidence(runId,selected,new Date());
-        recordTelemetry("research.sources",{returnedSources:response.results.length,sourceCount:evidence.sources.length,discardedSources:Math.max(0,Math.min(response.results.length,5)-evidence.sources.length)});
+        recordTelemetry("research.sources",{returnedSources:response.results.length,sourceCount:evidence.sources.length,discardedSources:Math.max(0,response.results.length-evidence.sources.length),extractedSources:evidence.passages.filter(p=>p.contentKind==='EXTRACTED_PAGE').length,extractionFailures});
         if (evidence.sources.length) {
           const checked = await evidenceGate.evaluate(evidence,options); evidenceVerdict = checked.verdict.decision;
           if (evidenceVerdict !== "ALLOW") throw new RetrievalError(evidenceVerdict === "BLOCK" ? "OUTPUT_BLOCKED" : "reason" in checked && checked.reason === "TIMEOUT" ? "DEADLINE_EXCEEDED" : "SAFETY_UNAVAILABLE");

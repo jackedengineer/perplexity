@@ -78,7 +78,7 @@ export function SourcesPanel({ answer,open,onToggle }: { answer: PublicAnswer | 
   const total=answer.sources.length+(answer.additionalSources?.length??0);
   function cards(sources:PublicAnswer['sources'],cited:boolean){return sources.map(source=><a key={source.sourceId} className="source-card" href={source.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">
     <span className="source-monogram" aria-hidden="true">{source.domain[0].toUpperCase()}</span><div><span className="source-domain">{source.domain}<span className="source-number">{cited?source.number:'Retrieved'}</span></span><h3>{source.title}</h3>
-    {source.retrievedAt&&<small className="source-evidence-meta">{source.contentKind==='EXTRACTED_PAGE'?'Page excerpt':'Search snippet'} · {source.publishedAt?`Published ${source.publishedAt.slice(0,10)}`:'Publication date unavailable'}<br/>Retrieved {source.retrievedAt.slice(0,10)}</small>}
+    {source.retrievedAt&&<small className="source-evidence-meta">{source.contentKind==='EXTRACTED_PAGE'?'Page excerpt':'Search snippet'} · {source.publishedAt?`Source date ${source.publishedAt.slice(0,10)} (provider estimate)`:'Source date unavailable'}<br/>Retrieved {source.retrievedAt.slice(0,10)}</small>}
     </div><Icon name="external" size={13}/>
   </a>);}
   const list=<div className="source-list">

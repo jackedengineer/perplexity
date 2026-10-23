@@ -3,7 +3,7 @@ import {canonicalSourceUrl} from './evidence';
 import {boundedSearch,RetrievalError,type RetrievalOptions} from './limits';
 import {readSearchResponse} from './tavily';
 import {safeRawEvidenceText} from './raw-text';
-const responseSchema=z.object({results:z.array(z.object({url:z.string().max(2048),raw_content:z.string().max(16000)})).max(2),failed_results:z.array(z.object({url:z.string().max(2048)})).max(2),usage:z.object({credits:z.int().min(0).max(1)})});
+const responseSchema=z.object({results:z.array(z.object({url:z.string().max(2048),raw_content:z.string().max(90000)})).max(2),failed_results:z.array(z.object({url:z.string().max(2048)})).max(2),usage:z.object({credits:z.int().min(0).max(1)})});
 export type ExtractResponse={pages:Array<{url:string;content:string;retrievedAt:string}>;failedUrls:string[];rejectedUrls:string[];credits:0|1};
 export interface ExtractProvider{extract(selectedUrls:readonly string[],options:RetrievalOptions):Promise<ExtractResponse>}
 export function createTavilyExtract(apiKey:string,request:typeof fetch=fetch):ExtractProvider{
@@ -17,12 +17,13 @@ export function createTavilyExtract(apiKey:string,request:typeof fetch=fetch):Ex
    if(!response.ok||signal.aborted||response.headers.get('content-type')?.split(';')[0].trim()!=='application/json'){void response.body?.cancel().catch(()=>{});throw new RetrievalError();}
    const decoded=responseSchema.parse(await readSearchResponse(response,signal)),returned=[...decoded.results,...decoded.failed_results];
    if(returned.some(r=>!urls.includes(r.url))||new Set(returned.map(r=>r.url)).size!==returned.length)throw new RetrievalError();
-   const pages:ExtractResponse['pages']=[],rejectedUrls:string[]=[];
+   const pages:ExtractResponse['pages']=[],rejectedUrls:string[]=[],unusableUrls:string[]=[];
    for(const result of decoded.results){
+    if(result.raw_content.length>16000){unusableUrls.push(result.url);continue;}
     if(!safeRawEvidenceText(result.raw_content)){rejectedUrls.push(result.url);continue;}
     pages.push({url:result.url,content:result.raw_content,retrievedAt:new Date().toISOString()});
    }
-   return {pages,rejectedUrls,failedUrls:urls.filter(url=>!decoded.results.some(r=>r.url===url)),credits:decoded.usage.credits as 0|1};
+   return {pages,rejectedUrls,failedUrls:urls.filter(url=>unusableUrls.includes(url)||!decoded.results.some(r=>r.url===url)),credits:decoded.usage.credits as 0|1};
   });
  }};
 }

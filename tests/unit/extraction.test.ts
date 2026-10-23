@@ -24,3 +24,7 @@ it('does not retry outages, leaks no upstream diagnostics and never dispatches a
  await expect(provider.extract([url],options())).rejects.toThrow('Retrieval unavailable');expect(request).toHaveBeenCalledOnce();
  const abort=new AbortController();abort.abort();await expect(provider.extract([url],{...options(),signal:abort.signal})).rejects.toThrow();expect(request).toHaveBeenCalledOnce();
 });
+it('an oversized page does not discard a usable sibling or masquerade as extracted evidence',async()=>{
+ const other='https://example.org/other',request=vi.fn<typeof fetch>().mockResolvedValue(Response.json({results:[{url,raw_content:'x'.repeat(16001)},{url:other,raw_content:'Usable selected page.'}],failed_results:[],usage:{credits:1}}));
+ expect(await createTavilyExtract('synthetic-key',request).extract([url,other],options())).toMatchObject({pages:[{url:other,content:'Usable selected page.'}],failedUrls:[url],rejectedUrls:[]});
+});
