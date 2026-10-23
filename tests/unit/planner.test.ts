@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {expect,it} from 'vitest';
-import {validatePlan,standaloneFallback,type PlannerInput} from '@/server/ai/plan';
+import {validatePlan,standaloneFallback,plannerInputSchema,preparePlanningInput,PLANNER_LIMITS,type PlannerInput} from '@/server/ai/plan';
 const input=(text='Compare Neon and Supabase for Next.js, not MongoDB. Budget $100.'):PlannerInput=>({original:{id:randomUUID(),text},context:[],now:'2026-10-23T09:00:00.000Z',timezone:'Asia/Kolkata',locale:null});
 const answer=(i:PlannerInput)=>({action:'ANSWER',standaloneQuestion:i.original.text,intent:'COMPARE',explicitConstraints:[{name:'EXPLICIT',value:'not MongoDB',sourceMessageId:i.original.id},{name:'EXPLICIT',value:'Budget $100',sourceMessageId:i.original.id}],disclosedAssumptions:[],retrieval:{required:true,queries:['Neon Supabase Next.js comparison'],freshness:'ANY',startDate:null,endDate:null},answerLanguage:'en'});
 it('preserves original text, explicit negation, entities and budgets in a bounded immutable plan',()=>{
@@ -53,4 +53,31 @@ it('normalizes grammatical possessives without allowing new entities or material
  const i=input('What about its pricing?');i.context=[{id:randomUUID(),role:'USER',text:'Explain Supabase'}];
  const p={...answer(i),standaloneQuestion:"What is Supabase’s pricing?",explicitConstraints:[],retrieval:{...answer(i).retrieval,queries:['Supabase pricing details']}};
  expect(validatePlan(p,i)).toMatchObject({action:'ANSWER'});expect(()=>validatePlan({...p,standaloneQuestion:"What is Python’s pricing?"},i)).toThrow();
+});
+it('accepts the full submission character limit for multibyte originals',()=>{
+ for(const text of ['界'.repeat(4000),'🌈'.repeat(3900)])expect(plannerInputSchema.safeParse(input(text)).success).toBe(true);
+});
+it('selects contiguous whole recent context by bytes without truncating a multibyte original',()=>{
+ const i=input('界'.repeat(4000));i.context=Array.from({length:6},()=>({id:randomUUID(),role:'USER',text:'履歴'.repeat(250)}));
+ const selected=preparePlanningInput(i);
+ expect(selected.original).toEqual(i.original);expect(selected.context).toEqual(i.context.slice(-2));
+ expect(Buffer.byteLength(JSON.stringify(selected),'utf8')).toBeLessThanOrEqual(PLANNER_LIMITS.inputBytes);
+ expect(i.context).toHaveLength(6);
+});
+it('does not import old topics, budgets, constraints or freshness into a new standalone topic',()=>{
+ const i=input('Explain photosynthesis');i.context=[{id:randomUUID(),role:'USER',text:'Compare PostgreSQL today with a $100 budget.'}];
+ const p={...answer(i),standaloneQuestion:i.original.text,explicitConstraints:[],retrieval:{...answer(i).retrieval,queries:['photosynthesis explanation']}};
+ expect(validatePlan(p,i)).toMatchObject({action:'ANSWER'});
+ for(const change of [
+  {standaloneQuestion:'Explain photosynthesis PostgreSQL $100'},
+  {retrieval:{...p.retrieval,queries:['photosynthesis PostgreSQL']}},
+  {explicitConstraints:[{name:'EXPLICIT',value:'$100',sourceMessageId:i.context[0].id}]},
+  {retrieval:{...p.retrieval,freshness:'RECENT'}},
+ ])expect(()=>validatePlan({...p,...change},i)).toThrow();
+});
+it('rejects off-topic clarification vocabulary and history laundering',()=>{
+ const i=input('Recommend a database');i.context=[{id:randomUUID(),role:'USER',text:'Explain Python 3'}];
+ const p={action:'CLARIFY',question:'What requirements matter for the database?',reasonCode:'MISSING_CONSTRAINT'};
+ expect(validatePlan(p,i)).toMatchObject({action:'CLARIFY'});
+ for(const question of ['Which Python version do you use?','Should the database cost $100?'])expect(()=>validatePlan({...p,question},i)).toThrow();
 });

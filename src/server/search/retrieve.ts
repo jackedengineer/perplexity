@@ -14,6 +14,7 @@ import { buildEvidence, validateEvidence } from "./evidence";
 import { RETRIEVAL_LIMITS, RetrievalError, searchQuerySchema } from "./limits";
 import type {ExtractProvider} from "./extract";
 import {rankEvidenceResults,explicitPreferredDomains,type RankedResult} from "./rank";
+import {freshnessTimeRange} from './freshness';
 import type { SearchProvider } from "./tavily";
 import {queryPlanSchema} from "@/server/contracts/pipeline";
 import type { EvidencePackage } from "@/server/contracts/pipeline";
@@ -78,7 +79,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
         }
         await db.transaction(tx=>checkpoint(tx,subject,runId,prepared.run,stage,signal));
         const plan=prepared.plan?.action==='ANSWER'?prepared.plan:null;
-        const filters=plan?{freshness:plan.retrieval.freshness,...(plan.retrieval.freshness==='RECENT'?{timeRange: /\b(today|yesterday)\b/iu.test(prepared.original)?'day' as const:/\b(this week|last week)\b/iu.test(prepared.original)?'week' as const:'month' as const}:{}),startDate:plan.retrieval.startDate,endDate:plan.retrieval.endDate,preferredDomains:explicitPreferredDomains(prepared.original)}:undefined;
+        const filters=plan?{freshness:plan.retrieval.freshness,...(plan.retrieval.freshness==='RECENT'?{timeRange:freshnessTimeRange(prepared.original)??'month'}:{}),startDate:plan.retrieval.startDate,endDate:plan.retrieval.endDate,preferredDomains:explicitPreferredDomains(prepared.original)}:undefined;
         const responses=await Promise.allSettled(queries.map((query,index)=>(index===0?search:dependencies.searchSecond!).search(query,{...options,...(filters?{filters}:{})})));
         const successful=responses.flatMap(r=>r.status==='fulfilled'?[r.value]:[]);
         if(!successful.length)throw new RetrievalError();

@@ -4,13 +4,14 @@ import {createOpenRouter} from '@openrouter/ai-sdk-provider';
 import {queryPlanSchema,type QueryPlan} from '@/server/contracts/pipeline';
 import {boundedModelFetch,boundedWork,type ExecutionOptions} from './bounded';
 import {isVerifiedNonReasoningModel,type SafetyModelConfig} from './models';
-import {plannerInputSchema,clarifyUnresolvedReference,resolvePricingFollowup,validatePlan,PlanningError,type PlannerInput} from './plan';
+import {PLANNER_LIMITS,plannerInputSchema,clarifyUnresolvedReference,resolvePricingFollowup,validatePlan,PlanningError,type PlannerInput} from './plan';
 import {providerUsage,type ProviderUsage} from './usage';
 import {PLANNER_PROMPT} from './prompts/planner';
 export interface PlannerProvider {readonly modelId:string;plan(input:PlannerInput,options:ExecutionOptions):Promise<{plan:QueryPlan;usage:ProviderUsage;engine?:"MODEL"|"CONTEXT_RULE"}>;usage?():ProviderUsage|undefined}
 export function createPlannerProvider(config:SafetyModelConfig,request:typeof fetch=fetch):PlannerProvider{
  let usage:ProviderUsage|undefined;
- const boundedFetch=boundedModelFetch(request),router=createOpenRouter({apiKey:config.apiKey,compatibility:'strict',fetch:async(url,init)=>{
+ const boundedFetch=boundedModelFetch(request,PLANNER_LIMITS.wireBytes),router=createOpenRouter({apiKey:config.apiKey,compatibility:'strict',fetch:async(url,init)=>{
+  if(typeof init?.body!=='string'||Buffer.byteLength(init.body,'utf8')>PLANNER_LIMITS.wireBytes)throw new PlanningError();
   const response=await boundedFetch(url,init),envelope=JSON.parse(await response.clone().text());
   usage=providerUsage(envelope?.usage,envelope?.model);return response;
  }});

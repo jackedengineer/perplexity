@@ -47,3 +47,12 @@ it('creates one neutral clarification for exact unresolved references without a 
  for(const text of ['Is it better?','Compare them','What about its pricing?','Which one should I use?','Is that current?']){const i=input();i.original.text=text;expect(await provider.plan(i,options())).toMatchObject({plan:{action:'CLARIFY'},usage:{costMicroUsd:0n},engine:'CONTEXT_RULE'});}
  expect(fetcher).not.toHaveBeenCalled();
 });
+it('fits a maximum multibyte original plus selected history inside the unchanged planner cost cap',async()=>{
+ const {preparePlanningInput,PLANNER_LIMITS}=await import('@/server/ai/plan');
+ const i=input();i.original.text='🌈'.repeat(3900);i.context=Array.from({length:6},()=>({id:randomUUID(),role:'USER',text:'履歴'.repeat(250)}));
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(response({plan:{action:'CLARIFY',question:'Which topic do you mean?',reasonCode:'MISSING_ENTITY'}}));
+ await createPlannerProvider(config,fetcher).plan(preparePlanningInput(i),options());
+ const bytes=Buffer.byteLength(String(fetcher.mock.calls[0][1]?.body),'utf8');
+ expect(bytes).toBeLessThanOrEqual(PLANNER_LIMITS.wireBytes);
+ expect(Math.ceil(PLANNER_LIMITS.wireBytes*.075+1024*.2)).toBeLessThanOrEqual(2000);
+});

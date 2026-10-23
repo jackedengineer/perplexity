@@ -1,39 +1,55 @@
 import {z} from 'zod';
 import {queryPlanSchema,type QueryPlan} from '@/server/contracts/pipeline';
-import {localeSchema,questionTextSchema,timezoneSchema} from '@/server/contracts/chat';
+import {MAX_SUBMISSION_BYTES,localeSchema,questionTextSchema,timezoneSchema} from '@/server/contracts/chat';
 import {safeEvidenceText} from '@/server/search/evidence';
-export const PLANNING_VERSION="planner-v3";
-export const PLANNER_LIMITS=Object.freeze({contextMessages:6,inputBytes:10000,queryCount:1,clarificationCharacters:240});
+import {freshnessTimeRange} from '@/server/search/freshness';
+export const PLANNING_VERSION="planner-v4";
+export const PLANNER_LIMITS=Object.freeze({contextMessages:6,inputBytes:MAX_SUBMISSION_BYTES,wireBytes:23000,queryCount:1,clarificationCharacters:240});
 const turn=z.strictObject({id:z.uuid(),role:z.enum(['USER','ASSISTANT']),text:questionTextSchema});
-export const plannerInputSchema=z.strictObject({original:z.strictObject({id:z.uuid(),text:questionTextSchema}),context:z.array(turn).max(6),now:z.iso.datetime(),timezone:timezoneSchema,locale:localeSchema.nullable()})
+const plannerInputShape=z.strictObject({original:z.strictObject({id:z.uuid(),text:questionTextSchema}),context:z.array(turn).max(6),now:z.iso.datetime(),timezone:timezoneSchema,locale:localeSchema.nullable()});
+export const plannerInputSchema=plannerInputShape
  .refine(value=>new Set([value.original.id,...value.context.map(m=>m.id)]).size===value.context.length+1&&Buffer.byteLength(JSON.stringify(value),'utf8')<=PLANNER_LIMITS.inputBytes);
 export type PlannerInput=z.infer<typeof plannerInputSchema>;
+// Keep the original intact and choose the newest contiguous whole turns by wire
+// bytes, not character count. Any valid 4,000-character original fits alone.
+export function preparePlanningInput(value:PlannerInput):PlannerInput{
+ const input=plannerInputShape.parse(value),selected={...input,context:[] as PlannerInput['context']};
+ for(const message of [...input.context].reverse()){
+  const context=[message,...selected.context];
+  if(Buffer.byteLength(JSON.stringify({...selected,context}),'utf8')>PLANNER_LIMITS.inputBytes)break;
+  selected.context=context;
+ }
+ return plannerInputSchema.parse(selected);
+}
 export class PlanningError extends Error{constructor(){super('Planning unavailable');}}
 const genericWords=new Set(('a an and are as at about be between by can compare comparison cost costs current date dates describe differences do does explain explanation fact facts features find for from general give how in information is latest me of official on or overview plans please price prices pricing question recent research resources results review search sources than the their them then these they this those to topic use using vs versus was were what when where which why with without work works you your it its that into details summary summarize provide tell more examples difference brief briefly concise sentence sentences word words').split(' '));
 const words=(text:string)=>(text.normalize('NFKC').replace(/[’‘]/gu,"'").toLowerCase().match(/[\p{L}\p{N}]+(?:[._'-][\p{L}\p{N}]+)*/gu)??[]).map(word=>word.replace(/'s$/u,''));
 const numeric=(text:string)=>text.normalize('NFKC').match(/\d+(?:[.,/-]\d+)*/gu)?.map(v=>v.replaceAll(',',''))??[];
 const references=/\b(?:it|its|they|their|them|that|this|these|those|former|latter)\b/iu;
-const freshness=/\b(?:current|latest|recent|today|yesterday|this week|this month|last week|last month)\b|आज|नवीनतम|últim[oa]/iu;
 const negative=/\b(?:not|no|without|exclude|excluding|avoid|except|never|don't|doesn't)\b/giu;
+const clarificationWords=new Set('product products service services comparing mean refer referring information topic topics requirements requirement important matters matter aspect aspects options option criteria priorities priority goals goal purpose needs need looking clarify specify range location timeframe time region country currency audience case cases main budget workload constraints type detail details consider intended'.split(' '));
 function freeze<T>(value:T):T{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;}
 // Conservative provenance validation, not a semantic-equivalence or safety proof.
 // Actual outbound queries still require the independent semantic safety gate.
 export function validatePlan(value:unknown,input:unknown,maxQueries:number=PLANNER_LIMITS.queryCount):QueryPlan{
  try{
   const original=plannerInputSchema.parse(input),plan=queryPlanSchema.parse(value);
+  const resolving=references.test(original.original.text);
+  const context=resolving?original.context:[];
+  const users=[original.original,...context.filter(m=>m.role==='USER')];
+  const vocabulary=new Set(words([original.original.text,...context.map(m=>m.text)].join(' ')));
+  const userNumbers=new Set(users.flatMap(m=>numeric(m.text)));
   if(plan.action==='CLARIFY'){
    if(standaloneFallback(original)||resolvePricingFollowup(original))throw new PlanningError();
    if(plan.question.length>240||(plan.question.match(/\?/gu)?.length??0)>1||/[\r\n]/u.test(plan.question)||!safeEvidenceText(plan.question)||/https?:|www\./iu.test(plan.question))throw new PlanningError();
+   if(words(plan.question).some(word=>!vocabulary.has(word)&&!genericWords.has(word)&&!clarificationWords.has(word))||numeric(plan.question).some(n=>!userNumbers.has(n)))throw new PlanningError();
    return freeze(plan);
   }
   if(![1,2].includes(maxQueries)||!plan.retrieval.required||plan.retrieval.queries.length>maxQueries||plan.disclosedAssumptions.length)throw new PlanningError();
-  const users=[original.original,...original.context.filter(m=>m.role==='USER')];
   for(const constraint of plan.explicitConstraints){
    const source=users.find(m=>m.id===constraint.sourceMessageId);
    if(constraint.name!=='EXPLICIT'||!source||!source.text.includes(constraint.value))throw new PlanningError();
   }
-  const vocabulary=new Set(words([original.original.text,...original.context.map(m=>m.text)].join(' ')));
-  const userNumbers=new Set(users.flatMap(m=>numeric(m.text)));
   const derived=[plan.standaloneQuestion,...plan.retrieval.queries];
   if(derived.some(text=>!safeEvidenceText(text)||words(text).some(word=>!vocabulary.has(word)&&!genericWords.has(word))||numeric(text).some(n=>!userNumbers.has(n))))throw new PlanningError();
   // Rewrites cannot erase explicit negation, numeric limits or named user topics.
@@ -46,7 +62,7 @@ export function validatePlan(value:unknown,input:unknown,maxQueries:number=PLANN
    const previous=new Set(original.context.flatMap(m=>words(m.text)).filter(w=>!genericWords.has(w)));
    if(!words(plan.standaloneQuestion).some(w=>previous.has(w))||references.test(plan.standaloneQuestion))throw new PlanningError();
   }
-  if(plan.retrieval.freshness==='RECENT'&&!freshness.test(users.map(m=>m.text).join(' ')))throw new PlanningError();
+  if(plan.retrieval.freshness==='RECENT'&&!freshnessTimeRange(users.map(m=>m.text).join(' ')))throw new PlanningError();
   if(plan.retrieval.freshness==='SPECIFIC_RANGE'&&![plan.retrieval.startDate,plan.retrieval.endDate].every(date=>users.some(m=>m.text.includes(date!))))throw new PlanningError();
   return freeze(plan);
  }catch{throw new PlanningError();}
@@ -56,7 +72,7 @@ export function standaloneFallback(value:unknown):QueryPlan|null{
   const input=plannerInputSchema.parse(value),text=input.original.text;
   const compare=/^compare\s+\S[\s\S]{0,240}\s+(?:and|vs\.?|versus)\s+\S/iu.test(text.trim());
   if(text.length>300||references.test(text)||/\b(?:best|better|recommend)\b/iu.test(text)||!compare&&!/^(?:explain|define|describe|why (?:do|does|is)|how (?:do|does)|what (?:is|are))\s+\S+/iu.test(text.trim()))return null;
-  return validatePlan({action:'ANSWER',standaloneQuestion:text,intent:compare?'COMPARE':'EXPLAIN',explicitConstraints:[],disclosedAssumptions:[],retrieval:{required:true,queries:[text],freshness:freshness.test(text)?'RECENT':'ANY',startDate:null,endDate:null},answerLanguage:input.locale??'en'},input);
+  return validatePlan({action:'ANSWER',standaloneQuestion:text,intent:compare?'COMPARE':'EXPLAIN',explicitConstraints:[],disclosedAssumptions:[],retrieval:{required:true,queries:[text],freshness:freshnessTimeRange(text)?'RECENT':'ANY',startDate:null,endDate:null},answerLanguage:input.locale??'en'},input);
  }catch{return null;}
 }
 

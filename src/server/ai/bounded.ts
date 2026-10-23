@@ -14,9 +14,9 @@ export async function boundedWork<T>(options: ExecutionOptions,limitMs: number,w
   } catch { throw new AnswerError(); }
   finally { clearTimeout(timer); options.signal.removeEventListener("abort",abort);controller.signal.removeEventListener("abort",stop); }
 }
-export function boundedModelFetch(request: typeof fetch): typeof fetch {
+export function boundedModelFetch(request: typeof fetch,maxRequestBytes=20000): typeof fetch {
   return async(url,init)=>{
-    if (String(url) !== "https://openrouter.ai/api/v1/chat/completions" || typeof init?.body !== "string" || Buffer.byteLength(init.body) > 20000) throw new AnswerError();
+    if (String(url) !== "https://openrouter.ai/api/v1/chat/completions" || typeof init?.body !== "string" || Buffer.byteLength(init.body) > maxRequestBytes) throw new AnswerError();
     const response = await request(url,{ ...init,redirect: "error",credentials: "omit",cache: "no-store" });
     if (!response.ok || init.signal?.aborted || response.headers.get("content-type")?.split(";")[0].trim() !== "application/json") {
       void response.body?.cancel().catch(()=>undefined); throw new AnswerError();

@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import {and,eq} from 'drizzle-orm';
 import {inputSafetyReviews,messages,runPlans,runs} from '@/db/schema';
-import {PLANNING_VERSION,plannerInputSchema,standaloneFallback,validatePlan} from '@/server/ai/plan';
+import {PLANNING_VERSION,preparePlanningInput,standaloneFallback,validatePlan} from '@/server/ai/plan';
 import type {PlannerProvider} from '@/server/ai/planner-provider';
 import type {SubmitQuery} from '@/server/contracts/chat';
 import {lockOwnedRun} from './lock';
@@ -16,7 +16,7 @@ export async function planRun(db:AdmissionDatabase,subject:string,runId:string,s
   const [message]=review?.acceptedMessageId?await tx.select().from(messages).where(and(eq(messages.id,review.acceptedMessageId),eq(messages.conversationId,run.conversationId))):[];
   if(!message?.approvedAt||message.role!=='USER'||message.parts.length!==1||message.parts[0].text!==submission.message.text||review.attemptVersion!==run.attemptVersion)throw new AdmissionError('SAFETY_UNAVAILABLE');
   const context=await loadPlanningContext(tx,run.conversationId,message.sequence);
-  return {run,input:plannerInputSchema.parse({original:{id:message.id,text:message.parts[0].text},context,now:now.toISOString(),timezone:submission.timezone??'UTC',locale:submission.locale??null})};
+  return {run,input:preparePlanningInput({original:{id:message.id,text:message.parts[0].text},context,now:now.toISOString(),timezone:submission.timezone??'UTC',locale:submission.locale??null})};
  });
  let plan;
  try{plan=validatePlan((await provider.plan(loaded.input,{signal,deadlineAt:loaded.run.deadlineAt})).plan,loaded.input,loaded.run.accountingVersion===2?2:1);}
