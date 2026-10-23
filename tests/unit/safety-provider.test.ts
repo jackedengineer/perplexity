@@ -1,10 +1,11 @@
 import { expect, it, vi } from "vitest";
+import { safetyCategorySchema } from "@/server/safety/policy";
 import { parseSafetyModel } from "@/server/ai/models";
 import { createOpenRouterSafetyProvider } from "@/server/safety/openrouter";
 const env = { OPENROUTER_API_KEY: "synthetic-test-key-only", MODEL_SAFETY: "test/classifier-v1", SAFETY_OPENROUTER_PROVIDER: "test-provider" };
 const config = () => parseSafetyModel(env)!;
 const input = { text: "Explain account security", context: [{ role: "USER" as const, text: "I own the staging app" }] };
-const wire = { decision: "ALLOW", categoryCodes: [], policyVersion: "v1", retryable: null };
+const wire = { classification: "ALLOW", policyVersion: "v1" };
 const envelope = (content: unknown = JSON.stringify(wire), finish_reason = "stop", extra = {}) => ({ choices: [{ finish_reason,
   message: { role: "assistant", content, ...extra } }], usage: { prompt_tokens: 1, completion_tokens: 1 } });
 const json = (value: unknown) => new Response(JSON.stringify(value),{ headers: { "content-type": "application/json" } });
@@ -31,7 +32,7 @@ it("uses one isolated, tool-free, nonstreaming strict-schema request with fixed 
   expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
   expect(options).toMatchObject({ method: "POST", cache: "no-store", redirect: "error", credentials: "omit" });
   const body = JSON.parse(options!.body as string);
-  expect(body).toMatchObject({ model: "test/classifier-v1", stream: false, max_completion_tokens: 384, tools: [], tool_choice: "none",
+  expect(body).toMatchObject({ model: "test/classifier-v1", stream: false, temperature: 0, max_completion_tokens: 384, tools: [], tool_choice: "none",
     provider: { only: ["test-provider"], allow_fallbacks: false, require_parameters: true, data_collection: "deny", zdr: true },
     response_format: { type: "json_schema", json_schema: { strict: true, schema: { additionalProperties: false } } } });
   expect(body.messages.map((item: { role: string })=>item.role)).toEqual(["system","user"]);
@@ -41,11 +42,11 @@ it("uses one isolated, tool-free, nonstreaming strict-schema request with fixed 
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
 it("maps consistent BLOCK/UNAVAILABLE wire objects and discards reasoning fields", async () => {
-  for (const verdict of [{ decision: "BLOCK", categoryCodes: ["FRAUD"], policyVersion: "v1", retryable: null },
-    { decision: "UNAVAILABLE", categoryCodes: [], policyVersion: "v1", retryable: true }]) {
+  for (const verdict of [{ classification: "FRAUD", policyVersion: "v1" },
+    { classification: "UNAVAILABLE", policyVersion: "v1" }]) {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json(envelope(JSON.stringify(verdict),"stop",{ reasoning: "PRIVATE REASONING" })));
     const result = await createOpenRouterSafetyProvider(config(),fetcher).classify(input,new AbortController().signal);
-    expect(result).toMatchObject({ decision: verdict.decision, policyVersion: "v1" });
+    expect(result).toMatchObject({ decision: verdict.classification === "UNAVAILABLE" ? "UNAVAILABLE" : "BLOCK", policyVersion: "v1" });
     expect(JSON.stringify(result)).not.toContain("PRIVATE");
   }
 });
@@ -106,4 +107,14 @@ it("uses an evidence-specific system policy without treating sources as trusted 
   expect(body.messages[1].role).toBe("user");
   expect(JSON.parse(body.messages[1].content).context[0].role).toBe("ASSISTANT");
   expect(body).toMatchObject({ tools: [],tool_choice: "none",stream: false });
+});
+
+it("rejects ambiguous legacy verdicts instead of repairing ALLOW/category contradictions",async()=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(json(envelope(JSON.stringify({decision:"ALLOW",categoryCodes:["FRAUD"],policyVersion:"v1",retryable:null}))));
+ await expect(createOpenRouterSafetyProvider(config(),fetcher).classify(input,new AbortController().signal)).rejects.toMatchObject({reason:"MALFORMED_OUTPUT"});
+});
+
+it.each(safetyCategorySchema.options)("maps the single %s category to a policy stop",async(category)=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(json(envelope(JSON.stringify({classification:category,policyVersion:"v1"}))));
+ expect(await createOpenRouterSafetyProvider(config(),fetcher).classify(input,new AbortController().signal)).toEqual({decision:"BLOCK",categoryCodes:[category],policyVersion:"v1"});
 });

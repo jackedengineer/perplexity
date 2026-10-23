@@ -1,0 +1,2 @@
+export const SAFETY_PROMPT_VERSIONS = Object.freeze({input:"input-v3",evidence:"evidence-v2",output:"output-v2"} as const);
+export const SAFETY_WIRE_INSTRUCTIONS = "Return exactly classification and policyVersion. classification is ALLOW for permitted content, UNAVAILABLE when uncertain, or the most specific stop-required category code. Never return BLOCK as a classification. A category code itself requires the application to stop research and select the appropriate fixed response. policyVersion must be v1. Return no explanation or other fields.";

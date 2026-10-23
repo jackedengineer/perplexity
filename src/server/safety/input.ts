@@ -2,6 +2,7 @@ import {traceStage,recordTelemetry} from '@/server/telemetry/trace';
 import type {TelemetryStage} from '@/server/telemetry/contracts';
 import { guardVerdictSchema, SAFETY_POLICY, type GuardVerdict } from "./policy";
 import {INPUT_SAFETY_PROMPT_VERSION} from './prompt';
+import {SAFETY_PROMPT_VERSIONS} from './versions';
 import { inspectInput } from "./deterministic";
 import { INPUT_DETECTOR_VERSION, safetyInputSchema, SafetyProviderError, type InputReason, type SafetyProvider } from "./provider";
 
@@ -9,7 +10,7 @@ export type InputCheck = { verdict: GuardVerdict; reason: InputReason; detectorV
   modelId: string | null; durationMs: number };
 type SafetyStage=Extract<TelemetryStage,`safety.${string}`>;
 export function createInputGate(provider: SafetyProvider | undefined,stage:SafetyStage="safety.input") {
-  const promptVersion={"safety.input":INPUT_SAFETY_PROMPT_VERSION,"safety.query":INPUT_SAFETY_PROMPT_VERSION,"safety.evidence":"evidence-v1","safety.output":"output-v1"}[stage];
+  const promptVersion={"safety.input":INPUT_SAFETY_PROMPT_VERSION,"safety.query":INPUT_SAFETY_PROMPT_VERSION,"safety.evidence":SAFETY_PROMPT_VERSIONS.evidence,"safety.output":SAFETY_PROMPT_VERSIONS.output}[stage];
   return {
     async evaluate(value: unknown, options: { signal: AbortSignal; deadlineAt: Date }): Promise<InputCheck> {
       return traceStage(stage,async()=>{

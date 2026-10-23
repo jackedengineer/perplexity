@@ -5,20 +5,16 @@ import { INPUT_SAFETY_PROMPT } from "./prompt";
 import { SAFETY_POLICY, safetyCategorySchema } from "./policy";
 import { SafetyProviderError, type SafetyProvider } from "./provider";
 
-const wireSchema = z.strictObject({ decision: z.enum(["ALLOW", "BLOCK", "UNAVAILABLE"]),
-  categoryCodes: z.array(safetyCategorySchema).max(11), policyVersion: z.literal(SAFETY_POLICY.version), retryable: z.boolean().nullable(),
-}).refine((value)=>new Set(value.categoryCodes).size === value.categoryCodes.length && (value.decision === "UNAVAILABLE"
-  ? typeof value.retryable === "boolean" && value.categoryCodes.length === 0
-  : value.retryable === null && (value.decision === "ALLOW" ? value.categoryCodes.length === 0 : value.categoryCodes.length > 0)));
+const classifications = ["ALLOW","UNAVAILABLE",...safetyCategorySchema.options] as const;
+const wireSchema = z.strictObject({classification:z.enum(classifications),policyVersion:z.literal(SAFETY_POLICY.version)});
 const responseSchema = z.object({ usage: z.unknown().optional(),model: z.string().max(128).optional(),error: z.never().optional(), choices: z.array(z.object({ finish_reason: z.literal("stop"),
   message: z.object({ role: z.literal("assistant"), content: z.string().min(1).max(2048),
     tool_calls: z.array(z.never()).max(0).optional(), function_call: z.never().optional(), refusal: z.null().optional() }),
 })).length(1) });
 const outputSchema = { type: "object", additionalProperties: false,
-  required: ["decision","categoryCodes","policyVersion","retryable"], properties: {
-    decision: { type: "string", enum: ["ALLOW","BLOCK","UNAVAILABLE"] },
-    categoryCodes: { type: "array", items: { type: "string", enum: safetyCategorySchema.options }, maxItems: 11 },
-    policyVersion: { type: "string", enum: [SAFETY_POLICY.version] }, retryable: { type: ["boolean","null"] },
+  required: ["classification","policyVersion"], properties: {
+    classification: { type: "string", enum: classifications },
+    policyVersion: { type: "string", enum: [SAFETY_POLICY.version] },
   },
 };
 async function readResponse(response: Response) {
@@ -47,12 +43,12 @@ export function createOpenRouterSafetyProvider(config: SafetyModelConfig, reques
     modelId: config.modelId,
     async classify(input,signal) {
       usage = undefined;
-      const body = JSON.stringify({ model: config.modelId, stream: false, usage: { include: true },max_completion_tokens: 384,
+      const body = JSON.stringify({ model: config.modelId, stream: false,temperature:0, usage: { include: true },max_completion_tokens: 384,
         tools: [], tool_choice: "none", plugins: [],
         ...(!isVerifiedNonReasoningModel(config.modelId) ? {reasoning: { enabled: false, exclude: true }} : {}),
         provider: { only: [config.provider], allow_fallbacks: false, require_parameters: true, data_collection: "deny", zdr: true,
           max_price: { prompt: 0.1,completion: 0.4,request: 0 } },
-        response_format: { type: "json_schema", json_schema: { name: "input_safety_v1", strict: true, schema: outputSchema } },
+        response_format: { type: "json_schema", json_schema: { name: "research_safety_v2", strict: true, schema: outputSchema } },
         messages: [{ role: "system", content: prompt },{ role: "user", content: JSON.stringify(input) }],
       });
       if (Buffer.byteLength(body,"utf8") > 45_000) throw new SafetyProviderError("PROVIDER_UNAVAILABLE");
@@ -76,9 +72,9 @@ export function createOpenRouterSafetyProvider(config: SafetyModelConfig, reques
         if(receipt.success)usage = providerUsage(receipt.data.usage,receipt.data.model);
         const envelope = responseSchema.parse(value);
         const verdict = wireSchema.parse(JSON.parse(envelope.choices[0].message.content));
-        return verdict.decision === "UNAVAILABLE"
-          ? { decision: verdict.decision, retryable: verdict.retryable, policyVersion: verdict.policyVersion }
-          : { decision: verdict.decision, categoryCodes: verdict.categoryCodes, policyVersion: verdict.policyVersion };
+        return verdict.classification === "UNAVAILABLE"
+          ? {decision:"UNAVAILABLE",retryable:false,policyVersion:verdict.policyVersion}
+          : {decision:verdict.classification === "ALLOW"?"ALLOW":"BLOCK",categoryCodes:verdict.classification === "ALLOW"?[]:[verdict.classification],policyVersion:verdict.policyVersion};
       } catch { throw new SafetyProviderError("MALFORMED_OUTPUT"); }
     },
   };
