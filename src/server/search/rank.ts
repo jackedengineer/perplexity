@@ -11,7 +11,7 @@ function relevantWindow(text:string,query:Set<string>){
   let start=offset;if(start&&/[\uDC00-\uDFFF]/u.test(text[start]))start++;
   let end=Math.min(start+1000,text.length);if(end<text.length&&/[\uDC00-\uDFFF]/u.test(text[end]))end--;
   const window=text.slice(start,end),overlap=new Set(terms(window).filter(t=>query.has(t))).size;
-  if(overlap>score){best=window;score=overlap;}
+  if(overlap>score||overlap>0&&overlap===score&&window.length<best.length){best=window;score=overlap;}
  }
  return {text:best,overlap:score};
 }
@@ -33,7 +33,7 @@ export function rankEvidenceResults(results:RankedResult[],query:string,now:Date
 }
 export function explicitPreferredDomains(original:string){
  const hosts=new Set<string>();
- for(const match of original.matchAll(/\b(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,63})(?:\/[^\s]*)?/giu)){
+ for(const match of original.matchAll(/(?:https?:\/\/|\b(?:site|domain):\s*)((?:[a-z0-9-]+\.)+[a-z]{2,63})(?:\/[^\s]*)?/giu)){
   const canonical=canonicalSourceUrl(`https://${match[1]}/`);if(canonical)hosts.add(new URL(canonical).hostname);
  }
  return [...hosts].slice(0,3);

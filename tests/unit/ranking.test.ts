@@ -25,3 +25,8 @@ it('prefers the requested original domain over an earlier syndicated copy',()=>{
  const ranked=rankEvidenceResults([source('https://mirror.org/','Neon pricing costs $20.'),source('https://neon.tech/pricing','Neon pricing costs $20.')],'Neon pricing',now,{preferredDomains:['neon.tech']});
  expect(ranked.map(r=>r.url)).toEqual(['https://neon.tech/pricing']);
 });
+it('does not invent a domain preference from a framework name',async()=>{
+ const {explicitPreferredDomains}=await import('@/server/search/rank');
+ expect(explicitPreferredDomains('Compare Neon and Supabase for Next.js')).toEqual([]);
+ expect(explicitPreferredDomains('Use site:neon.tech and https://supabase.com/docs')).toEqual(['neon.tech','supabase.com']);
+});
