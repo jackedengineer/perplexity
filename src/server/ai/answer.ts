@@ -3,7 +3,7 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { questionTextSchema } from "@/server/contracts/chat";
 import { validateEvidence } from "@/server/search/evidence";
 import type { EvidencePackage } from "@/server/contracts/pipeline";
-import type { SafetyModelConfig } from "./models";
+import { isVerifiedNonReasoningModel,type SafetyModelConfig } from "./models";
 import { ANSWER_PROMPT } from "./prompts/answer";
 import { AnswerError, boundedModelFetch, boundedWork, type ExecutionOptions } from "./bounded";
 import { providerUsage, type ProviderUsage } from "./usage";
@@ -24,7 +24,8 @@ export function createAnswerProvider(config: SafetyModelConfig,request: typeof f
         const result = await generateText({ model: router.chat(config.modelId,{
           provider: { only: [config.provider],allow_fallbacks: false,require_parameters: true,data_collection: "deny",zdr: true,
             max_price: { prompt: 0.5,completion: 2,request: 0 } },
-          reasoning: { enabled: false,exclude: true,effort: "none" },usage: { include: true },extraBody: { plugins: [] },
+          ...(!isVerifiedNonReasoningModel(config.modelId) ? {reasoning: { enabled: false as const,exclude: true as const,effort: "none" as const }} : {}),
+          usage: { include: true },extraBody: { plugins: [] },
         }),system: ANSWER_PROMPT,prompt: JSON.stringify({ question: question.data,
           passages: evidence.passages.map(p=>({ sourceId: p.sourceId,text: p.text })) }),
           maxOutputTokens: 1200,maxRetries: 0,abortSignal: signal,timeout: 12000,tools: {},toolChoice: "none",

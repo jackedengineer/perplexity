@@ -1,6 +1,6 @@
 import { providerUsage,type ProviderUsage } from "@/server/ai/usage";
 import { z } from "zod";
-import type { SafetyModelConfig } from "@/server/ai/models";
+import { isVerifiedNonReasoningModel,type SafetyModelConfig } from "@/server/ai/models";
 import { INPUT_SAFETY_PROMPT } from "./prompt";
 import { SAFETY_POLICY, safetyCategorySchema } from "./policy";
 import { SafetyProviderError, type SafetyProvider } from "./provider";
@@ -48,7 +48,8 @@ export function createOpenRouterSafetyProvider(config: SafetyModelConfig, reques
     async classify(input,signal) {
       usage = undefined;
       const body = JSON.stringify({ model: config.modelId, stream: false, usage: { include: true },max_completion_tokens: 384,
-        tools: [], tool_choice: "none", plugins: [], reasoning: { enabled: false, exclude: true },
+        tools: [], tool_choice: "none", plugins: [],
+        ...(!isVerifiedNonReasoningModel(config.modelId) ? {reasoning: { enabled: false, exclude: true }} : {}),
         provider: { only: [config.provider], allow_fallbacks: false, require_parameters: true, data_collection: "deny", zdr: true,
           max_price: { prompt: 0.1,completion: 0.4,request: 0 } },
         response_format: { type: "json_schema", json_schema: { name: "input_safety_v1", strict: true, schema: outputSchema } },

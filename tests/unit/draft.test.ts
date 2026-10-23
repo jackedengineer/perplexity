@@ -9,6 +9,13 @@ const options = () => ({ signal: new AbortController().signal,deadlineAt: new Da
 const response = (text = "Water refracts sunlight [S1].",reason = "stop") => Response.json({ id: "synthetic",model: "test/answer",created: 1,
   choices: [{ index: 0,finish_reason: reason,message: { role: "assistant",content: text,reasoning: "PRIVATE REASONING" } }],
   usage: { prompt_tokens: 100,completion_tokens: 10,total_tokens: 110,cost: 0.0000123 } });
+it.each(["openai/gpt-4.1-nano","openai/gpt-4.1-mini"])("avoids unsupported reasoning parameters for %s while preserving spend/privacy controls",async(modelId)=>{
+  const fetcher=vi.fn<typeof fetch>().mockResolvedValue(response());
+  await createAnswerProvider({...config,modelId,provider:"azure"},fetcher).generate(input(),options());
+  const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body));
+  expect(body).not.toHaveProperty("reasoning");
+  expect(body.provider).toEqual({only:["azure"],allow_fallbacks:false,require_parameters:true,data_collection:"deny",zdr:true,max_price:{prompt:.5,completion:2,request:0}});
+});
 it("uses the AI SDK with one bounded, private, tool-free OpenRouter call",async()=>{
   const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response());
   const result = await createAnswerProvider(config,fetcher).generate(input(),options());
