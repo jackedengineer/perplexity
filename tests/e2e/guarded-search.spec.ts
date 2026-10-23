@@ -165,6 +165,10 @@ test('clarification is saved privately and a reply continues the same conversati
   await expect(page.locator('.answer-prose')).toHaveCount(2,{timeout:60000});expect(new URL(page.url()).pathname).toBe(path);
   await page.reload();await expect(page.getByRole('article',{name:'Your question'})).toHaveCount(2);
   expect(await f.owner.select().from(schema.runPlans).where(eq(schema.runPlans.conversationId,id))).toHaveLength(2);
+  await page.getByRole('textbox',{name:'Ask a question'}).fill('Neon and Supabase');await page.getByRole('button',{name:'Submit question'}).click();
+  // An intentionally repeated question is a new turn, not a hidden transport replay.
+  await expect(page.getByRole('article',{name:'Your question'})).toHaveCount(3);
+  await expect(page.locator('.answer-prose')).toHaveCount(3,{timeout:60000});
   await page.screenshot({path:'.artifacts/t13-clarification-followup.png',fullPage:true});
  }finally{await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
 });

@@ -12,12 +12,13 @@ export const idleResearch: ResearchState={question:"",pending:false,error:"",lab
 export function ThreadView({conversation,initial,research=idleResearch,submit}: {conversation:Conversation;initial:HistoryPage;research?:ResearchState;submit:(text:string)=>void}) {
   const [text,setText]=useState(""),[sourcesOpen,setSourcesOpen]=useState(false);
   const saved=research.committed;
+  const [baseSequence]=useState(()=>Math.max(0,...initial.items.map(message=>message.sequence)));
   let history=initial;
   if(saved&&!initial.items.some(message=>message.id===saved.messageId)){
     const now=saved.createdAt;
     history={...initial,items:[...initial.items,
-      ...(research.question&&initial.items.findLast(message=>message.role==="USER")?.parts[0]?.text!==research.question?[{id:saved.runId,role:"USER" as const,kind:"QUESTION" as const,parts:[{type:"text" as const,text:research.question}],sequence:1,schemaVersion:1 as const,createdAt:now}]:[]),
-      {id:saved.messageId,role:"ASSISTANT",kind:saved.answer.kind==="CLARIFICATION"?"CLARIFICATION":"ANSWER",parts:[{type:"text",text:saved.text}],sequence:2,schemaVersion:1,createdAt:now,answer:saved.answer}]};
+      ...(research.question&&!initial.items.some(message=>message.role==="USER"&&message.sequence>baseSequence)?[{id:saved.runId,role:"USER" as const,kind:"QUESTION" as const,parts:[{type:"text" as const,text:research.question}],sequence:baseSequence+1,schemaVersion:1 as const,createdAt:now}]:[]),
+      {id:saved.messageId,role:"ASSISTANT",kind:saved.answer.kind==="CLARIFICATION"?"CLARIFICATION":"ANSWER",parts:[{type:"text",text:saved.text}],sequence:baseSequence+2,schemaVersion:1,createdAt:now,answer:saved.answer}]};
   }
   const hasAnswer=history.items.some(message=>message.role==="ASSISTANT"),hasQuestion=history.items.some(message=>message.role==="USER");
   return <main id="main" className={`thread-page ${hasAnswer||hasQuestion||research.question||research.pending?"active-thread":""}`}>
@@ -28,7 +29,7 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
     <section className="thread-content" aria-label="Conversation history" tabIndex={0}>
       <h1>{conversation.title}</h1>
       {history.items.length>0&&<ConversationHistory key={`${saved?.messageId??"saved"}:${initial.items.length}`} conversationId={conversation.id} initial={history} sourcesOpen={sourcesOpen} onSourcesOpenChange={setSourcesOpen}/>}
-      {research.question&&history.items.findLast(message=>message.role==="USER")?.parts[0]?.text!==research.question&&!saved&&<article className="history-message question-message pending-question" aria-label="Your question"><p>{research.question}</p></article>}
+      {research.question&&!history.items.some(message=>message.role==="USER"&&message.sequence>baseSequence)&&!saved&&<article className="history-message question-message pending-question" aria-label="Your question"><p>{research.question}</p></article>}
       {research.pending&&<div className="research-progress" role="status" aria-live="polite"><span className="progress-mark" aria-hidden="true"><ResearchMark/></span><span>{research.label}</span><div className="answer-skeleton" aria-hidden="true"><span/><span/><span/></div></div>}
       {research.error&&!saved&&<div className="research-failure"><p role="alert">{research.error}</p><div className="failure-actions">
         <button className="research-button" disabled={research.pending} onClick={()=>void research.retry()}>Check same request</button>
