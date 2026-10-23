@@ -1,4 +1,4 @@
-import { questionTextSchema } from "@/server/contracts/chat";
+import { localeSchema,questionTextSchema } from "@/server/contracts/chat";
 import { validateEvidence } from "@/server/search/evidence";
 import { inspectInput } from "@/server/safety/deterministic";
 import { NO_EVIDENCE_TEXT } from "@/server/safety/release";
@@ -14,7 +14,7 @@ export async function generatePrivateDraft(input: DraftInput,provider: AnswerPro
     usage: { costMicroUsd: 0n,inputTokens: 0,outputTokens: 0,actualModel: null } };
   if (!provider) throw new AnswerError();
   try {
-    const draft = await provider.generate({ question: question.data,evidence,...(input.interpretation?{interpretation:questionTextSchema.parse(input.interpretation)}:{}) },options);
+    const draft = await provider.generate({ question: question.data,evidence,answerLanguage:localeSchema.parse(input.answerLanguage??'en'),...(input.interpretation?{interpretation:questionTextSchema.parse(input.interpretation)}:{}) },options);
     if (options.signal.aborted || Date.now() >= options.deadlineAt.getTime() || !questionTextSchema.safeParse(draft.text).success) throw new AnswerError();
     return { kind: "ANSWER",text: draft.text,usage: draft.usage };
   } catch { throw new AnswerError(); }

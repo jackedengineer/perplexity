@@ -72,3 +72,10 @@ it("sends a strict structured schema restricted to this evidence registry",async
  expect(body.response_format).toMatchObject({type:"json_schema",json_schema:{strict:true}});
  expect(JSON.stringify(body.response_format.json_schema.schema)).toContain('"enum":["S1"]');
 });
+it('passes the planned answer locale to the model as validated data',async()=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(response('La lumière est réfractée.'));
+ await createAnswerProvider(config,fetcher).generate({...input(),answerLanguage:'fr'},options());
+ const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body)),payload=JSON.parse(body.messages[1].content);
+ expect(payload.answerLanguage).toBe('fr');
+ expect(JSON.stringify(body.messages[0].content)).toContain('answerLanguage');
+});

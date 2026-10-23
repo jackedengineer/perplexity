@@ -173,3 +173,10 @@ it('database planning metadata rejects missing JSON action instead of accepting 
  await run(providers());const [plan]=await db.select().from(schema.runPlans);await db.delete(schema.runPlans);
  await expect(db.insert(schema.runPlans).values({...plan,plan:sql`'{}'::jsonb`})).rejects.toMatchObject({cause:{code:'23514'}});
 });
+
+it('carries the immutable planned locale into answer generation',async()=>{
+ person=await seedCompletion(db,50000n,'Explain photosynthesis',2,'fr');identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};
+ const p=providers();expect((await run(p)).result.kind).toBe('COMPLETED');
+ expect(p.answer.generate).toHaveBeenCalledWith(expect.objectContaining({answerLanguage:'fr'}),expect.anything());
+ expect((await db.select().from(schema.runPlans))[0].plan).toMatchObject({answerLanguage:'fr'});
+});
