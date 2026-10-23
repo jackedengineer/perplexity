@@ -59,6 +59,13 @@ it("rejects truncated/refused/tool-call/multiple-choice responses and conflictin
     await expect(createOpenRouterSafetyProvider(config(),fetcher).classify(input,new AbortController().signal)).rejects.toMatchObject({ reason: "MALFORMED_OUTPUT" });
   }
 });
+it("retains a validated usage receipt when the provider filters or malforms the completion",async()=>{
+  for(const value of [envelope(null,"content_filter"),envelope("not verdict JSON"),{...envelope(),choices:[]}]){
+    const classifier=createOpenRouterSafetyProvider(config(),vi.fn<typeof fetch>().mockResolvedValue(json({...value,model:"test/classifier-v1",usage:{cost:.0000697,prompt_tokens:589,completion_tokens:27}})));
+    await expect(classifier.classify(input,new AbortController().signal)).rejects.toMatchObject({reason:"MALFORMED_OUTPUT"});
+    expect(classifier.usage?.()).toEqual({costMicroUsd:70n,inputTokens:589,outputTokens:27,actualModel:"test/classifier-v1"});
+  }
+});
 it("caps actual response bytes, rejects non-JSON/error HTTP and makes no retry", async () => {
   for (const response of [new Response("PRIVATE HTTP failure",{ status: 500 }),new Response("PRIVATE html"),
     json({ padding: "x".repeat(16385) }),json(envelope(JSON.stringify({ ...wire, padding: "x".repeat(3000) })))]) {

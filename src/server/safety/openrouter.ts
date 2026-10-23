@@ -69,8 +69,12 @@ export function createOpenRouterSafetyProvider(config: SafetyModelConfig, reques
         throw new SafetyProviderError("PROVIDER_UNAVAILABLE");
       }
       try {
-        const envelope = responseSchema.parse(await readResponse(response));
-        usage = providerUsage(envelope.usage,envelope.model);
+        const value = await readResponse(response);
+        // A filtered/invalid verdict is still billable. Preserve only validated
+        // receipt fields without treating the completion as an approved verdict.
+        const receipt = z.object({usage:z.unknown().optional(),model:z.unknown().optional()}).safeParse(value);
+        if(receipt.success)usage = providerUsage(receipt.data.usage,receipt.data.model);
+        const envelope = responseSchema.parse(value);
         const verdict = wireSchema.parse(JSON.parse(envelope.choices[0].message.content));
         return verdict.decision === "UNAVAILABLE"
           ? { decision: verdict.decision, retryable: verdict.retryable, policyVersion: verdict.policyVersion }
