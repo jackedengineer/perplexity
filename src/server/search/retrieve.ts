@@ -82,7 +82,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
         }
         await db.transaction(tx=>checkpoint(tx,subject,runId,prepared.run,stage,signal));
         const plan=prepared.plan?.action==='ANSWER'?prepared.plan:null;
-        const filters=plan?{freshness:plan.retrieval.freshness,...(plan.retrieval.freshness==='RECENT'?{timeRange:freshnessTimeRange(prepared.original)??'month'}:{}),startDate:plan.retrieval.startDate,endDate:plan.retrieval.endDate,preferredDomains:explicitPreferredDomains(prepared.original)}:undefined;
+        const filters=plan?{freshness:plan.retrieval.freshness,...(plan.retrieval.freshness==='RECENT'?{timeRange:freshnessTimeRange(plan.standaloneQuestion)??freshnessTimeRange(prepared.original)??'month'}:{}),startDate:plan.retrieval.startDate,endDate:plan.retrieval.endDate,preferredDomains:explicitPreferredDomains(prepared.original)}:undefined;
         const responses=await Promise.allSettled(queries.map((query,index)=>(index===0?search:dependencies.searchSecond!).search(query,{...options,...(filters?{filters}:{})})));
         const successful=responses.flatMap(r=>r.status==='fulfilled'?[r.value]:[]);
         if(!successful.length)throw new RetrievalError();

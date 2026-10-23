@@ -187,3 +187,14 @@ it('carries the immutable planned locale into answer generation',async()=>{
  expect(p.answer.generate).toHaveBeenCalledWith(expect.objectContaining({answerLanguage:'fr'}),expect.anything());
  expect((await db.select().from(schema.runPlans))[0].plan).toMatchObject({answerLanguage:'fr'});
 });
+
+it('retains contextual day freshness on a resolved follow-up',async()=>{
+ person=await seedCompletion(db,50000n,'React news today',2);identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};
+ expect((await run(providers())).result.kind).toBe('COMPLETED');
+ const request={...person.request,clientRequestId:crypto.randomUUID(),expectedRevision:1,message:{text:'What about it?'}};
+ const admitted=await createRunAdmission(db,keys,{...FREE_ADMISSION_POLICY,operatorBudgetKey:person.operatorBudgetKey}).admit(person.subject,request);if(admitted.kind!=='ADMITTED')throw Error('Admission failed');
+ const p=providers(),base=p.planner.plan;
+ p.planner={...p.planner,plan:async(input,options)=>{const result=await base(input,options);if(result.plan.action==='ANSWER'){result.plan.standaloneQuestion='React news today';result.plan.retrieval.queries=['React news today'];result.plan.retrieval.freshness='RECENT';}return result;}};
+ expect((await createRunExecution(db,keys,p).execute(identity,admitted.run,submissionSchema.parse(request),new AbortController().signal,()=>{})).kind).toBe('COMPLETED');
+ expect(p.search.search).toHaveBeenCalledWith('React news today',expect.objectContaining({filters:expect.objectContaining({timeRange:'day'})}));
+});
