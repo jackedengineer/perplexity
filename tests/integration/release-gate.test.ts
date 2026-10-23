@@ -14,6 +14,7 @@ it("approves and freezes the entire visible payload, with canonical same-run cit
   expect(Object.isFrozen(result.response)).toBe(true); expect(Object.isFrozen(result.response.sources[0])).toBe(true);
   expect(result.response.sources[0]).toMatchObject({ sourceId: "S1",number: 1,supportStatus: "NOT_CHECKED" });
   expect(result.response.sources[0].passageIds).toEqual([value.evidence.passages[0].passageId]);
+  expect(JSON.parse(provider.classify.mock.calls[0][0].context[0].text)).toMatchObject({responseKind:"ANSWER",originalQuestion:value.question});
   const supplied = JSON.stringify(provider.classify.mock.calls[0][0]); expect(supplied).toContain("Water refracts sunlight [S1]."); expect(supplied).toContain("https://example.org/rainbows");
 });
 it.each(["Invented [S9]", "No citations here", "<script>alert(1)</script> [S1]", "[click](javascript:alert(1)) [S1]", "![image](https://evil.org) [S1]", "<https://evil.org> [S1]", "https://evil.org [S1]", "sk-or-v1-"+"a".repeat(64)+" [S1]"])("deterministically blocks unsafe %s before the classifier",async(markdown)=>{
@@ -37,6 +38,7 @@ it("routes no-evidence and clarification responses through the same semantic gat
     expect(result.kind).toBe("APPROVED");
   }
   expect(provider.classify).toHaveBeenCalledTimes(2);
+  expect(provider.classify.mock.calls.map(call=>JSON.parse(call[0].context[0].text).responseKind)).toEqual(["NO_EVIDENCE","CLARIFICATION"]);
   expect((await createReleaseGate(provider).approve({ ...value,kind: "NO_EVIDENCE",markdown: "Invented knowledge" },options())).kind).toBe("DENIED");
 });
 it("inspects visible source titles and stops unsafe metadata despite benign answer text",async()=>{

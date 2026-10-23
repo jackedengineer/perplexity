@@ -1,6 +1,6 @@
 # Build backlog
 
-T01–T03 and T05–T11 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T18 recovery and T19 distributed controls are implemented out of order on request, reusing T11 ownership/status boundaries; T12–T17 remain open. T12 intent-preserving planning is next in the original sequence. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
+T01–T03 and T05–T11 are implemented. T04 includes signed-in private conversations and owner isolation; deployed-preview verification remains outstanding. T18 recovery and T19 distributed controls are implemented out of order on request, reusing T11 ownership/status boundaries; T12–T13 and T15–T17 are implemented on the current feature branch. T14 has authored fixtures and a capped live runner; independent human review remains open. This is the canonical checklist. Dependencies name earlier task IDs. Each task is intended as a focused, reviewable slice. Generated lockfile/migration metadata and the initial framework scaffold may add mechanical files.
 
 Commands and current verification results are in [README](../README.md) and [the foundation record](../docs/foundation-verification.md). Default integration tests use isolated PGlite PostgreSQL. Opt-in live browser tests use synthetic identities in the dedicated development Neon project, never production.
 
@@ -117,59 +117,61 @@ T11 evidence: [public search](../docs/public-search.md). Provider doubles and re
 
 ### T12 — Add intent-preserving structured planning
 
-- [ ] Implement `CLARIFY | ANSWER` structured planning with original text, bounded server context, source-backed explicit constraints and short search queries; validate plan and outbound query safety.
-- [ ] Apply server-controlled fan-out/freshness limits; use original-query fallback only for an unambiguous standalone input after a planner failure.
-- [ ] Verify: fixtures preserve negation/entities/budget, reject invented constraints and prohibit unsafe outbound searches; a planner cannot disable guards or raise limits.
+- [x] Implement `CLARIFY | ANSWER` structured planning with original text, bounded server context, source-backed explicit constraints and short search queries; validate plan and outbound query safety.
+- [x] Apply server-controlled fan-out/freshness limits; use original-query fallback only for an unambiguous standalone input after a planner failure.
+- [x] Verify: fixtures preserve negation/entities/budget, reject invented constraints and prohibit unsafe outbound searches; a planner cannot disable guards or raise limits.
 - Dependencies: T11. Files: `src/server/ai/plan.ts`, `src/server/ai/prompts/planner.ts`, `src/server/safety/plan.ts`, `src/server/runs/execute.ts`, `tests/unit/planner.test.ts`.
 
 ### T13 — Make clarification and follow-ups work in the chat
 
-- [ ] Render a guarded focused clarification with terminal `NEEDS_CLARIFICATION`; answering it starts a new linked run using canonical server context.
-- [ ] Load a token-bounded conversation tail; resolve known entities without treating previous assistant prose as current factual evidence or trusting client history.
-- [ ] Verify: “its pricing” resolves to the actual discussed product; missing referents ask a question; a clear broad explanation avoids unnecessary clarification; multi-turn safety is re-evaluated.
+- [x] Render a guarded focused clarification with terminal `NEEDS_CLARIFICATION`; answering it starts a new linked run using canonical server context.
+- [x] Load a token-bounded conversation tail; resolve known entities without treating previous assistant prose as current factual evidence or trusting client history.
+- [x] Verify: “its pricing” resolves to the actual discussed product; missing referents ask a question; a clear broad explanation avoids unnecessary clarification; multi-turn safety is re-evaluated.
 - Dependencies: T12. Files: `src/server/runs/context.ts`, `src/server/runs/execute.ts`, `src/components/chat/clarification.tsx`, `tests/integration/followups.test.ts`, `tests/e2e/clarification.spec.ts`.
 
 ### T14 — Measure whether planning improves the answer flow
 
 - [ ] Create an initial 30-case human-reviewed dataset with direct/general/ambiguous/follow-up/false-premise cases and expected preserved constraints.
-- [ ] Compare planner on/off against frozen evidence; report intent preservation, unnecessary clarifications, relevance, added cost and latency; retain failing cases as regressions.
-- [ ] Verify: evaluation runs reproducibly with fixtures, emits sample sizes and distinguishes deterministic checks from model-judge opinions; live mode has a strict spending cap.
+- [x] Compare planner on/off against frozen evidence; report intent preservation, unnecessary clarifications, relevance, added cost and latency; retain failing cases as regressions.
+- [x] Verify: evaluation runs reproducibly with fixtures, emits sample sizes and distinguishes deterministic checks from model-judge opinions; live mode has a strict spending cap.
 - Dependencies: T13. Files: `evals/cases/planning.jsonl`, `evals/run.ts`, `evals/score-planning.ts`, `evals/README.md`.
+
+T12–T17 verification: [planning and evaluation](../docs/query-planning.md), [retrieval](../docs/retrieval.md) and [owner feedback](../docs/feedback.md). The 30 planning expectations and five retrieval cases are authored fixtures, not independent human labels. Live unavailable/failed samples are retained. Human intent/relevance/support acceptance remains open; completed technical checks do not establish universal answer quality.
 
 ### Checkpoint C
 
 - [ ] No material invented constraints in the curated rewrite suite; original questions remain intact.
-- [ ] Clarification ends the current run without search; the next user turn resumes intent through a new run.
-- [ ] Keep or tune planner behavior based on measured results, not an assumption that longer prompts are better.
+- [x] Clarification ends the current run without search; the next user turn resumes intent through a new run.
+- [x] Keep or tune planner behavior based on measured results, not an assumption that longer prompts are better.
 
 ## Milestone D — evidence quality and feedback
 
 ### T15 — Add selective extraction and evidence safety
 
-- [ ] Extend the Tavily adapter with bounded Extract for selected URLs and partial-failure handling; apply the existing evidence gate to the newly extracted content before synthesis.
-- [ ] Preserve exact excerpts, retrieval/publication timestamps and content hashes; exclude unsafe/unusable material and enforce context-token limits.
-- [ ] Verify: injected page text cannot authorize tools, extraction failure produces no invented passages and empty safe evidence produces an approved limited response.
+- [x] Extend the Tavily adapter with bounded Extract for selected URLs and partial-failure handling; apply the existing evidence gate to the newly extracted content before synthesis.
+- [x] Preserve exact excerpts, retrieval/publication timestamps and content hashes; exclude unsafe/unusable material and enforce context-token limits.
+- [x] Verify: injected page text cannot authorize tools, extraction failure produces no invented passages and empty safe evidence produces an approved limited response.
 - Dependencies: T14. Files: `src/server/search/tavily.ts`, `src/server/search/extract.ts`, `src/server/safety/evidence.ts`, `src/server/search/evidence.ts`, `tests/integration/evidence-safety.test.ts`.
 
 ### T16 — Improve ranking and source transparency
 
-- [ ] Add bounded two-query search, lexical passage relevance, duplicate/syndication handling and explicit freshness/domain preferences; retain meaningful contradictory evidence.
-- [ ] Show cited versus additional retrieved sources with approved metadata and an honest citation-support label; do not label ID validation as fact checking.
-- [ ] Verify: frozen ranking fixtures and a small labeled retrieval set show the effect of changes; one authoritative source is not discarded solely to meet a diversity heuristic.
+- [x] Add bounded two-query search, lexical passage relevance, duplicate/syndication handling and explicit freshness/domain preferences; retain meaningful contradictory evidence.
+- [x] Show cited versus additional retrieved sources with approved metadata and an honest citation-support label; do not label ID validation as fact checking.
+- [x] Verify: frozen ranking fixtures and a small labeled retrieval set show the effect of changes; one authoritative source is not discarded solely to meet a diversity heuristic.
 - Dependencies: T15. Files: `src/server/search/rank.ts`, `src/server/search/evidence.ts`, `src/components/chat/sources.tsx`, `tests/unit/ranking.test.ts`, `evals/cases/retrieval.jsonl`.
 
 ### T17 — Collect owner-scoped feedback
 
-- [ ] Add idempotent feedback upsert and UI controls for helpfulness, missing evidence, wrong interpretation and false refusal; only owned approved messages accept feedback.
-- [ ] Use allowlisted reason codes initially, avoiding an unnecessary second untrusted free-text pipeline.
-- [ ] Verify: two-user tests reject cross-user feedback; retries update one row; selected state survives reload.
+- [x] Add idempotent feedback upsert and UI controls for helpfulness, missing evidence, wrong interpretation and false refusal; only owned approved messages accept feedback.
+- [x] Use allowlisted reason codes initially, avoiding an unnecessary second untrusted free-text pipeline.
+- [x] Verify: two-user tests reject cross-user feedback; retries update one row; selected state survives reload.
 - Dependencies: T16. Files: `src/server/db/schema.ts`, `src/app/api/messages/[id]/feedback/route.ts`, `src/components/chat/feedback.tsx`, `tests/integration/feedback.test.ts` plus generated SQL.
 
 ### Checkpoint D
 
 - [ ] Retrieval failures, conflicting sources and unsupported portions are represented honestly.
-- [ ] Citations resolve to the exact selected run/source/passages after reload.
-- [ ] Source panels expose only approved display data.
+- [x] Citations resolve to the exact selected run/source/passages after reload.
+- [x] Source panels expose only approved display data.
 
 ## Milestone E — operational readiness
 

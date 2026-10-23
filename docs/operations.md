@@ -40,8 +40,8 @@ provider model string), reported tokens/credits and known micro-USD. An UNKNOWN
 status remains unresolved even when some usage is reported. Failed update attempts
 do not emit another usage event. No provider-response objects are serialized.
 
-`research.run_usage` is a bounded, six-call observation of this execution. Known
-cost includes input/query/evidence/output classifiers and a private draft even
+`research.run_usage` is a bounded, ten-call observation of this execution. Known
+cost includes planning, input/query/evidence/output classifiers and a private draft even
 when the output is rejected. Token totals are reported subtotals; absent model
 token usage is null when no subtotal is known. Unknown calls and search credits
 remain explicit. Tavily's one reported credit does not imply a known USD charge.
@@ -118,8 +118,7 @@ The named reports provide:
   no finished classifier call (including abandoned STARTED and SKIPPED claims)
   are excluded. Citation/pre-classifier failures are visible
   in stage traces; this report is not a count of all deterministic guard executions.
-- `false_refusal_feedback`: explicit NOT_COLLECTED_T17 coverage with null rates and
-  denominators. T17 feedback collection and T21's human/live evaluation baseline are open;
+- `false_refusal_feedback`: OWNER_REPORTS_ONLY counts from approved owned messages, with null confirmed rates and human-label denominators. Independent human adjudication remains open;
   a refusal count alone cannot establish a false-refusal rate. Once labeled,
   report confirmed false refusals / labeled benign requests, plus sample size,
   policy/model versions and reviewer agreement. Never treat missing feedback as 0%.
@@ -213,3 +212,5 @@ logs/screenshots and DevTools profiles. T20 changes no schema or production
 configuration: development has 24 tables; production remains at 21. Production
 migrations 0007–0008, hosted recovery, exporter/retention/notification setup, T17
 feedback and paid testing remain explicit release/dependency gates.
+
+T12–T17 update: development now has 26 tables and migrations through 0013. Provider observations include PLANNER, QUERY_SECOND, SEARCH_SECOND and EXTRACT; reconciliation supports both immutable accounting profiles. Source metrics distinguish extraction failures and selected extracted passages. Feedback counts owner reports without claiming a confirmed false-refusal rate. See [planning](query-planning.md), [retrieval](retrieval.md) and [feedback](feedback.md) for current behavior. Historical T19/T20 measurements above describe their recorded candidates. Production migration, hosted recovery/telemetry, retention and public/paid launch checks remain outstanding.

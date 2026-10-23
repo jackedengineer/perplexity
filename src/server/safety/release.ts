@@ -31,7 +31,7 @@ export function createReleaseGate(provider: SafetyProvider | undefined) {
       const sources = await traceStage("citations",async()=>validateCitations(input.markdown,input.evidence,input.kind === "ANSWER"));
       const additionalSources=input.evidence.sources.filter(s=>!sources.some(c=>c.sourceId===s.sourceId)).map((s,i)=>visibleSourceFor(input.evidence,s.sourceId,sources.length+i+1));
       const verdict = await gate.evaluate({ text: input.markdown,context: [
-        { role: "USER",text: JSON.stringify({ originalQuestion: input.question }) },
+        { role: "USER",text: JSON.stringify({ originalQuestion: input.question,responseKind:input.kind }) },
         ...[...sources,...additionalSources].map(source=>({ role: "ASSISTANT",text: JSON.stringify(source) })),
       ] },options);
       const decision = resolveSafetyDecision(verdict.verdict);

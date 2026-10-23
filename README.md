@@ -1,6 +1,6 @@
 # Perplex
 
-A web-research application in progress. Next.js, Neon/Drizzle, Google sign-in, private conversations, budgeted admission, input safety, bounded retrieval, guarded answer persistence, and signed-in browser submission/citations are implemented. Intent planning, contextual follow-ups, guest allowances and billing follow on the [backlog](tasks/todo.md).
+A web-research application in progress. Next.js, Neon/Drizzle, Google sign-in, private conversations, budgeted admission, input safety, bounded retrieval, guarded answer persistence, and signed-in browser submission/citations are implemented. The current feature branch adds intent planning, contextual follow-ups, guarded clarification, selective extraction, source ranking/transparency and owner feedback. Human quality review, guest allowances and billing remain on the [backlog](tasks/todo.md).
 
 ## Run locally
 
@@ -38,6 +38,7 @@ Avoid running dev and build simultaneously in the same checkout; Next.js regener
 | `RUN_HMAC_KEYS_JSON` | JSON object mapping key IDs to independent 32-byte lowercase hex secrets; retain historical keys |
 | `RUN_OPERATOR_BUDGET_KEY` | Optional server deployment spend namespace; defaults to `research`, requires privileged bucket provisioning |
 | `OPENROUTER_API_KEY` | Server-only answer/classifier API key; no live key or default |
+| `MODEL_PLANNER`, `PLANNER_OPENROUTER_PROVIDER` | Explicit private planning role and single upstream provider |
 | `MODEL_SAFETY` | Explicit evaluated classifier model ID; never a browser model selection |
 | `SAFETY_OPENROUTER_PROVIDER` | Explicit provider slug supporting the model, strict output, privacy and price controls |
 | `TAVILY_API_KEY` | Server-only search key; no live search calls or paid activation |
@@ -131,8 +132,10 @@ See [the foundation verification record](docs/foundation-verification.md), [priv
 
 Use a feature branch and focused commits. Keep hand-written changes near 400–700 lines or one coherent feature; generated lockfiles/schema snapshots are mechanical exceptions. Run relevant checks before committing and keep `main` reviewable. Do not merge or push without reviewing the final diff. T05–T11, T18–T19 and production configuration preparation are merged into main through PR #8. T18 adds durable cancellation, stale-run recovery and append-only usage reconciliation; see [the recovery contract and operator procedure](docs/run-recovery.md). T19 adds shared submission abuse counters and provider stage deadlines; see [distributed controls and verification](docs/distributed-controls.md). T20 adds private stage traces, usage observations and [operator queries/verification](docs/operations.md). Production migration, hosted telemetry configuration and cron activation remain separate deployment gates.
 
-The [system design](docs/system-design.md), [session contract](docs/authentication.md) and [implementation plan](tasks/plan.md) describe the larger product. T08 uses the Vercel AI SDK for answer generation; T06/T07 retain small fixed-protocol guard/search adapters. No paid provider smoke test has been run. Live answers require explicit provider configuration and provisioned development allowances; missing settings fail safely.
+The [system design](docs/system-design.md), [session contract](docs/authentication.md) and [implementation plan](tasks/plan.md) describe the larger product. T08 uses the Vercel AI SDK for answer generation; T06/T07 retain small fixed-protocol guard/search adapters. Paid provider checks are recorded in [live verification](docs/openrouter-live-verification.md) and the [planning evaluation](docs/query-planning.md); finite samples and human acceptance are tracked separately. Live answers require explicit provider configuration and provisioned development allowances; missing settings fail safely.
 
 The latest [interface/performance/launch review](docs/launch-review.md) records PR review fixes, lab measurements, streaming behavior and the remaining deployment requirements. Public launch remains gated on actual provider evaluation, production OAuth/database configuration and operational release gates.
 
-The [production setup record](docs/production-setup.md) tracks capped OpenRouter/Tavily keys, isolated migrated production Neon, the one-credit live Tavily check, and pending OAuth/deployment. Paid-model verification was explicitly left pending; no Vercel project or deployment has been created. Production maintenance credentials use ignored `.env.launch.local`, which Next.js does not automatically load.
+The [production setup record](docs/production-setup.md) tracks capped OpenRouter/Tavily keys, isolated migrated production Neon, the one-credit live Tavily check, and pending OAuth/deployment. Paid-model testing was later authorized after funding; no Vercel deployment has been created. Production maintenance credentials use ignored `.env.launch.local`, which Next.js does not automatically load.
+
+Planning, clarification and evaluation are documented in [query planning](docs/query-planning.md). New runs use [versioned retrieval budgets](docs/retrieval.md), with inspected extraction, exact ranked excerpts and separately approved cited/additional sources. [Owner feedback](docs/feedback.md) uses enum-only, idempotent versioned updates. Development migrations 0009–0013 are applied; production rollout remains a separate gate.
