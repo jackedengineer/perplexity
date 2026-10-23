@@ -1,9 +1,13 @@
+import { randomUUID } from "node:crypto";
 import { defineConfig,devices } from "@playwright/test";
 import { config } from "dotenv";
 config({path:".env.local",quiet:true});
 if(process.env.LIVE_NEON_E2E!=="1")throw new Error("Explicit development Neon opt-in required");
 process.env.LIVE_NEON_ADMISSION="1";
-const budgetKey="test-t11-browser";
+// Workers inherit the same run namespace; interrupted runs cannot contaminate
+// a subsequent run or require deleting active development budget windows.
+const budgetKey=process.env.T11_TEST_BUDGET_KEY??`test-t11-browser-${randomUUID()}`;
+if(!/^test-t11-browser-[a-f0-9-]{36}$/u.test(budgetKey))throw new Error("Isolated browser budget namespace required");
 process.env.T11_TEST_BUDGET_KEY=budgetKey;
 export default defineConfig({testDir:"./tests/e2e",testMatch:["**/guarded-search.spec.ts","**/recovery.spec.ts","**/stale-run-recovery.spec.ts","**/cross-process-recovery.spec.ts","**/distributed-controls.spec.ts"],outputDir:".artifacts/t11-browser-results",workers:1,retries:0,forbidOnly:Boolean(process.env.CI),timeout:90000,
   use:{baseURL:"http://localhost:3001",trace:"retain-on-failure"},
