@@ -136,7 +136,7 @@ T11 evidence: [public search](../docs/public-search.md). Provider doubles and re
 - [x] Verify: evaluation runs reproducibly with fixtures, emits sample sizes and distinguishes deterministic checks from model-judge opinions; live mode has a strict spending cap.
 - Dependencies: T13. Files: `evals/cases/planning.jsonl`, `evals/run.ts`, `evals/score-planning.ts`, `evals/README.md`.
 
-T12–T17 verification: [planning and evaluation](../docs/query-planning.md), [retrieval](../docs/retrieval.md) and [owner feedback](../docs/feedback.md). The 30 planning expectations and five retrieval cases are authored fixtures, not independent human labels. Live unavailable/failed samples are retained. Human intent/relevance/support acceptance remains open; completed technical checks do not establish universal answer quality.
+T12–T17 verification: [candidate results and remaining gates](../docs/t12-t17-verification.md), [planning and evaluation](../docs/query-planning.md), [retrieval](../docs/retrieval.md) and [owner feedback](../docs/feedback.md). The 30 planning expectations and five retrieval cases are authored fixtures, not independent human labels. Live unavailable/failed samples are retained. Human intent/relevance/support acceptance remains open; completed technical checks do not establish universal answer quality.
 
 ### Checkpoint C
 
