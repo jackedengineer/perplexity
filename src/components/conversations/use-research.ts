@@ -24,11 +24,11 @@ export function useResearch(conversationId: string,revision: number,initialRunId
         if(!response.ok)break;
         const status=runStateView.parse(await response.json());
         if(status.conversationId!==conversationId)break;
-        if(status.state==="COMPLETED"&&status.answer){resolved=true;setCommitted(status.answer);setError("");setStage(null);router.refresh();return;}
-        if(status.state==="UNAVAILABLE"||status.state==="COMPLETED"){resolved=true;
+        if(["COMPLETED","NEEDS_CLARIFICATION"].includes(status.state)&&status.answer){resolved=true;setCommitted(status.answer);setError("");setStage(null);router.refresh();return;}
+        if(status.state==="UNAVAILABLE"||["COMPLETED","NEEDS_CLARIFICATION"].includes(status.state)){resolved=true;
           setError(current=>savedFailureMessage(current,status.terminalReason));setStage(null);break;
         }
-        setStage(status.state==="CHECKING_REQUEST"?null:status.state);
+        setStage(status.state==="CHECKING_REQUEST"?null:status.state as PublicStage);
         await new Promise<void>(resolve=>{const aborted=()=>{clearTimeout(timer);resolve();};const timer=setTimeout(()=>{abort.signal.removeEventListener("abort",aborted);resolve();},pause);abort.signal.addEventListener("abort",aborted,{once:true});});pause=Math.min(5000,pause*1.5);
       }
     } catch { /* Keep the fixed failure and the same intent available for a manual recovery. */ }
@@ -59,7 +59,7 @@ export function useResearch(conversationId: string,revision: number,initialRunId
     try{
       const status=await controller.cancel();
       if(status&&status.conversationId!==conversationId)throw new Error("Saved run mismatch");
-      if(status?.state==="COMPLETED"&&status.answer){setCommitted(status.answer);setError("");router.refresh();}
+      if(status&&["COMPLETED","NEEDS_CLARIFICATION"].includes(status.state)&&status.answer){setCommitted(status.answer);setError("");router.refresh();}
       else setError(status?.terminalReason==="CANCELLED"?"Research stopped. You can start a new search.":status?.terminalReason==="TIMED_OUT"?"This research request timed out. You can start a new search.":"Stop requested. Check the same request for its saved status.");
     }catch{setError("Cancellation could not be confirmed. Check the same request for its saved status.");}
     finally{stopping.current=false;setCancelling(false);busy.current=false;setPending(false);setStage(null);}

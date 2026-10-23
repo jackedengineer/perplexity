@@ -8,7 +8,7 @@ import { ANSWER_PROMPT } from "./prompts/answer";
 import { AnswerError, boundedModelFetch, boundedWork, type ExecutionOptions } from "./bounded";
 import { providerUsage, type ProviderUsage } from "./usage";
 import { citedDraftSchema,renderCitedDraft } from "./cited-draft";
-export type DraftInput = { question: string;evidence: EvidencePackage };
+export type DraftInput = { question: string;interpretation?:string;evidence: EvidencePackage };
 export type PrivateDraft = { text: string;usage: ProviderUsage };
 export interface AnswerProvider { readonly modelId?: string;generate(input: DraftInput,options: ExecutionOptions): Promise<PrivateDraft>; usage?(): ProviderUsage | undefined }
 export function createAnswerProvider(config: SafetyModelConfig,request: typeof fetch = fetch): AnswerProvider {
@@ -28,6 +28,7 @@ export function createAnswerProvider(config: SafetyModelConfig,request: typeof f
     async generate(input,options) {
       usage = undefined;
       const evidence = validateEvidence(input.evidence),question = questionTextSchema.safeParse(input.question);
+      if(input.interpretation!==undefined&&!questionTextSchema.safeParse(input.interpretation).success)throw new AnswerError();
       if (!evidence?.sources.length || !question.success) throw new AnswerError();
       return boundedWork(options,12000,async(signal)=>{
         const result = await generateText({ model: router.chat(config.modelId,{
@@ -35,7 +36,7 @@ export function createAnswerProvider(config: SafetyModelConfig,request: typeof f
             max_price: { prompt: 0.5,completion: 2,request: 0 } },
           ...(!isVerifiedNonReasoningModel(config.modelId) ? {reasoning: { enabled: false as const,exclude: true as const,effort: "none" as const }} : {}),
           usage: { include: true },extraBody: { plugins: [] },
-        }),output: Output.object({schema:citedDraftSchema(evidence)}),system: ANSWER_PROMPT,prompt: JSON.stringify({ question: question.data,
+        }),output: Output.object({schema:citedDraftSchema(evidence)}),system: ANSWER_PROMPT,prompt: JSON.stringify({ question: question.data,...(input.interpretation?{interpretation:input.interpretation}:{}),
           passages: evidence.passages.map(p=>({ sourceId: p.sourceId,text: p.text })) }),
           maxOutputTokens: 1200,maxRetries: 0,abortSignal: signal,timeout: 12000,tools: {},toolChoice: "none",
           experimental_telemetry: { isEnabled: false,recordInputs: false,recordOutputs: false },

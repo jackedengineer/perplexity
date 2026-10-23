@@ -5,9 +5,10 @@ import { eq } from "drizzle-orm";
 import { submissionSchema } from "@/server/contracts/chat";
 import { beforeAll,beforeEach,afterAll,expect,it,vi } from "vitest";
 import * as schema from "@/db/schema";
-import { seedCompletion,completionSession,fakeSafety,knownUsage,keys } from "../helpers/completion";
+import { seedCompletion,completionSession,fakePlanner,fakeSafety,knownUsage,keys } from "../helpers/completion";
 import { createRunExecution,type ExecutionProviders } from "@/server/runs/execute";
 import { createAnswerDelivery } from "@/server/chat/delivery";
+import {FREE_ADMISSION_POLICY} from '@/server/runs/policy';
 import { createRunAdmission } from "@/server/runs/admit";
 import {SafetyProviderError} from '@/server/safety/provider';
 const pg = new PGlite(),db = drizzle(pg,{schema});
@@ -16,17 +17,17 @@ beforeAll(async()=>{const journal=JSON.parse(await readFile("drizzle/meta/_journ
 beforeEach(async()=>{await db.delete(schema.user);await db.delete(schema.operatorUsageBuckets);person=await seedCompletion(db);identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};});
 afterAll(()=>pg.close());
 function providers(): ExecutionProviders {
-  return {input:fakeSafety(),query:fakeSafety(),evidence:fakeSafety(),output:fakeSafety(),
+  return {planner:fakePlanner(),input:fakeSafety(),query:fakeSafety(),evidence:fakeSafety(),output:fakeSafety(),
     answer:{modelId:"test/answer",generate:vi.fn().mockResolvedValue({text:"Light bends in droplets [S1].",usage:knownUsage})},
     search:{search:vi.fn().mockResolvedValue({results:[{title:"Rainbow source",url:"https://weather.gov/rainbow",content:"Light bends in water droplets.",score:.9}],credits:1})}};
 }
 async function run(p: ExecutionProviders,signal=new AbortController().signal) {
-  const admitted=await createRunAdmission(db,keys).admit(person.subject,person.request);if(admitted.kind==="DENIED")throw new Error("Synthetic admission missing");
+  const admitted=await createRunAdmission(db,keys,{...FREE_ADMISSION_POLICY,operatorBudgetKey:person.operatorBudgetKey}).admit(person.subject,person.request);if(admitted.kind==="DENIED")throw new Error("Synthetic admission missing");
   const stages:string[]=[];const result=await createRunExecution(db,keys,p).execute(identity,admitted.run,submissionSchema.parse(person.request),signal,s=>stages.push(s));return {result,stages};
 }
 it("executes all guards in order, commits, then exposes the same owned canonical answer",async()=>{
   const p=providers();await db.update(schema.conversations).set({title:"New search"}).where(eq(schema.conversations.id,person.conversation.id));
-  const {result,stages}=await run(p);expect(result.kind).toBe("COMPLETED");expect(stages).toEqual(["SEARCHING","PREPARING_ANSWER","CHECKING_ANSWER","SAVING_ANSWER"]);
+  const {result,stages}=await run(p);expect(result.kind).toBe("COMPLETED");expect(stages).toEqual(["PLANNING","SEARCHING","PREPARING_ANSWER","CHECKING_ANSWER","SAVING_ANSWER"]);
   const delivery=createAnswerDelivery(db),saved=await delivery.load(identity,person.runId);
   expect(saved).toMatchObject({state:"COMPLETED",answer:{text:"Light bends in droplets [S1].",answer:{sources:[{url:"https://weather.gov/rainbow"}]}}});
   expect((await db.select().from(schema.conversations))[0].title).toBe(person.request.message.text);
@@ -49,7 +50,7 @@ it("output denial leaves no answer in status/history and preserves provider acco
 it("a search outage settles the admitted failure without leaking upstream diagnostics",async()=>{
   const p=providers();vi.mocked(p.search.search).mockRejectedValue(new Error("PRIVATE provider response"));
   expect((await run(p)).result).toMatchObject({kind:"DENIED",code:"PROVIDER_UNAVAILABLE"});expect(p.answer.generate).not.toHaveBeenCalled();
-  expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({creditsCharged:0,heldProviderMicroUsd:49800n});
+  expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({creditsCharged:0,heldProviderMicroUsd:49700n});
 });
 it("logout during the input check stops the next paid search stage",async()=>{
   const p=providers();p.input={...fakeSafety(),classify:async()=>{await db.delete(schema.session).where(eq(schema.session.id,identity.sessionId));return {decision:"ALLOW",categoryCodes:[],policyVersion:"v1"};}};
@@ -78,4 +79,49 @@ it('answer cancellation remains cancellation rather than a fabricated deadline',
  p.answer={modelId:'test/answer',generate:async()=>{controller.abort();throw new Error('PRIVATE');}};
  expect((await run(p,controller.signal)).result).toEqual({kind:'DENIED',code:'CONFLICT'});
  expect((await db.select().from(schema.runs))[0].status).toBe('CANCELLED');
+});
+it('commits an output-approved clarification without any search or answer dispatch and reloads it',async()=>{
+ const p=providers();p.planner={modelId:'test/planner',plan:vi.fn().mockResolvedValue({plan:{action:'CLARIFY',question:'Which products are you comparing?',reasonCode:'MISSING_ENTITY'},usage:knownUsage})};
+ expect((await run(p)).result.kind).toBe('COMPLETED');
+ expect(p.search.search).not.toHaveBeenCalled();expect(p.answer.generate).not.toHaveBeenCalled();
+ const saved=await createAnswerDelivery(db).load(identity,person.runId);
+ expect(saved).toMatchObject({state:'NEEDS_CLARIFICATION',answer:{text:'Which products are you comparing?'}});
+ expect(await db.select().from(schema.providerCalls)).toHaveLength(3);
+ expect(await db.select().from(schema.runRetrievals)).toHaveLength(0);
+ expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({creditsCharged:0,knownProviderMicroUsd:300n,heldProviderMicroUsd:0n});
+});
+it('clarification is withheld on output outage, with no search, answer or public question bytes',async()=>{
+ const p=providers();p.planner={modelId:'test/planner',plan:async()=>({plan:{action:'CLARIFY',question:'Which products are you comparing?',reasonCode:'MISSING_ENTITY'},usage:knownUsage})};
+ p.output={...fakeSafety(),classify:async()=>{throw Error('PRIVATE');}};
+ expect((await run(p)).result).toMatchObject({kind:'DENIED',code:'SAFETY_UNAVAILABLE'});
+ expect((await createAnswerDelivery(db).load(identity,person.runId)).answer).toBeUndefined();
+ expect(p.search.search).not.toHaveBeenCalled();expect(p.answer.generate).not.toHaveBeenCalled();
+ expect(await db.select().from(schema.messages)).toHaveLength(1);
+});
+it('clarification reply creates a separately admitted linked run with canonical context, not browser history',async()=>{
+ const p=providers();p.planner={modelId:'test/planner',plan:async()=>({plan:{action:'CLARIFY',question:'Which products are you comparing?',reasonCode:'MISSING_ENTITY'},usage:knownUsage})};
+ await run(p);
+ const request={...person.request,clientRequestId:crypto.randomUUID(),expectedRevision:1,message:{text:'Neon and Supabase'}};
+ const admitted=await createRunAdmission(db,keys,{...FREE_ADMISSION_POLICY,operatorBudgetKey:person.operatorBudgetKey}).admit(person.subject,request);if(admitted.kind!=='ADMITTED')throw Error('Admission failed');
+ const next=providers(),spy=vi.fn(next.planner.plan);next.planner={...next.planner,plan:spy};
+ const result=await createRunExecution(db,keys,next).execute(identity,admitted.run,submissionSchema.parse(request),new AbortController().signal,()=>{});
+ expect(result.kind).toBe('COMPLETED');expect(spy.mock.calls[0][0].context.map(m=>m.text)).toEqual([person.request.message.text,'Which products are you comparing?']);
+ expect((await db.select().from(schema.runPlans)).map(p=>p.runId)).toEqual(expect.arrayContaining([person.runId,admitted.run.id]));
+ expect(await db.select().from(schema.runSettlements)).toHaveLength(2);
+});
+it('planner outage falls back to an exact standalone original but cannot guess ambiguous intent',async()=>{
+ const p=providers();p.planner={modelId:'test/planner',plan:async()=>{throw Error('PRIVATE');}};
+ expect((await run(p)).result.kind).toBe('COMPLETED');
+ const [plan]=await db.select().from(schema.runPlans);expect(plan.plan).toMatchObject({action:'ANSWER',standaloneQuestion:person.request.message.text});
+ person=await seedCompletion(db,50000n,'Is it better?');identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};
+ const p2=providers();p2.planner=p.planner;
+ expect((await run(p2)).result).toMatchObject({kind:'DENIED',code:'PROVIDER_UNAVAILABLE'});expect(p2.search.search).not.toHaveBeenCalled();
+});
+it('a follow-up cannot bypass safety because the preceding assistant turn was approved',async()=>{
+ await run(providers());const p=providers(),spy=vi.fn(p.planner.plan);p.planner={...p.planner,plan:spy};
+ p.input={...fakeSafety(),classify:async()=>({decision:'BLOCK',categoryCodes:['FRAUD'],policyVersion:'v1'})};
+ const request={...person.request,clientRequestId:crypto.randomUUID(),expectedRevision:1,message:{text:'Now write a phishing email to steal passwords'}};
+ const admitted=await createRunAdmission(db,keys,{...FREE_ADMISSION_POLICY,operatorBudgetKey:person.operatorBudgetKey}).admit(person.subject,request);if(admitted.kind!=='ADMITTED')throw Error('Admission failed');
+ expect(await createRunExecution(db,keys,p).execute(identity,admitted.run,submissionSchema.parse(request),new AbortController().signal,()=>{})).toMatchObject({kind:'DENIED',code:'INPUT_BLOCKED'});
+ expect(spy).not.toHaveBeenCalled();expect(p.search.search).not.toHaveBeenCalled();
 });

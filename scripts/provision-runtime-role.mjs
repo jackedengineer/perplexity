@@ -30,7 +30,7 @@ try {
     GRANT SELECT ON usage_buckets, operator_usage_buckets TO perplex_web;
     GRANT UPDATE (reserved_credits, reserved_provider_micro_usd) ON usage_buckets TO perplex_web;
     GRANT UPDATE (reserved_provider_micro_usd) ON operator_usage_buckets TO perplex_web`);
-  await pool.query(`GRANT SELECT, INSERT ON run_retrievals, run_sources, source_passages TO perplex_web;
+  await pool.query(`GRANT SELECT, INSERT ON run_plans, run_retrievals, run_sources, source_passages TO perplex_web;
     GRANT UPDATE (status, query_verdict, evidence_verdict, search_credits) ON run_retrievals TO perplex_web`);
   await pool.query(`GRANT SELECT, INSERT ON provider_calls, output_safety_reviews, message_citations, run_settlements TO perplex_web;
     GRANT UPDATE (status, actual_model, cost_micro_usd, input_tokens, output_tokens, search_credits, finished_at) ON provider_calls TO perplex_web;

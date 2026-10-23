@@ -24,7 +24,7 @@ test("a public question shows guarded progress, committed citations and exact re
     await page.getByRole("textbox",{name:"Ask a question"}).fill("Why do rainbows form?");
     const responsePromise=page.waitForResponse(response=>response.url().endsWith("/api/chat"));
     await page.getByRole("button",{name:"Submit question"}).click();
-    await expect(page.getByRole("status").filter({hasText:/Checking request|Searching the web|Preparing an answer/u})).toBeVisible({timeout:15000});
+    await expect(page.getByRole("status").filter({hasText:/Checking request|Understanding your question|Searching the web|Preparing an answer/u})).toBeVisible({timeout:15000});
     expect(await page.locator(".answer-prose").count()).toBe(0);
     await page.screenshot({path:`.artifacts/t11-progress-${info.project.name}.png`});
     const response=await responsePromise;expect(response.status()).toBe(200);
@@ -83,7 +83,7 @@ test("a public question shows guarded progress, committed citations and exact re
     // Same HTTP intent recovers the existing answer rather than another provider attempt.
     const duplicate=await context.request.post("/api/chat",{headers:{Origin:"http://localhost:3001"},data:submitted});expect(duplicate.status()).toBe(200);expect(await duplicate.text()).toContain('"type":"data-answer"');
     const [run]=await f.owner.select().from(schema.runs).where(eq(schema.runs.clientRequestId,submitted.clientRequestId));
-    expect(await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id))).toHaveLength(6);
+    expect(await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id))).toHaveLength(7);
     expect(await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,run.id))).toHaveLength(1);
     const stranger=await browser.newContext({baseURL:"http://localhost:3001"});const other=await identityFixture(stranger,"Other reader");
     try {expect((await stranger.request.get(`/api/runs/${run.id}`)).status()).toBe(404);}finally{await other.cleanup();await stranger.close();}
@@ -144,4 +144,25 @@ test("stop cancels the admitted request and replay cannot restart paid work",asy
     await expect(page.locator(".answer-prose")).toHaveCount(0);expect(errors).toEqual([]);
     await page.screenshot({path:`.artifacts/t11-stopped-${info.project.name}.png`});
   }finally{await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
+});
+
+test('clarification is saved privately and a reply continues the same conversation',async({page,context})=>{
+ const identity=await identityFixture(context),f=createNeonFixture();let buckets:string[]=[];
+ try{
+  buckets=await provision(f,identity.id);await page.goto('/workspace');
+  await page.getByRole('textbox',{name:'Ask a question'}).fill('Is it better?');
+  await page.getByRole('button',{name:'Submit question'}).click();
+  await expect(page.locator('.answer-prose')).toHaveText('Which products are you comparing?',{timeout:60000});
+  const path=new URL(page.url()).pathname,id=path.split('/').at(-1)!;
+  const [first]=await f.owner.select().from(schema.runs).where(eq(schema.runs.conversationId,id));
+  expect(first.status).toBe('NEEDS_CLARIFICATION');
+  expect((await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,first.id))).map(c=>c.stage).sort()).toEqual(['INPUT_SAFETY','OUTPUT_SAFETY','PLANNER']);
+  expect((await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,first.id)))[0].creditsCharged).toBe(0);
+  await page.reload();await expect(page.locator('.answer-prose')).toHaveText('Which products are you comparing?');
+  await page.getByRole('textbox',{name:'Ask a question'}).fill('Neon and Supabase');await page.getByRole('button',{name:'Submit question'}).click();
+  await expect(page.locator('.answer-prose')).toHaveCount(2,{timeout:60000});expect(new URL(page.url()).pathname).toBe(path);
+  await page.reload();await expect(page.getByRole('article',{name:'Your question'})).toHaveCount(2);
+  expect(await f.owner.select().from(schema.runPlans).where(eq(schema.runPlans.conversationId,id))).toHaveLength(2);
+  await page.screenshot({path:'.artifacts/t13-clarification-followup.png',fullPage:true});
+ }finally{await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
 });

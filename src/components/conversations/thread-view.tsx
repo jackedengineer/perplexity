@@ -6,7 +6,7 @@ import type { CommittedAnswer } from "@/server/chat/views";
 import { Icon,ResearchMark } from "./icons";
 import { ConversationActions } from "./conversation-actions";
 import { ConversationHistory } from "./conversation-history";
-import { QuestionComposer,StartQuestion } from "./question-composer";
+import { QuestionComposer } from "./question-composer";
 export type ResearchState={question:string;pending:boolean;error:string;label:string;committed:CommittedAnswer|null;retry:()=>void;stop?:()=>void};
 export const idleResearch: ResearchState={question:"",pending:false,error:"",label:"Checking request",committed:null,retry:()=>{}};
 export function ThreadView({conversation,initial,research=idleResearch,submit}: {conversation:Conversation;initial:HistoryPage;research?:ResearchState;submit:(text:string)=>void}) {
@@ -16,7 +16,7 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
   if(saved&&!initial.items.some(message=>message.id===saved.messageId)){
     const now=saved.createdAt;
     history={...initial,items:[...initial.items,
-      ...(research.question&&!initial.items.some(message=>message.role==="USER")?[{id:saved.runId,role:"USER" as const,kind:"QUESTION" as const,parts:[{type:"text" as const,text:research.question}],sequence:1,schemaVersion:1 as const,createdAt:now}]:[]),
+      ...(research.question&&initial.items.findLast(message=>message.role==="USER")?.parts[0]?.text!==research.question?[{id:saved.runId,role:"USER" as const,kind:"QUESTION" as const,parts:[{type:"text" as const,text:research.question}],sequence:1,schemaVersion:1 as const,createdAt:now}]:[]),
       {id:saved.messageId,role:"ASSISTANT",kind:saved.answer.kind==="CLARIFICATION"?"CLARIFICATION":"ANSWER",parts:[{type:"text",text:saved.text}],sequence:2,schemaVersion:1,createdAt:now,answer:saved.answer}]};
   }
   const hasAnswer=history.items.some(message=>message.role==="ASSISTANT"),hasQuestion=history.items.some(message=>message.role==="USER");
@@ -28,7 +28,7 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
     <section className="thread-content" aria-label="Conversation history" tabIndex={0}>
       <h1>{conversation.title}</h1>
       {history.items.length>0&&<ConversationHistory key={`${saved?.messageId??"saved"}:${initial.items.length}`} conversationId={conversation.id} initial={history} sourcesOpen={sourcesOpen} onSourcesOpenChange={setSourcesOpen}/>}
-      {research.question&&!hasQuestion&&!saved&&<article className="history-message question-message pending-question" aria-label="Your question"><p>{research.question}</p></article>}
+      {research.question&&history.items.findLast(message=>message.role==="USER")?.parts[0]?.text!==research.question&&!saved&&<article className="history-message question-message pending-question" aria-label="Your question"><p>{research.question}</p></article>}
       {research.pending&&<div className="research-progress" role="status" aria-live="polite"><span className="progress-mark" aria-hidden="true"><ResearchMark/></span><span>{research.label}</span><div className="answer-skeleton" aria-hidden="true"><span/><span/><span/></div></div>}
       {research.error&&!saved&&<div className="research-failure"><p role="alert">{research.error}</p><div className="failure-actions">
         <button className="research-button" disabled={research.pending} onClick={()=>void research.retry()}>Check same request</button>
@@ -38,8 +38,7 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
     </section>
     <div className="thread-bottom">
       {research.pending?<QuestionComposer text="" onText={()=>{}} onSubmit={()=>{}} pending onStop={research.stop} placeholder={research.label}/>
-        :hasAnswer||research.question||hasQuestion||research.error?<StartQuestion compact/>
-        :<QuestionComposer text={text} onText={setText} onSubmit={()=>void submit(text)} pending={false}/>}
+         :<QuestionComposer text={text} onText={setText} onSubmit={()=>{if(text.trim()){void submit(text);setText('');}}} pending={false} placeholder={hasAnswer?'Ask a follow-up…':'Ask a question…'}/>}
     </div>
   </main>;
 }

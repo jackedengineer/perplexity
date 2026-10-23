@@ -2,7 +2,7 @@ import {traceStage} from '@/server/telemetry/trace';
 import { randomUUID } from "node:crypto";
 import { and,eq,gt,sql } from "drizzle-orm";
 import { z } from "zod";
-import { ACTIVE_RUN_STATUSES,conversations,messages,outputReviews,messageCitations,runs,inputSafetyReviews,providerCalls,runSettlements,runSources,sourcePassages,session,runRetrievals } from "@/db/schema";
+import { ACTIVE_RUN_STATUSES,conversations,messages,outputReviews,messageCitations,runs,inputSafetyReviews,providerCalls,runSettlements,runSources,sourcePassages,session,runRetrievals,runPlans } from "@/db/schema";
 import type { AdmissionDatabase,AdmissionTransaction } from "./usage";
 import { lockOwnedRun } from "./lock";
 import { AdmissionError } from "./errors";
@@ -28,18 +28,21 @@ export function createFinalization(db: AdmissionDatabase) {
         if (current.expiresAt <= now || current.createdAt.getTime()+30*86400000 <= now.getTime()) throw new AdmissionError("UNAUTHENTICATED");
         const serialized = serializeApprovedPayload(value);
         const [existing] = await tx.select().from(outputReviews).where(eq(outputReviews.runId,run.id));
-        if (run.status === "COMPLETED" && existing?.decision === "ALLOW" && existing.messageId && existing.payloadHash === serialized.payloadHash) return { kind: "ALREADY_COMMITTED",runId: run.id,messageId: existing.messageId };
+        if (["COMPLETED","NEEDS_CLARIFICATION"].includes(run.status) && existing?.decision === "ALLOW" && existing.messageId && existing.payloadHash === serialized.payloadHash) return { kind: "ALREADY_COMMITTED",runId: run.id,messageId: existing.messageId };
         if (run.status !== "CHECKING_OUTPUT" || signal.aborted || run.deadlineAt <= now || run.attemptVersion !== value.attemptVersion ||
           conversation.revision !== value.revision || run.admittedRevision !== value.revision || value.policyVersion !== SAFETY_POLICY.version || run.policyVersion !== value.policyVersion) throw new AdmissionError("CONFLICT");
+        const clarifying=value.kind==='CLARIFICATION';
+        const [planning]=await tx.select().from(runPlans).where(eq(runPlans.runId,run.id));
+        if(clarifying&&(!planning||planning.attemptVersion!==run.attemptVersion||planning.plan.action!=='CLARIFY'||planning.plan.question!==value.markdown))throw new AdmissionError('CONFLICT');
         const calls = await tx.select().from(providerCalls).where(eq(providerCalls.runId,run.id));
         if (!calls.some(c=>c.stage === "OUTPUT_SAFETY" && c.status === "SUCCEEDED" && c.attemptVersion === run.attemptVersion) ||
-          !calls.some(c=>c.stage === "ANSWER" && (c.status === (value.kind === "ANSWER" ? "SUCCEEDED" : "SKIPPED")) && c.attemptVersion === run.attemptVersion)) throw new AdmissionError("SAFETY_UNAVAILABLE");
+          (!clarifying && !calls.some(c=>c.stage === "ANSWER" && (c.status === (value.kind === "ANSWER" ? "SUCCEEDED" : "SKIPPED")) && c.attemptVersion === run.attemptVersion))) throw new AdmissionError("SAFETY_UNAVAILABLE");
         const [input] = await tx.select({ approvedAt: messages.approvedAt,messagePolicy: messages.policyVersion,reviewPolicy: inputSafetyReviews.policyVersion })
           .from(inputSafetyReviews).innerJoin(messages,eq(messages.id,inputSafetyReviews.acceptedMessageId))
           .where(and(eq(inputSafetyReviews.runId,run.id),eq(inputSafetyReviews.decision,"ALLOW"),eq(inputSafetyReviews.attemptVersion,run.attemptVersion)));
         if (!input?.approvedAt || input.messagePolicy !== value.policyVersion || input.reviewPolicy !== value.policyVersion) throw new AdmissionError("SAFETY_UNAVAILABLE");
         const [retrieval] = await tx.select().from(runRetrievals).where(eq(runRetrievals.runId,run.id));
-        if (!retrieval || retrieval.expiresAt <= now || retrieval.policyVersion !== value.policyVersion || retrieval.attemptVersion !== run.attemptVersion ||
+        if (clarifying ? Boolean(retrieval)||calls.some(c=>["SEARCH","ANSWER","QUERY_SAFETY"].includes(c.stage)) : !retrieval || retrieval.expiresAt <= now || retrieval.policyVersion !== value.policyVersion || retrieval.attemptVersion !== run.attemptVersion ||
           (value.kind === "ANSWER" ? retrieval.status !== "READY" : retrieval.status !== "NO_EVIDENCE")) throw new AdmissionError("CONFLICT");
         const sources = await tx.select().from(runSources).where(eq(runSources.runId,run.id)).limit(6);
         const passages = await tx.select().from(sourcePassages).where(eq(sourcePassages.runId,run.id)).limit(6);
@@ -58,7 +61,7 @@ export function createFinalization(db: AdmissionDatabase) {
         await settleRun(tx,run,value.kind === "ANSWER" ? run.answerCredits : 0,now);
         await tx.update(conversations).set({ nextSequence: conversation.nextSequence+1,updatedAt: now }).where(eq(conversations.id,conversation.id));
         if (signal.aborted) throw new AdmissionError("CONFLICT");
-        const changed = await tx.update(runs).set({ status: "COMPLETED",updatedAt: now }).where(and(eq(runs.id,run.id),eq(runs.status,"CHECKING_OUTPUT"),eq(runs.attemptVersion,value.attemptVersion),gt(runs.deadlineAt,sql`clock_timestamp()`),
+        const changed = await tx.update(runs).set({ status: clarifying ? "NEEDS_CLARIFICATION" : "COMPLETED",updatedAt: now }).where(and(eq(runs.id,run.id),eq(runs.status,"CHECKING_OUTPUT"),eq(runs.attemptVersion,value.attemptVersion),gt(runs.deadlineAt,sql`clock_timestamp()`),
           sql`EXISTS (SELECT 1 FROM session s WHERE s.id = ${sessionId} AND s.user_id = ${subject} AND s.expires_at > clock_timestamp() AND s.created_at + interval '30 days' > clock_timestamp())`)).returning({ id: runs.id });
         if (!changed.length || signal.aborted) throw new AdmissionError("CONFLICT");
         return { kind: "COMMITTED",runId: run.id,messageId };

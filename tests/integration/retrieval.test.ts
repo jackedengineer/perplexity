@@ -141,7 +141,7 @@ it("checks the admitted stage allocation before either classifier or Tavily",asy
 });
 it("restricted SQL role enforces reviewed insertion and immutable evidence",async()=>{
   await pg.exec(`CREATE ROLE retrieval_writer_test; GRANT USAGE ON SCHEMA public TO retrieval_writer_test;
-    GRANT SELECT ON app_users,input_safety_reviews,messages,usage_reservations TO retrieval_writer_test;
+    GRANT SELECT ON app_users,input_safety_reviews,messages,run_plans,usage_reservations TO retrieval_writer_test;
     GRANT SELECT,UPDATE ON conversations,runs TO retrieval_writer_test;
     GRANT SELECT,INSERT ON run_retrievals,run_sources,source_passages TO retrieval_writer_test;
     GRANT UPDATE (status,query_verdict,evidence_verdict,search_credits) ON run_retrievals TO retrieval_writer_test;

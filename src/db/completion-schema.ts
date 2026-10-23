@@ -16,7 +16,7 @@ export const providerCalls = pgTable("provider_calls",{
   uniqueIndex("provider_id_run_unique").on(t.id,t.runId),
   uniqueIndex("provider_run_stage_unique").on(t.runId,t.stage),
   check("provider_attempt_valid",sql`${t.attemptVersion} > 0 AND length(trim(${t.requestedModel})) > 0 AND ${t.status} IN ('STARTED','SUCCEEDED','UNKNOWN','SKIPPED')`),
-  check("provider_cap_valid",sql`${t.capMicroUsd} > 0 AND ${t.capMicroUsd} = CASE ${t.stage} WHEN 'INPUT_SAFETY' THEN 5000 WHEN 'QUERY_SAFETY' THEN 5000 WHEN 'SEARCH' THEN 8000 WHEN 'EVIDENCE_SAFETY' THEN 5000 WHEN 'ANSWER' THEN 20000 WHEN 'OUTPUT_SAFETY' THEN 5000 ELSE -1 END`),
+  check("provider_cap_valid",sql`${t.capMicroUsd} > 0 AND ${t.capMicroUsd} = CASE ${t.stage} WHEN 'PLANNER' THEN 2000 WHEN 'INPUT_SAFETY' THEN 5000 WHEN 'QUERY_SAFETY' THEN 5000 WHEN 'SEARCH' THEN 8000 WHEN 'EVIDENCE_SAFETY' THEN 5000 WHEN 'ANSWER' THEN 20000 WHEN 'OUTPUT_SAFETY' THEN 5000 ELSE -1 END`),
   check("provider_usage_valid",sql`(${t.costMicroUsd} IS NULL OR ${t.costMicroUsd} >= 0) AND (${t.inputTokens} IS NULL OR ${t.inputTokens} BETWEEN 0 AND 1000000) AND (${t.outputTokens} IS NULL OR ${t.outputTokens} BETWEEN 0 AND 1000000) AND (${t.searchCredits} IS NULL OR ${t.searchCredits} = 1)`),
   check("provider_lifecycle_valid",sql`(${t.status} = 'STARTED' AND ${t.finishedAt} IS NULL AND ${t.costMicroUsd} IS NULL) OR (${t.status} <> 'STARTED' AND ${t.finishedAt} IS NOT NULL AND ${t.finishedAt} >= ${t.startedAt} AND (${t.status} <> 'SKIPPED' OR ${t.costMicroUsd} IS NOT DISTINCT FROM 0))`),
 ]);

@@ -12,7 +12,7 @@ for (const key of ["DATABASE_URL", "DATABASE_URL_DIRECT"]) {
     const result = await client.query(`SELECT
       current_setting('server_version_num')::integer AS version,
       (SELECT count(*)::integer FROM information_schema.tables
-       WHERE table_schema='public' AND table_name IN ('user','session','account','verification','rate_limit','app_users','conversations','messages','runs','usage_buckets','operator_usage_buckets','usage_reservations','admission_attempt_buckets','input_safety_reviews','run_retrievals','run_sources','source_passages','provider_calls','output_safety_reviews','message_citations','run_settlements','provider_usage_resolutions','run_reconciliations','request_rate_buckets')) AS tables`);
+       WHERE table_schema='public' AND table_name IN ('user','session','account','verification','rate_limit','app_users','conversations','messages','runs','usage_buckets','operator_usage_buckets','usage_reservations','admission_attempt_buckets','input_safety_reviews','run_retrievals','run_sources','source_passages','provider_calls','output_safety_reviews','message_citations','run_settlements','provider_usage_resolutions','run_reconciliations','request_rate_buckets','run_plans')) AS tables`);
     const permissions = await client.query(`SELECT
       has_column_privilege(current_user,'runs','deadline_at','UPDATE') AS deadline_write,
       (has_column_privilege(current_user,'provider_calls','cap_micro_usd','UPDATE') OR has_column_privilege(current_user,'provider_calls','stage','UPDATE') OR has_column_privilege(current_user,'provider_calls','run_id','UPDATE') OR has_column_privilege(current_user,'provider_calls','attempt_version','UPDATE')) AS provider_cap_write,
@@ -54,7 +54,7 @@ for (const key of ["DATABASE_URL", "DATABASE_URL_DIRECT"]) {
     const rights = permissions.rows[0];
     if (key === "DATABASE_URL" && (!rights.reconciliation_access || rights.reconciliation_elevation || !rights.completion_write || rights.completion_mutation || rights.accounting_snapshot_write || !rights.provider_outcome_write || rights.provider_delete || !rights.evidence_write || rights.evidence_mutation || !rights.evidence_rls || rights.evidence_policies !== 4 || rights.evidence_expiry_write || !rights.conversations || !rights.history || !rights.message_write || rights.message_update || !rights.message_rls || rights.bypass_rls || rights.message_owner || rights.message_policies !== 3 || !rights.review_write || rights.review_mutation || rights.schema_create || hasBudgetProvisioningRights(rights) || rights.fingerprint_write || !rights.settlement_write || rights.reservation_write || !rights.reserve_credits || !rights.reserve_operator)) throw new Error("Runtime privilege check failed");
     if(key==='DATABASE_URL'&&(!rights.request_rate_access||rights.request_rate_elevation||rights.deadline_write||rights.provider_cap_write))throw new Error("Runtime rate privilege check failed");
-    if (!tls || result.rows[0].tables !== 24) throw new Error("Database check failed");
+    if (!tls || result.rows[0].tables !== 25) throw new Error("Database check failed");
     console.log(JSON.stringify({ connection: key, ...result.rows[0], permissions: permissions.rows[0], verifiedTls: tls, connectAndQueryMs: Math.round(performance.now() - start) }));
     } finally { client.release(); }
   } catch {

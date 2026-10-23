@@ -11,7 +11,7 @@ import type { AnswerProvider } from "@/server/ai/answer";
 import type { SafetyProvider } from "@/server/safety/provider";
 import type { SearchProvider } from "@/server/search/tavily";
 import { createMessageAcceptance } from "./accept-message";
-import { createProviderCalls,recordSafetyProvider,recordSearchProvider } from "./provider-calls";
+import { createProviderCalls,recordPlannerProvider,recordSafetyProvider,recordSearchProvider } from "./provider-calls";
 import { createInputGate } from "@/server/safety/input";
 import { createEvidenceGate } from "@/server/safety/evidence";
 import { createRetrieval } from "@/server/search/retrieve";
@@ -19,8 +19,11 @@ import { createAnswerCompletion } from "./complete";
 import { createFinalization } from "./finalize";
 import { AdmissionError } from "./errors";
 import { startRunMonitor } from "./monitor";
+import type {PlannerProvider} from '@/server/ai/planner-provider';
+import {planRun} from './plan';
+import {clarifyRun} from './clarify';
 type Admitted = Exclude<AdmissionResult,{kind: "DENIED"}>["run"];
-export type ExecutionProviders = { input: SafetyProvider;query: SafetyProvider;evidence: SafetyProvider;output: SafetyProvider;answer: AnswerProvider;search: SearchProvider };
+export type ExecutionProviders = { planner:PlannerProvider;input: SafetyProvider;query: SafetyProvider;evidence: SafetyProvider;output: SafetyProvider;answer: AnswerProvider;search: SearchProvider };
 export function createRunExecution(db: AdmissionDatabase,keys: unknown,providers: ExecutionProviders) {
   return { async execute(identity: ChatIdentity,run: Admitted,input: SubmitQuery,signal: AbortSignal,onStage: (stage: PublicStage)=>void) {
     bindRunTelemetry({runId:run.id});
@@ -30,7 +33,7 @@ export function createRunExecution(db: AdmissionDatabase,keys: unknown,providers
     const monitor=startRunMonitor(async()=>{
       const [live]=await db.select({id:runs.id}).from(runs).innerJoin(appUsers,eq(appUsers.id,runs.userId))
         .innerJoin(session,and(eq(session.id,identity.sessionId),eq(session.userId,subject),sql`${session.expiresAt}>clock_timestamp()`,sql`${session.createdAt}+interval '30 days'>clock_timestamp()`))
-        .where(and(eq(runs.id,run.id),eq(appUsers.authSubject,subject),eq(runs.attemptVersion,1),eq(runs.admittedRevision,run.revision),inArray(runs.status,[...ACTIVE_RUN_STATUSES,'COMPLETED'])));
+        .where(and(eq(runs.id,run.id),eq(appUsers.authSubject,subject),eq(runs.attemptVersion,1),eq(runs.admittedRevision,run.revision),inArray(runs.status,[...ACTIVE_RUN_STATUSES,'COMPLETED','NEEDS_CLARIFICATION'])));
       return Boolean(live);
     },signal,Date.parse(run.deadlineAt));
     signal=monitor.signal;
@@ -40,6 +43,13 @@ export function createRunExecution(db: AdmissionDatabase,keys: unknown,providers
       const [liveSession] = await db.select({ id: session.id }).from(session).where(and(eq(session.id,identity.sessionId),eq(session.userId,subject),
         sql`${session.expiresAt} > clock_timestamp()`,sql`${session.createdAt} + interval '30 days' > clock_timestamp()`));
       if (!liveSession) throw new AdmissionError("UNAUTHENTICATED");
+      onStage('PLANNING');
+      const planned=await traceStage('planning',()=>planRun(db,subject,run.id,input,recordPlannerProvider(calls,providers.planner),signal));
+      if(planned.plan.action==='CLARIFY'){
+        onStage('CHECKING_ANSWER');
+        await clarifyRun(db,subject,identity.sessionId,run,planned.original,planned.plan.question,providers.output,signal);
+        onStage('SAVING_ANSWER');return {kind:'COMPLETED'} as const;
+      }
       onStage("SEARCHING");
       const retrieval = createRetrieval(db,{ modelId: providers.query.modelId,search: recordSearchProvider(calls,providers.search),
         queryGate: createInputGate(recordSafetyProvider(calls,"QUERY_SAFETY",providers.query),"safety.query"),evidenceGate: createEvidenceGate(recordSafetyProvider(calls,"EVIDENCE_SAFETY",providers.evidence)) });

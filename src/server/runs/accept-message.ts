@@ -1,6 +1,6 @@
 import {bindRunTelemetry} from '@/server/telemetry/trace';
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gt, isNotNull, or, sql } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { conversations, inputSafetyReviews, messages, runs } from "@/db/schema";
 import { submissionSchema, type SubmitQuery } from "@/server/contracts/chat";
@@ -9,10 +9,11 @@ import { createInputGate, type InputCheck } from "@/server/safety/input";
 import { INPUT_DETECTOR_VERSION } from "@/server/safety/provider";
 import { guardVerdictSchema, SAFETY_POLICY } from "@/server/safety/policy";
 import { resolveSafetyDecision, type SafetyResponse } from "@/server/safety/responses";
+import {loadPlanningContext} from './context';
 import { AdmissionError } from "./errors";
 import { matchesFingerprint, parseAdmissionConfig, type AdmissionConfig } from "./policy";
 import { lockOwnedRun } from "./lock";
-import type { AdmissionDatabase, AdmissionTransaction } from "./usage";
+import type { AdmissionDatabase } from "./usage";
 
 export type InputAcceptance =
   | { kind: "ACCEPTED"; runId: string; messageId: string; revision: number }
@@ -25,21 +26,6 @@ function verifyPayload(run: typeof runs.$inferSelect, request: SubmitQuery, conf
     throw new AdmissionError("IDEMPOTENCY_MISMATCH");
   }
   if (run.policyVersion !== SAFETY_POLICY.version) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
-}
-const textParts = z.array(z.strictObject({ type: z.literal("text"), text: z.string().max(4000) })).min(1).max(16);
-async function loadContext(tx: AdmissionTransaction, conversationId: string) {
-  const tail = await tx.select({ role: messages.role,parts: messages.parts,approvedAt: messages.approvedAt,policyVersion: messages.policyVersion }).from(messages).where(and(
-    eq(messages.conversationId,conversationId),or(eq(messages.role,"USER"),isNotNull(messages.approvedAt)),
-  )).orderBy(desc(messages.sequence)).limit(7);
-  if (tail.length > 6) return null; // Do not launder older intent by silently truncating safety context.
-  const context = [];
-  for (const turn of tail.reverse()) {
-    if (!turn.approvedAt || turn.policyVersion !== SAFETY_POLICY.version) return null;
-    const parts = textParts.safeParse(turn.parts);
-    if (!parts.success) return null;
-    context.push({ role: turn.role,text: parts.data.map((part)=>part.text).join("\n") });
-  }
-  return context;
 }
 function interrupted(check: InputCheck, reason: "CANCELLED" | "TIMEOUT"): InputCheck {
   return { ...check, reason, verdict: { decision: "UNAVAILABLE",retryable: false,policyVersion: SAFETY_POLICY.version } };
@@ -59,7 +45,7 @@ export function createMessageAcceptance(db: AdmissionDatabase, keys: unknown, ga
           if (run.status !== "RECEIVED") return { kind: terminal.includes(run.status) ? "RUN_ALREADY_FINISHED" : "RUN_IN_PROGRESS",runId } as const;
           if (signal.aborted || run.deadlineAt <= now) throw new AdmissionError("SAFETY_UNAVAILABLE");
           if (conversation.revision !== run.admittedRevision) throw new AdmissionError("CONFLICT");
-          const context = await loadContext(tx,conversation.id);
+          const context = await loadPlanningContext(tx,conversation.id).then(turns=>turns.map(({role,text})=>({role,text}))).catch(()=>null);
           await tx.update(runs).set({ status: "CHECKING_INPUT",updatedAt: now }).where(eq(runs.id,runId));
           return { kind: "CLAIMED",run,context } as const;
         });

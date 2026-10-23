@@ -1,7 +1,7 @@
 import {recordTelemetry} from '@/server/telemetry/trace';
 import { and, eq, gt, sql } from "drizzle-orm";
 import { z } from "zod";
-import { inputSafetyReviews, messages, runRetrievals, runs, runSources, sourcePassages, usageReservations } from "@/db/schema";
+import { inputSafetyReviews, messages, runRetrievals, runs, runSources, sourcePassages, usageReservations,runPlans } from "@/db/schema";
 import type { PublicErrorCode } from "@/server/contracts/errors";
 import { AdmissionError } from "@/server/runs/errors";
 import { lockOwnedRun } from "@/server/runs/lock";
@@ -12,6 +12,7 @@ import { SAFETY_POLICY } from "@/server/safety/policy";
 import { buildEvidence, validateEvidence } from "./evidence";
 import { RETRIEVAL_LIMITS, RetrievalError, searchQuerySchema } from "./limits";
 import type { SearchProvider } from "./tavily";
+import {queryPlanSchema} from "@/server/contracts/pipeline";
 import type { EvidencePackage } from "@/server/contracts/pipeline";
 
 type Dependencies = { modelId: string; search: SearchProvider; queryGate: ReturnType<typeof createInputGate>; evidenceGate: ReturnType<typeof createEvidenceGate> };
@@ -47,13 +48,18 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
           const [review] = await tx.select().from(inputSafetyReviews).where(and(eq(inputSafetyReviews.runId,runId),eq(inputSafetyReviews.decision,"ALLOW"),eq(inputSafetyReviews.attemptVersion,run.attemptVersion)));
           if (!review?.acceptedMessageId || review.policyVersion !== SAFETY_POLICY.version) throw new AdmissionError("SAFETY_UNAVAILABLE");
           const [message] = await tx.select().from(messages).where(and(eq(messages.id,review.acceptedMessageId),eq(messages.conversationId,run.conversationId)));
-          const parts = z.tuple([z.strictObject({ type: z.literal("text"),text: searchQuerySchema })]).safeParse(message?.parts);
-          if (!message?.approvedAt || message.role !== "USER" || message.kind !== "QUESTION" || message.sequence !== 1 ||
+          const parts = z.tuple([z.strictObject({ type: z.literal("text"),text: z.string().min(1).max(4000) })]).safeParse(message?.parts);
+          if (!message?.approvedAt || message.role !== "USER" || message.kind !== "QUESTION" || 
             message.policyVersion !== SAFETY_POLICY.version || !parts.success) throw new AdmissionError("INVALID_INPUT");
+          const [record]=await tx.select().from(runPlans).where(eq(runPlans.runId,runId));
+          const plan=record?queryPlanSchema.parse(record.plan):null;
+          // Legacy internal fixtures may retrieve without a plan; public execution always plans first.
+          if(record&&(record.messageId!==message.id||record.attemptVersion!==run.attemptVersion||plan?.action!=='ANSWER'))throw new AdmissionError('CONFLICT');
+          const query=searchQuerySchema.parse(plan?.action==='ANSWER'?plan.retrieval.queries[0]:parts.data[0].text);
           await tx.insert(runRetrievals).values({ runId,attemptVersion: run.attemptVersion,policyVersion: run.policyVersion,
             detectorVersion: EVIDENCE_DETECTOR_VERSION,modelId: dependencies.modelId,status: "STARTED",createdAt: now,expiresAt: new Date(now.getTime()+30*86_400_000) });
           await tx.update(runs).set({ status: "SEARCHING",updatedAt: now }).where(eq(runs.id,runId));
-          return { kind: "CLAIMED",run,query: parts.data[0].text } as const;
+          return { kind: "CLAIMED",run,query } as const;
         });
         if (prepared.kind !== "CLAIMED") return prepared;
         claim = prepared.run;

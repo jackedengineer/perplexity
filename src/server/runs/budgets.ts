@@ -1,5 +1,6 @@
 // FAST has one claim per stage. These ceilings are server policy, never browser input.
 export const STAGE_LIMITS=Object.freeze({
+ PLANNER:Object.freeze({capMicroUsd:2000n,maxDurationMs:5000}),
  INPUT_SAFETY:Object.freeze({capMicroUsd:5000n,maxDurationMs:5000}),QUERY_SAFETY:Object.freeze({capMicroUsd:5000n,maxDurationMs:5000}),
  SEARCH:Object.freeze({capMicroUsd:8000n,maxDurationMs:8000}),EVIDENCE_SAFETY:Object.freeze({capMicroUsd:5000n,maxDurationMs:5000}),
  ANSWER:Object.freeze({capMicroUsd:20000n,maxDurationMs:12000}),OUTPUT_SAFETY:Object.freeze({capMicroUsd:5000n,maxDurationMs:5000}),

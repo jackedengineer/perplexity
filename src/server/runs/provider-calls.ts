@@ -9,7 +9,7 @@ import type { SearchProvider } from "@/server/search/tavily";
 import {providerDeadline,STAGE_LIMITS,type ProviderStage} from './budgets';
 import {recordProviderObservation,traceStage} from '@/server/telemetry/trace';
 const noUsage:ProviderUsage={costMicroUsd:0n,inputTokens:0,outputTokens:0,actualModel:null};
-const phases = { INPUT_SAFETY: "CHECKING_INPUT",QUERY_SAFETY: "SEARCHING",SEARCH: "SEARCHING",EVIDENCE_SAFETY: "PREPARING_EVIDENCE",ANSWER: "GENERATING",OUTPUT_SAFETY: "CHECKING_OUTPUT" };
+const phases = { PLANNER: "PLANNING", INPUT_SAFETY: "CHECKING_INPUT",QUERY_SAFETY: "SEARCHING",SEARCH: "SEARCHING",EVIDENCE_SAFETY: "PREPARING_EVIDENCE",ANSWER: "GENERATING",OUTPUT_SAFETY: "CHECKING_OUTPUT" };
 export function createProviderCalls(db: AdmissionDatabase,subject: string,runId: string) {
   return {
     async begin(stage: ProviderStage,requestedModel: string,signal?:AbortSignal) {
@@ -71,4 +71,15 @@ export function recordSearchProvider(calls: ReturnType<typeof createProviderCall
     finally{budget.stop();}
     });
   } };
+}
+
+export function recordPlannerProvider(calls:ReturnType<typeof createProviderCalls>,provider:import('@/server/ai/planner-provider').PlannerProvider):import('@/server/ai/planner-provider').PlannerProvider{
+ return {modelId:provider.modelId,usage:provider.usage,async plan(input,options){
+  const claim=await calls.begin('PLANNER',provider.modelId,options.signal),budget=providerDeadline(claim,options.signal);
+  try{
+   if(budget.signal.aborted){await calls.finish(claim.id,'SKIPPED',noUsage);throw new Error('No dispatch');}
+   const result=await provider.plan(input,{signal:budget.signal,deadlineAt:claim.deadlineAt});await calls.finish(claim.id,'SUCCEEDED',result.usage);
+   if(budget.signal.aborted)throw new Error('Deadline');return result;
+  }catch(error){try{await calls.finish(claim.id,'UNKNOWN',provider.usage?.());}catch{}throw error;}finally{budget.stop();}
+ }};
 }

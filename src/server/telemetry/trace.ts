@@ -22,7 +22,7 @@ export function bindRunTelemetry(value:unknown) {
 export function recordProviderObservation(value:unknown,started=false) {
  const current=storage.getStore(),parsed=providerTelemetryFieldsSchema.safeParse(value);if(!current||!parsed.success)return;
  const fields=parsed.data;if(!fields.providerCallId||!fields.providerStage)return;
- if(!current.calls.has(fields.providerCallId)&&current.calls.size>=6)return;
+ if(!current.calls.has(fields.providerCallId)&&current.calls.size>=7)return;
  const observation={...current.calls.get(fields.providerCallId),...fields};
  current.calls.set(fields.providerCallId,observation);
  recordTelemetry(started?'research.provider_started':'research.usage',observation);

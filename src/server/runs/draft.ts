@@ -14,7 +14,7 @@ export async function generatePrivateDraft(input: DraftInput,provider: AnswerPro
     usage: { costMicroUsd: 0n,inputTokens: 0,outputTokens: 0,actualModel: null } };
   if (!provider) throw new AnswerError();
   try {
-    const draft = await provider.generate({ question: question.data,evidence },options);
+    const draft = await provider.generate({ question: question.data,evidence,...(input.interpretation?{interpretation:questionTextSchema.parse(input.interpretation)}:{}) },options);
     if (options.signal.aborted || Date.now() >= options.deadlineAt.getTime() || !questionTextSchema.safeParse(draft.text).success) throw new AnswerError();
     return { kind: "ANSWER",text: draft.text,usage: draft.usage };
   } catch { throw new AnswerError(); }
