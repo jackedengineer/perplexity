@@ -161,3 +161,6 @@ live sample should use the curated nonpersonal questions, explicit spend caps an
 nonproduction resources, and preserve unknown provider receipts honestly. Obtain
 separate authorization before any paid run. This harness neither exports private
 production data nor adds an evaluation endpoint or release bypass.
+
+The committed [offline baseline](baseline.md) records the measured finite checks
+and explicitly pending human/live results.
