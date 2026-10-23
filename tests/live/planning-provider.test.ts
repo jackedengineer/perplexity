@@ -32,14 +32,16 @@ it('evaluates the complete fixed planning corpus and paired frozen answers withi
   return {limit:data.limit,usage:data.usage,remaining:data.limit_remaining};
  };
  const before=await metadata();if(before.remaining<.25)throw Error('Insufficient headroom for the local $0.25 evaluation envelope');
- let booked=0n,known=0n,unknown=0,calls=0;const cap=250000n,bounded=boundedModelFetch(fetch);
+ let activeFixtureId="",booked=0n,known=0n,unknown=0,calls=0;
+ const wirePlans:Array<Record<string,unknown>>=[],guardResults:Array<Record<string,unknown>>=[];const cap=250000n,bounded=boundedModelFetch(fetch);
  const capped:typeof fetch=async(url,init)=>{
-  const body=JSON.parse(String(init?.body)),reserve=body.model===answerConfig.modelId?12500n:2250n;
+  const fixtureId=activeFixtureId,body=JSON.parse(String(init?.body)),reserve=body.model===answerConfig.modelId?12500n:2250n;
   if(++calls>180||booked+reserve>cap)throw Error('Local evaluation spending envelope exhausted');booked+=reserve;
   let receipt=false;
   try{
    const response=await bounded(url,init),envelope=JSON.parse(await response.clone().text()),usage=providerUsage(envelope.usage,envelope.model);
    if(usage.costMicroUsd!==null){booked+=usage.costMicroUsd-reserve;known+=usage.costMicroUsd;receipt=true;}
+   try{const output=JSON.parse(envelope.choices?.[0]?.message?.content);if(output.plan)wirePlans.push({fixtureId,plan:output.plan});if(output.classification)guardResults.push({fixtureId,classification:output.classification});}catch{}
    return response;
   }finally{if(!receipt)unknown++;}
  };
@@ -53,6 +55,7 @@ it('evaluates the complete fixed planning corpus and paired frozen answers withi
  const options=()=>({signal:AbortSignal.timeout(45000),deadlineAt:new Date(Date.now()+45000)});
  const directory=`.artifacts/planning-live/${revision.slice(0,8)}-${randomUUID()}`;await mkdir(directory,{recursive:true,mode:0o700});
  for(const fixture of cases){
+  activeFixtureId=fixture.id;
   const input=planningInput(fixture),started=performance.now();let plan:QueryPlan|null=null,guarded=false;
   let plannerLatency:number|null=null,plannerCost:string|null=null;
   try{
@@ -89,7 +92,7 @@ it('evaluates the complete fixed planning corpus and paired frozen answers withi
    }
    row.answers=pairs;
   }
-  packet.push(row);await writeFile(`${directory}/review-packet.json`,JSON.stringify(packet,null,2),{mode:0o600});
+  packet.push(row);await writeFile(`${directory}/wire-plans.json`,JSON.stringify(wirePlans,null,2),{mode:0o600});await writeFile(`${directory}/guard-results.json`,JSON.stringify(guardResults,null,2),{mode:0o600});await writeFile(`${directory}/review-packet.json`,JSON.stringify(packet,null,2),{mode:0o600});
  }
  const after=await metadata(),report={sourceRevision:revision,plannerVersion:PLANNING_VERSION,promptVersions:CURRENT_PROMPT_VERSIONS,corpusHash,models:{planner:plannerConfig.modelId,safety:safetyConfig.modelId,answer:answerConfig.modelId},keyCap:{before,after},localEnvelopeMicroUsd:String(cap),knownAllRoleMicroUsd:String(known),bookedIncludingUnknownMicroUsd:String(booked),unknownReceipts:unknown,providerRequests:calls,directPlans,deterministicPlans,fallbackPlans,clarificationResponses,approvedClarifications,clarificationDenominator:5,pairedApproved,pairedDenominator:14,...compareFrozenPlanning(cases,observations,'LIVE_PROVIDER')};
  await writeFile(`${directory}/report.json`,JSON.stringify(report,null,2),{mode:0o600});

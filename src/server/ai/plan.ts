@@ -2,7 +2,7 @@ import {z} from 'zod';
 import {queryPlanSchema,type QueryPlan} from '@/server/contracts/pipeline';
 import {localeSchema,questionTextSchema,timezoneSchema} from '@/server/contracts/chat';
 import {safeEvidenceText} from '@/server/search/evidence';
-export const PLANNING_VERSION="planner-v2";
+export const PLANNING_VERSION="planner-v3";
 export const PLANNER_LIMITS=Object.freeze({contextMessages:6,inputBytes:10000,queryCount:1,clarificationCharacters:240});
 const turn=z.strictObject({id:z.uuid(),role:z.enum(['USER','ASSISTANT']),text:questionTextSchema});
 export const plannerInputSchema=z.strictObject({original:z.strictObject({id:z.uuid(),text:questionTextSchema}),context:z.array(turn).max(6),now:z.iso.datetime(),timezone:timezoneSchema,locale:localeSchema.nullable()})
@@ -72,5 +72,17 @@ export function resolvePricingFollowup(value:unknown):QueryPlan|null{
   if(!match)return null;
   const entity=match[1],question=input.original.text.replace(/\bits\b/iu,entity);
   return validatePlan({action:'ANSWER',standaloneQuestion:question,intent:'RESEARCH',explicitConstraints:[],disclosedAssumptions:[],retrieval:{required:true,queries:[entity+' pricing'],freshness:'ANY',startDate:null,endDate:null},answerLanguage:input.locale??'en'},input);
+ }catch{return null;}
+}
+
+export function clarifyUnresolvedReference(value:unknown):QueryPlan|null{
+ try{
+  const input=plannerInputSchema.parse(value);if(input.context.length)return null;
+  const text=input.original.text.trim().replace(/\s+/gu,' ');
+  const comparing=/^(?:is it better|compare (?:them|these|those)|which one should I use)\??$/iu.test(text);
+  const pricing=/^(?:what|how) about (?:its|their) (?:pricing|costs?|features?)\??$/iu.test(text);
+  const current=/^is (?:that|this|it) (?:current|accurate)\??$/iu.test(text);
+  if(!comparing&&!pricing&&!current)return null;
+  return queryPlanSchema.parse({action:'CLARIFY',question:comparing?'Which products are you comparing?':pricing?'Which product or service do you mean?':'Which information or topic do you mean?',reasonCode:'AMBIGUOUS_REFERENCE'});
  }catch{return null;}
 }

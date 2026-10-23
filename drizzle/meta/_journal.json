@@ -92,6 +92,13 @@
       "when": 1792751608603,
       "tag": "0012_yielding_iron_lad",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792752433450,
+      "tag": "0013_light_nekra",
+      "breakpoints": true
     }
   ]
 }

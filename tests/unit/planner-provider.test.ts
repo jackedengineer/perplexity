@@ -42,3 +42,8 @@ it('resolves one exact user-topic pricing reference locally, with no paid call o
  i.context.push({id:randomUUID(),role:'USER',text:'Explain Supabase'});fetcher.mockResolvedValue(response({plan:{action:'CLARIFY',question:'Which product do you mean?',reasonCode:'AMBIGUOUS_REFERENCE'}}));
  expect((await provider.plan(i,options())).plan.action).toBe('CLARIFY');expect(fetcher).toHaveBeenCalledOnce();
 });
+it('creates one neutral clarification for exact unresolved references without a paid planning attempt',async()=>{
+ const fetcher=vi.fn<typeof fetch>(),provider=createPlannerProvider(config,fetcher);
+ for(const text of ['Is it better?','Compare them','What about its pricing?','Which one should I use?','Is that current?']){const i=input();i.original.text=text;expect(await provider.plan(i,options())).toMatchObject({plan:{action:'CLARIFY'},usage:{costMicroUsd:0n},engine:'CONTEXT_RULE'});}
+ expect(fetcher).not.toHaveBeenCalled();
+});
