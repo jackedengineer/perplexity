@@ -39,6 +39,9 @@ it("uses one isolated, tool-free, nonstreaming strict-schema request with fixed 
   expect(JSON.parse(body.messages[1].content)).toEqual(input);
   expect(body.messages[0].content).toContain("v1");
   expect(body.messages[0].content).not.toContain(input.text);
+  // DeepInfra's grammar does not implement uniqueItems; runtime validation still
+  // rejects duplicates rather than weakening the accepted verdict contract.
+  expect(body.response_format.json_schema.schema.properties.classification.anyOf[1]).not.toHaveProperty("uniqueItems");
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
 it("maps consistent BLOCK/UNAVAILABLE wire objects and discards reasoning fields", async () => {

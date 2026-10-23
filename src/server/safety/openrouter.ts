@@ -15,7 +15,7 @@ const responseSchema = z.object({ usage: z.unknown().optional(),model: z.string(
 const outputSchema = { type: "object", additionalProperties: false,
   required: ["classification","policyVersion"], properties: {
     classification: { anyOf: [{type:"string",enum:["ALLOW","UNAVAILABLE"]},
-      {type:"array",items:{type:"string",enum:safetyCategorySchema.options},minItems:1,maxItems:11,uniqueItems:true}] },
+      {type:"array",items:{type:"string",enum:safetyCategorySchema.options},minItems:1,maxItems:11}] },
     policyVersion: { type: "string", enum: [SAFETY_POLICY.version] },
   },
 };
