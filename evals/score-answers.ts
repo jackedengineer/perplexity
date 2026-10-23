@@ -3,9 +3,10 @@ export type Support='SUPPORTED'|'UNSUPPORTED'|'UNCERTAIN';
 export type ScoredClaim={support:Support|null;judgeSupport?:Support|null;cited:boolean};
 export type AnswerObservation=TimingCost&{id:string;disposition:'ANSWER'|'REFUSAL'|'ERROR'|'NO_EVIDENCE'|'CLARIFICATION';citationValid:boolean;claims:ScoredClaim[]};
 export function scoreAnswers(cases:readonly {id:string;kind?:string}[],observations:readonly AnswerObservation[]){
- const matched=matchObservations(cases,observations),expectedAnswers=matched.filter(r=>r.observation&&(r.testCase.kind===undefined||r.testCase.kind==='ANSWER'));
- const falseRefusals=rate(expectedAnswers.filter(r=>r.observation!.disposition==='REFUSAL').length,expectedAnswers.length);
- const answerCoverage=rate(expectedAnswers.filter(r=>r.observation!.disposition==='ANSWER').length,expectedAnswers.length);
+ const matched=matchObservations(cases,observations),expectedAnswers=matched.filter(r=>r.testCase.kind===undefined||r.testCase.kind==='ANSWER');
+ const observedExpectedAnswers=expectedAnswers.filter(r=>r.observation);
+ const falseRefusals=rate(observedExpectedAnswers.filter(r=>r.observation!.disposition==='REFUSAL').length,observedExpectedAnswers.length);
+ const answerCoverage=rate(expectedAnswers.filter(r=>r.observation?.disposition==='ANSWER').length,expectedAnswers.length);
  const exceptions=matched.filter(r=>r.testCase.kind==='CLARIFICATION'||r.testCase.kind==='NO_EVIDENCE');
  const requiredDisposition=rate(exceptions.filter(r=>r.observation?.disposition===r.testCase.kind).length,exceptions.length);
  const wrongDisposition=exceptions.filter(r=>r.observation&&r.observation.disposition!=='ERROR'&&r.observation.disposition!==r.testCase.kind).length;

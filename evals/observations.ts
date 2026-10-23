@@ -1,6 +1,7 @@
 import {unified} from 'unified';
 import remarkParse from 'remark-parse';
 import {validateCitations} from '@/server/ai/citations';
+import {NO_EVIDENCE_TEXT} from '@/server/safety/release';
 import {answerObservationSchema} from './contracts';
 import type {AnswerObservation} from './score-answers';
 export function parseJsonLines(source:string):unknown[]{
@@ -29,7 +30,9 @@ export function prepareAnswerObservation(value:unknown):AnswerObservation {
  const row=parsed.data,markers=citationMarkers(row.markdown);let sourceIds=new Set<string>(),citationValid=false;
  try{
   const sources=validateCitations(row.markdown,row.evidence,row.disposition==='ANSWER');
-  sourceIds=new Set(sources.map(s=>s.sourceId));citationValid=true;
+  sourceIds=new Set(sources.map(s=>s.sourceId));
+  citationValid=!(row.disposition==='NO_EVIDENCE'&&(row.markdown!==NO_EVIDENCE_TEXT||row.evidence.sources.length>0))&&
+   !(row.disposition==='CLARIFICATION'&&(row.markdown.length>800||row.evidence.sources.length>0));
  }catch{}
  return {id:row.id,disposition:row.disposition,elapsedMs:row.elapsedMs,costMicroUsd:row.costMicroUsd,citationValid,
   claims:row.claims.map(c=>({support:c.support,judgeSupport:c.judgeSupport,cited:citationValid&&markers.some(m=>m.start>=c.start&&m.end<=c.end&&sourceIds.has(m.id))}))};

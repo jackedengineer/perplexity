@@ -1,6 +1,15 @@
 import {expect,it} from 'vitest';
 import {prepareAnswerObservation,parseJsonLines} from '../../evals/observations';
 import {frozenEvidence} from '../../evals/offline';
+import {NO_EVIDENCE_TEXT} from '@/server/safety/release';
+it('validates the runtime non-answer contract instead of trusting the disposition label',()=>{
+ const row={id:'sample',disposition:'NO_EVIDENCE',markdown:NO_EVIDENCE_TEXT,evidence:frozenEvidence([]),claims:[]};
+ expect(prepareAnswerObservation(row).citationValid).toBe(true);
+ expect(prepareAnswerObservation({...row,markdown:'Arbitrary uncited prose.'}).citationValid).toBe(false);
+ expect(prepareAnswerObservation({...row,disposition:'CLARIFICATION',markdown:'x'.repeat(801)}).citationValid).toBe(false);
+ expect(prepareAnswerObservation({...row,disposition:'CLARIFICATION',markdown:'Which city?'}).citationValid).toBe(true);
+ expect(prepareAnswerObservation({...row,evidence:frozenEvidence([{title:'Unrelated',text:'Evidence must be empty.'}])}).citationValid).toBe(false);
+});
 it('counts only valid in-span source markers and requires human support annotations',()=>{
  const evidence=frozenEvidence([{title:'Reference',text:'Water refracts light.'}]);
  const value={id:'sample',disposition:'ANSWER',markdown:'Water refracts light [S1].',evidence,humanReviewed:true,claims:[{start:0,end:25,support:'SUPPORTED'}]};

@@ -31,6 +31,8 @@ it('uses all human-reviewed factual claims including uncertain claims in support
 it('does not treat a perfectly annotated tiny sample as release readiness',()=>{
  const report=scoreAnswers([{id:'a'},{id:'b'}],[{id:'a',disposition:'ANSWER',citationValid:true,claims:[{support:'SUPPORTED',cited:true}]}]);
  expect(report.supportedClaims.rate).toBe(1);expect(report.pending).toBe(1);expect(report.releaseStatus).toBe('PENDING');
+ expect(report.answerCoverage).toEqual(rate(1,2));
+ expect(scoreAnswers([{id:'a',kind:'ANSWER'},{id:'b',kind:'CLARIFICATION'}],[]).answerCoverage).toEqual(rate(0,1));
 });
 it('fails sparse citation coverage even if the sampled factual claims are supported',()=>{
  const report=scoreAnswers([{id:'a'}],[{id:'a',disposition:'ANSWER',citationValid:true,claims:[{support:'SUPPORTED',cited:true},{support:'SUPPORTED',cited:false}]}]);

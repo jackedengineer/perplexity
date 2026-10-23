@@ -26,6 +26,8 @@ jobs:
         with:
           name: offline-evaluation-summary
           path: .artifacts/evals/offline.json
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 7
       - run: pnpm audit --prod --audit-level=high
       - run: pnpm build

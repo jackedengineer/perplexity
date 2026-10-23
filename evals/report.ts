@@ -1,9 +1,10 @@
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
+import {isDeepStrictEqual} from 'node:util';
 import {z} from 'zod';
-import {safetyCaseSchema,answerCaseSchema,safetyObservationSchema,manifestSchema} from './contracts';
+import {safetyCaseSchema,answerCaseSchema,safetyObservationSchema,answerObservationSchema,manifestSchema} from './contracts';
 import {parseJsonLines,prepareAnswerObservation} from './observations';
-import {runOfflineSafety,runFrozenCitationChecks} from './offline';
+import {runOfflineSafety,runFrozenCitationChecks,frozenEvidence} from './offline';
 import {scoreSafety} from './score-safety';
 import {scoreAnswers} from './score-answers';
 import {rate} from './shared';
@@ -34,7 +35,13 @@ export async function scoreManualResults(value:unknown,root?:string){
  const parsed=z.strictObject({manifest:manifestSchema,safety:z.array(safetyObservationSchema).max(1000),answers:z.array(z.unknown()).max(1000)}).safeParse(value);
  if(!parsed.success||parsed.data.manifest.mode!=='MANUAL_LIVE'||parsed.data.safety.length>0&&parsed.data.manifest.models.safety===null||parsed.data.answers.length>0&&(parsed.data.manifest.models.answer===null||parsed.data.manifest.models.safety===null)||parsed.data.manifest.corpusHash!==corpus.corpusHash)throw Error('Invalid evaluation manifest; no contents logged');
  const input=parsed.data;
- const preparedAnswers=input.answers.map(prepareAnswerObservation);
+ const preparedAnswers=input.answers.map(value=>{
+  const parsedRow=answerObservationSchema.safeParse(value);
+  if(!parsedRow.success)throw Error('Invalid evaluation observation; no contents logged');
+  const testCase=corpus.answers.find(c=>c.id===parsedRow.data.id&&c.expectedCitationValid);
+  if(!testCase||!isDeepStrictEqual(parsedRow.data.evidence,frozenEvidence(testCase.passages)))throw Error('Invalid evaluation evidence; no contents logged');
+  return prepareAnswerObservation(parsedRow.data);
+ });
  if(input.manifest.judge===null&&preparedAnswers.some(row=>row.claims.some(c=>c.judgeSupport!=null)))throw Error('Judge identity required for model annotations');
  if(input.safety.some(r=>!corpus.safety.some(c=>c.id===r.id&&c.test==='SEMANTIC')))throw Error('Invalid semantic evaluation case');
  const safety=scoreSafety(corpus.safety,[...await runOfflineSafety(corpus.safety),...input.safety]);

@@ -9,7 +9,10 @@ import type {SafetyObservation} from './score-safety';
 const runId='11111111-1111-4111-8111-111111111111';
 const frozenDate=new Date('2026-10-23T00:00:00.000Z');
 export function frozenEvidence(passages:{title:string;text:string}[]){
- return buildEvidence(runId,passages.map((p,i)=>({title:p.title,url:`https://example.org/evals/${i+1}`,content:p.text,score:1-i*.1})),frozenDate);
+ const evidence=buildEvidence(runId,passages.map((p,i)=>({title:p.title,url:`https://example.org/evals/${i+1}`,content:p.text,score:1-i*.1})),frozenDate);
+ // Stable fixture identities allow exact observation-to-corpus binding on import.
+ evidence.passages.forEach((p,i)=>{p.passageId=`22222222-2222-4222-8222-${String(i+1).padStart(12,'0')}`;});
+ return evidence;
 }
 const sampleEvidence=()=>frozenEvidence([{title:'Frozen fixture',text:'Light refracts and reflects inside water droplets.'}]);
 const allow={decision:'ALLOW',categoryCodes:[],policyVersion:'v1'};
