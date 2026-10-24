@@ -19,6 +19,7 @@ export const outputSafetyInputSchema=safetyInputShape.extend({context:context(81
 export type SafetyInput = z.infer<typeof safetyInputSchema>;
 import type { ProviderUsage } from "@/server/ai/usage";
 export interface SafetyProvider {
+  accepts?(input: SafetyInput): boolean;
   usage?(): ProviderUsage | undefined;
   readonly modelId: string;
   classify(input: SafetyInput, signal: AbortSignal): Promise<unknown>;

@@ -9,7 +9,7 @@ import { createInputGate, type InputCheck } from "@/server/safety/input";
 import { INPUT_DETECTOR_VERSION } from "@/server/safety/provider";
 import { guardVerdictSchema, SAFETY_POLICY } from "@/server/safety/policy";
 import { resolveSafetyDecision, type SafetyResponse } from "@/server/safety/responses";
-import {loadPlanningContext} from './context';
+import {loadSafetyContext} from './context';
 import { AdmissionError } from "./errors";
 import { matchesFingerprint, parseAdmissionConfig, type AdmissionConfig } from "./policy";
 import { lockOwnedRun } from "./lock";
@@ -45,7 +45,7 @@ export function createMessageAcceptance(db: AdmissionDatabase, keys: unknown, ga
           if (run.status !== "RECEIVED") return { kind: terminal.includes(run.status) ? "RUN_ALREADY_FINISHED" : "RUN_IN_PROGRESS",runId } as const;
           if (signal.aborted || run.deadlineAt <= now) throw new AdmissionError("SAFETY_UNAVAILABLE");
           if (conversation.revision !== run.admittedRevision) throw new AdmissionError("CONFLICT");
-          const context = await loadPlanningContext(tx,conversation.id).then(turns=>turns.map(({role,text})=>({role,text}))).catch(()=>null);
+          const context = await loadSafetyContext(tx,conversation.id).then(turns=>turns.map(({role,text})=>({role,text}))).catch(()=>null);
           await tx.update(runs).set({ status: "CHECKING_INPUT",updatedAt: now }).where(eq(runs.id,runId));
           return { kind: "CLAIMED",run,context } as const;
         });

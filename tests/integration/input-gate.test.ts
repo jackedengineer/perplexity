@@ -159,10 +159,10 @@ it("stops secrets in approved context before forwarding and stores only the deci
   expect(JSON.stringify([result,review])).not.toContain(secret);
   expect(await db.select().from(schema.messages)).toHaveLength(1);
 });
-it("rechecks the six most recent complete turns when earlier history exceeds the context window", async()=>{
+it("fails closed when complete safety history exceeds the context window", async()=>{
   await db.insert(schema.messages).values(Array.from({ length: 7 },(_,index)=>({ conversationId,role: "USER" as const,kind: "QUESTION" as const,
     sequence: index+1,policyVersion: "v1",approvedAt: new Date(),parts: [{ type: "text" as const,text: `Turn ${index}` }] })));
   await db.update(schema.conversations).set({ nextSequence: 8 });
-  const p = pipeline(); expect(await p.execute()).toMatchObject({ kind: "ACCEPTED" });
-  expect(p.provider.classify.mock.calls[0][0].context).toHaveLength(6); expect(await db.select().from(schema.messages)).toHaveLength(8);
+  const p = pipeline(); expect(await p.execute()).toMatchObject({ kind: "DENIED",code:"SAFETY_UNAVAILABLE" });
+  expect(p.provider.classify).not.toHaveBeenCalled(); expect(await db.select().from(schema.messages)).toHaveLength(7);
 });

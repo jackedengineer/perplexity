@@ -43,12 +43,7 @@ async function readResponse(response: Response) {
 }
 export function createOpenRouterSafetyProvider(config: SafetyModelConfig, request: typeof fetch = fetch, prompt: string = INPUT_SAFETY_PROMPT): SafetyProvider {
   let usage: ProviderUsage | undefined;
-  return {
-    usage: ()=>usage,
-    modelId: config.modelId,
-    async classify(input,signal) {
-      usage = undefined;
-      const body = JSON.stringify({ model: config.modelId, stream: false,temperature:0, usage: { include: true },max_completion_tokens: 384,
+  const serialize = (input: import("./provider").SafetyInput) => JSON.stringify({ model: config.modelId, stream: false,temperature:0, usage: { include: true },max_completion_tokens: 384,
         tools: [], tool_choice: "none", plugins: [],
         ...(!isVerifiedNonReasoningModel(config.modelId) ? {reasoning: { enabled: false, exclude: true }} : {}),
         provider: { only: [config.provider], allow_fallbacks: false, require_parameters: true, data_collection: "deny", zdr: true,
@@ -56,6 +51,13 @@ export function createOpenRouterSafetyProvider(config: SafetyModelConfig, reques
         response_format: { type: "json_schema", json_schema: { name: "research_safety_v3", strict: true, schema: outputSchema } },
         messages: [{ role: "system", content: prompt },{ role: "user", content: JSON.stringify(input) }],
       });
+  return {
+    usage: ()=>usage,
+    accepts: input => Buffer.byteLength(serialize(input),"utf8") <= SAFETY_REQUEST_BYTES,
+    modelId: config.modelId,
+    async classify(input,signal) {
+      usage = undefined;
+      const body = serialize(input);
       if (Buffer.byteLength(body,"utf8") > SAFETY_REQUEST_BYTES) throw new SafetyProviderError("PROVIDER_UNAVAILABLE");
       let response: Response;
       try {

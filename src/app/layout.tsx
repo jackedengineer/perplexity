@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Perplex — Follow your curiosity", template: "%s · Perplex" },
+  title: { default: "perplexity — Follow your curiosity", template: "%s · perplexity" },
   description: "A thoughtful place to ask questions, explore sources, and understand more.",
 };
 

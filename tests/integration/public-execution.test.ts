@@ -92,7 +92,7 @@ it('carries a valid maximum multibyte submission into the planner and persists i
  const p=providers(),plan=vi.fn().mockResolvedValue({plan:{action:'CLARIFY',question:'Which topic do you mean?',reasonCode:'MISSING_ENTITY'},usage:knownUsage});p.planner={modelId:'test/planner',plan};
  expect((await run(p)).result.kind).toBe('COMPLETED');expect(plan).toHaveBeenCalledOnce();
  expect(plan.mock.calls[0][0].original.text).toBe(person.request.message.text);
- expect((await db.select().from(schema.runPlans))[0].version).toBe('planner-v5');
+ expect((await db.select().from(schema.runPlans))[0].version).toBe('planner-v6');
 });
 it('commits an output-approved clarification without any search or answer dispatch and reloads it',async()=>{
  await ambiguous();
