@@ -5,7 +5,7 @@ config({ path: ".env.local", quiet: true });
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  testMatch: process.env.LIVE_NEON_E2E ? ["**/live-session.spec.ts", "**/private-conversations.spec.ts", "**/approved-history.spec.ts"] : "**/foundation.spec.ts",
+  testMatch: process.env.LIVE_NEON_E2E ? ["**/live-session.spec.ts", "**/private-conversations.spec.ts", "**/approved-history.spec.ts", "**/privacy.spec.ts"] : "**/foundation.spec.ts",
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),

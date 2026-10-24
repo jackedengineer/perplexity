@@ -1,6 +1,6 @@
-import { and,eq,sql } from "drizzle-orm";
+import { and,eq,isNull,sql } from "drizzle-orm";
 import { z } from "zod";
-import { ACTIVE_RUN_STATUSES,appUsers,messages,outputReviews,runs,session } from "@/db/schema";
+import { ACTIVE_RUN_STATUSES,conversations,appUsers,messages,outputReviews,runs,session } from "@/db/schema";
 import type { AdmissionDatabase } from "@/server/runs/usage";
 import { AdmissionError } from "@/server/runs/errors";
 import { serializeApprovedPayload } from "@/server/ai/approved-payload";
@@ -16,7 +16,7 @@ export function createAnswerDelivery(db: AdmissionDatabase) {
     const [row] = await db.select({ id: runs.id,conversationId: runs.conversationId,revision: runs.admittedRevision,status: runs.status,deadlineAt:runs.deadlineAt,dbNow:sql<string>`clock_timestamp()::text`,
       policyVersion: runs.policyVersion,payload: outputReviews.payload,payloadHash: outputReviews.payloadHash,bodyHash: outputReviews.bodyHash,
       decision: outputReviews.decision,messageId: messages.id,parts: messages.parts,approvedAt: messages.approvedAt,messagePolicy: messages.policyVersion,createdAt: messages.createdAt,
-    }).from(runs).innerJoin(appUsers,eq(appUsers.id,runs.userId))
+    }).from(runs).innerJoin(conversations,and(eq(conversations.id,runs.conversationId),isNull(conversations.deletedAt))).innerJoin(appUsers,eq(appUsers.id,runs.userId))
       .innerJoin(session,and(eq(session.userId,appUsers.authSubject),eq(session.id,identity.sessionId),sql`${session.expiresAt} > clock_timestamp()`,sql`${session.createdAt} + interval '30 days' > clock_timestamp()`))
       .leftJoin(outputReviews,eq(outputReviews.runId,runs.id)).leftJoin(messages,and(eq(messages.id,outputReviews.messageId),eq(messages.conversationId,runs.conversationId)))
       .where(and(eq(appUsers.authSubject,identity.user.id),eq(runs.id,runId))).limit(1);

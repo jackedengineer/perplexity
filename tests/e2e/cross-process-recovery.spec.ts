@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {readFile} from 'node:fs/promises';
 import {test,expect} from '@playwright/test';
 import {eq,inArray} from 'drizzle-orm';
@@ -10,7 +11,7 @@ test('another tab cancels a paused provider and the original stream cannot publi
  try{
   const [profile]=await f.owner.insert(schema.appUsers).values({authSubject:identity.id}).returning();
   const window={startsAt:new Date(Date.now()-86400000),endsAt:new Date(Date.now()+86400000)};
-  await f.owner.insert(schema.usageBuckets).values((['PERIOD','DAY'] as const).map(kind=>({userId:profile.id,kind,...window,entitlementVersion:'test-t18',creditLimit:10,providerLimitMicroUsd:100000n})));
+  await f.owner.execute(sql`SELECT ensure_free_credits(${profile.id}::uuid)`);
   operatorIds=(await f.owner.insert(schema.operatorUsageBuckets).values((['PERIOD','DAY'] as const).map(kind=>({budgetKey:process.env.T11_TEST_BUDGET_KEY!,kind,...window,providerLimitMicroUsd:100000n}))).returning({id:schema.operatorUsageBuckets.id})).map(r=>r.id);
   const before=await abortCount();await page.goto('/workspace');await page.getByRole('textbox',{name:'Ask a question'}).fill('t18-cancel Explain why rainbows form.');
   const response=page.waitForResponse(r=>r.url().endsWith('/api/chat'));await page.getByRole('button',{name:'Submit question'}).click();

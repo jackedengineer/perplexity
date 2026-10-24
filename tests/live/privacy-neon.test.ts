@@ -1,0 +1,22 @@
+import {afterAll,beforeAll,expect,it} from 'vitest';
+import {eq} from 'drizzle-orm';
+import * as schema from '@/db/schema';
+import {createNeonFixture} from './admission-fixture';
+import {createConversationPrivacy} from '@/server/conversations/privacy';
+import {createConversationRepository} from '@/server/conversations/repository';
+import {prepareCompletion} from '../helpers/completion';
+const f=createNeonFixture();
+beforeAll(()=>f.budgets(300000n));
+afterAll(()=>f.close());
+it('restricted runtime deletes reviewed content and keeps durable settlement',async()=>{
+ const p=await f.identity();const admitted=await f.admission.admit(p.subject,p.request);
+ expect(admitted.kind).toBe('ADMITTED');if(admitted.kind!=='ADMITTED')return;
+ await prepareCompletion(f.runtime,{...p,runId:admitted.run.id},f.keys);
+ await createConversationPrivacy(f.runtime).remove(p.subject,p.conversation.id);
+ expect(await f.runtime.select().from(schema.messages).where(eq(schema.messages.conversationId,p.conversation.id))).toEqual([]);
+ expect(await f.runtime.select().from(schema.runSources).where(eq(schema.runSources.runId,admitted.run.id))).toEqual([]);
+ const [run]=await f.runtime.select().from(schema.runs).where(eq(schema.runs.id,admitted.run.id));
+ expect(run.status).toBe('CANCELLED');
+ expect(await f.runtime.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,run.id))).toHaveLength(1);
+ await expect(createConversationRepository(f.runtime).get(p.subject,p.conversation.id)).rejects.toMatchObject({code:'NOT_FOUND'});
+});

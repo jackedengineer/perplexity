@@ -2,11 +2,13 @@ import { presentAnswer } from "@/server/answers/presentation";
 import { serializeApprovedPayload } from "@/server/ai/approved-payload";
 import { SAFETY_POLICY } from "@/server/safety/policy";
 import { createHash } from "node:crypto";
-import { and, desc, eq, ilike, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import * as schema from "@/db/schema";
-import { ACTIVE_RUN_STATUSES, appUsers, conversations, messages, outputReviews, runs } from "@/db/schema";
+import { ACTIVE_RUN_STATUSES, appUsers, conversations, messages, messageFeedback, outputReviews, runs } from "@/db/schema";
 import { encodeCursor, type Conversation, type CreateInput, type HistoryInput, type ListInput } from "./contracts";
+import { historyPageView } from "./views";
+import { createConversationPrivacy } from "./privacy";
 import { ConversationError } from "./errors";
 
 const fields = {
@@ -20,8 +22,8 @@ const serialize = (row: Row): Conversation => ({
 });
 
 export function createConversationRepository(db: PgDatabase<PgQueryResultHKT, typeof schema>) {
-  const owned = (authSubject: string) => inArray(conversations.userId,
-    db.select({ id: appUsers.id }).from(appUsers).where(eq(appUsers.authSubject, authSubject)));
+  const owned = (authSubject: string) => and(isNull(conversations.deletedAt), inArray(conversations.userId,
+    db.select({ id: appUsers.id }).from(appUsers).where(eq(appUsers.authSubject, authSubject))));
 
   async function get(authSubject: string, id: string) {
     const [row] = await db.select(fields).from(conversations).where(and(owned(authSubject), eq(conversations.id, id))).limit(1);
@@ -30,7 +32,23 @@ export function createConversationRepository(db: PgDatabase<PgQueryResultHKT, ty
   }
 
   return {
+    ...createConversationPrivacy(db),
     get,
+    async exportData(subject: string, id: string): Promise<{schemaVersion:number;exportedAt:string;conversation:Conversation;messages:import("./views").HistoryPage["items"];feedback:{messageId:string;rating:string;reason:string|null}[]}> {
+      return db.transaction(async tx => {
+        const reader = createConversationRepository(tx);
+        const first = await reader.history(subject,id,{limit:50});
+        const items = [...historyPageView.parse(first).items];
+        let before = first.nextBefore;
+        while (before !== null) {
+          if (items.length >= 1000) throw new ConversationError("TOO_LARGE");
+          const page = await reader.history(subject,id,{limit:50,before});
+          items.unshift(...historyPageView.parse(page).items); before = page.nextBefore;
+        }
+        const feedback = await tx.select({messageId:messageFeedback.messageId,rating:messageFeedback.rating,reason:messageFeedback.reason}).from(messageFeedback).innerJoin(conversations,eq(conversations.id,messageFeedback.conversationId)).where(and(owned(subject),eq(conversations.id,id)));
+        return {schemaVersion:1,exportedAt:new Date().toISOString(),conversation:first.conversation,messages:items,feedback};
+      },{isolationLevel:"repeatable read",accessMode:"read only"});
+    },
     async create(authSubject: string, input: CreateInput) {
       const fingerprint = createHash("sha256").update(input.title).digest("hex");
       return db.transaction(async (tx) => {
@@ -40,8 +58,9 @@ export function createConversationRepository(db: PgDatabase<PgQueryResultHKT, ty
           userId: profile.id, creationRequestId: input.clientRequestId, creationFingerprint: fingerprint, title: input.title,
         }).onConflictDoNothing({ target: [conversations.userId, conversations.creationRequestId] }).returning(fields);
         if (inserted[0]) return { conversation: serialize(inserted[0]), created: true };
-        const [existing] = await tx.select({ ...fields, fingerprint: conversations.creationFingerprint }).from(conversations)
+        const [existing] = await tx.select({ ...fields, deletedAt: conversations.deletedAt, fingerprint: conversations.creationFingerprint }).from(conversations)
           .where(and(eq(conversations.userId, profile.id), eq(conversations.creationRequestId, input.clientRequestId)));
+        if (existing.deletedAt) throw new ConversationError("NOT_FOUND");
         if (existing.fingerprint !== fingerprint) throw new ConversationError("IDEMPOTENCY_MISMATCH");
         return { conversation: serialize(existing), created: false };
       });

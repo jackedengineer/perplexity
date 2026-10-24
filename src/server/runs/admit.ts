@@ -1,3 +1,4 @@
+import { prepareEntitlement } from "@/server/billing/entitlements";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { ACTIVE_RUN_STATUSES, appUsers, conversations, runs, usageReservations } from "@/db/schema";
 import { submissionSchema } from "@/server/contracts/chat";
@@ -17,24 +18,25 @@ const denied = (code: PublicErrorCode): AdmissionResult => ({ kind: "DENIED", co
 const isActive = (status: Run["status"]) => ACTIVE_RUN_STATUSES.some((value)=>value === status);
 
 // Internal API: authSubject comes only from the verified application session, never from a body.
-export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, policyInput: unknown = FREE_ADMISSION_POLICY,assertNewRunAvailable?:()=>void) {
+export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, policyInput: unknown = FREE_ADMISSION_POLICY,assertNewRunAvailable?:(modelKey:string)=>void,entitlements=false) {
   const config = parseAdmissionConfig(configInput);
   const parsedPolicy = admissionPolicySchema.safeParse(policyInput);
   if (!parsedPolicy.success) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
-  const policy = Object.freeze(parsedPolicy.data);
+  const basePolicy = Object.freeze(parsedPolicy.data);
   return {
     async admit(authSubject: string, input: unknown): Promise<AdmissionResult> {
       const parsed = submissionSchema.safeParse(input);
       if (!parsed.success) throw new AdmissionError("INVALID_INPUT");
       const request = parsed.data;
       return db.transaction(async (tx) => {
+        let policy = basePolicy, carryPeriod = 0, carryDay = 0;
         await tx.execute(sql`SET LOCAL lock_timeout = '2s'`);
         const [owner] = await tx.select({ id: appUsers.id }).from(appUsers).where(eq(appUsers.authSubject,authSubject)).limit(1);
         if (!owner) return denied("NOT_FOUND");
         // Transaction-scoped only: compatible with a pooled connection and multiple app processes.
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'run-admission:'+owner.id}::text,0))`);
         const [conversation] = await tx.select().from(conversations).where(and(eq(conversations.id,request.conversationId),eq(conversations.userId,owner.id))).for("update");
-        if (!conversation) return denied("NOT_FOUND");
+        if (!conversation || conversation.deletedAt) return denied("NOT_FOUND");
         const [existing] = await tx.select().from(runs).where(and(eq(runs.userId,owner.id),eq(runs.clientRequestId,request.clientRequestId))).limit(1);
         if (existing) {
           if (!matchesFingerprint(request,existing,{ hmac: existing.payloadHmac, keyId: existing.hmacKeyId, version: existing.payloadVersion },config)) return denied("IDEMPOTENCY_MISMATCH");
@@ -42,9 +44,13 @@ export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, 
         }
         // Synchronous configuration checks only; replay/recovery never needs a provider.
         // Keep this before counters/reservations and never perform network I/O under the lock.
-        try { assertNewRunAvailable?.(); }
+        try { assertNewRunAvailable?.(request.modelKey); }
         catch(error) { if(error instanceof AdmissionError)return denied(error.code);throw error; }
         const [{ now }] = await tx.select({ now: sql<string>`clock_timestamp()::text`.mapWith((value) => new Date(value)) }).from(appUsers).where(eq(appUsers.id,owner.id));
+        if(entitlements) {
+          try { const result=await prepareEntitlement(tx,owner.id,request.modelKey,basePolicy,now);policy=result.policy;carryPeriod=result.carryPeriod;carryDay=result.carryDay; }
+          catch(error){if(error instanceof AdmissionError)return denied(error.code);throw error;}
+        }
         if (!await consumeAttempts(tx,owner.id,now,policy)) return denied("RATE_LIMITED");
         // Expected denials roll back this savepoint, retaining only the consumed attempt counters.
         try {
@@ -53,6 +59,7 @@ export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, 
             const active = await reserve.select({ id: runs.id }).from(runs).where(and(eq(runs.userId,owner.id),inArray(runs.status,[...ACTIVE_RUN_STATUSES]))).limit(1);
             if (active.length) return denied("RUN_IN_PROGRESS");
             const budgets = await loadBudgets(reserve,owner.id,policy.operatorBudgetKey,now);
+            if(budgets.period.creditLimit-budgets.period.settledCredits-budgets.period.reservedCredits-carryPeriod<policy.answerCredits || budgets.day.creditLimit-budgets.day.settledCredits-budgets.day.reservedCredits-carryDay<policy.answerCredits)return denied("BUDGET_EXCEEDED");
             const snapshot = { ...policy, entitlementVersion: budgets.period.entitlementVersion };
             const fingerprint = fingerprintSubmission(request,snapshot,config);
             await reserveBudgets(reserve,budgets,policy);

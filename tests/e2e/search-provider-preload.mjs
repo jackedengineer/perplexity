@@ -36,7 +36,7 @@ globalThis.fetch=async(input,init)=>{
   const content=body.messages?.[0]?.content;
   const system=typeof content==="string"?content:Array.isArray(content)?content.map(part=>part.text??"").join("\n"):"";
   const output=system.startsWith("Inspect the COMPLETE visible response");
-  const stage=body.model==="test/planner"?"planner":body.model==="test/answer"?"answer":output?"output":"guard";record(stage,scenario);
+  const stage=body.model==="test/planner"?"planner":["test/answer","openai/gpt-4.1-mini","openai/gpt-4.1-nano"].includes(body.model)?"answer":output?"output":"guard";record(stage,scenario);
   if(scenario==="t19-safety-deadline"||stage==="answer"&&(scenario==="t18-cancel"||scenario==="t19-deadline"))await new Promise((resolve,reject)=>{
     const timer=setTimeout(resolve,scenario==="t19-safety-deadline"?6000:scenario==="t19-deadline"?15000:9000);
     const abort=()=>{record("answer-abort",scenario);clearTimeout(timer);reject(new Error("Synthetic provider aborted"));};
@@ -48,7 +48,7 @@ globalThis.fetch=async(input,init)=>{
     return Response.json({id:'synthetic-planner',model:body.model,created:1,choices:[{index:0,finish_reason:'stop',message:{role:'assistant',content:JSON.stringify({plan})}}],usage:{prompt_tokens:100,completion_tokens:100,total_tokens:200,cost:.0001}});
   }
   const blocked=scenario==="input-block"||(output&&scenario==="output-block");
-  const text=body.model==="test/answer"?(scenario==="conflicting"?"The reports disagree: source A gives 20 units [S1], while source B gives 30 units [S2]. The supplied evidence does not resolve the difference.":scenario==="t18-cancel"?"T18_PRIVATE_LATE_DRAFT [S1].":scenario==="output-block"?"UNREVIEWED_PRIVATE_DRAFT [S1].":scenario==="invalid-citation"?"UNREVIEWED_PRIVATE_DRAFT [S9].":answer):JSON.stringify({classification:blocked?["FRAUD"]:"ALLOW",policyVersion:"v1"});
-  return Response.json({id:"synthetic-t11",model:body.model,created:1,choices:[{index:0,finish_reason:"stop",message:{role:"assistant",content:body.model==="test/answer"?JSON.stringify({paragraphs:text.split("\n\n").map(text=>({text:text.replace(/\[S[1-9]\]/gu,""),sourceIds:[...new Set([...text.matchAll(/\[(S[1-9])\]/gu)].map(match=>match[1]))].length?[...new Set([...text.matchAll(/\[(S[1-9])\]/gu)].map(match=>match[1]))]:["S1"]}))}):text,reasoning:"PRIVATE_REASONING_MUST_NOT_LEAK"}}],usage:{prompt_tokens:100,completion_tokens:100,total_tokens:200,cost:.0001}});
+  const text=["test/answer","openai/gpt-4.1-mini","openai/gpt-4.1-nano"].includes(body.model)?(scenario==="conflicting"?"The reports disagree: source A gives 20 units [S1], while source B gives 30 units [S2]. The supplied evidence does not resolve the difference.":scenario==="t18-cancel"?"T18_PRIVATE_LATE_DRAFT [S1].":scenario==="output-block"?"UNREVIEWED_PRIVATE_DRAFT [S1].":scenario==="invalid-citation"?"UNREVIEWED_PRIVATE_DRAFT [S9].":answer):JSON.stringify({classification:blocked?["FRAUD"]:"ALLOW",policyVersion:"v1"});
+  return Response.json({id:"synthetic-t11",model:body.model,created:1,choices:[{index:0,finish_reason:"stop",message:{role:"assistant",content:["test/answer","openai/gpt-4.1-mini","openai/gpt-4.1-nano"].includes(body.model)?JSON.stringify({paragraphs:text.split("\n\n").map(text=>({text:text.replace(/\[S[1-9]\]/gu,""),sourceIds:[...new Set([...text.matchAll(/\[(S[1-9])\]/gu)].map(match=>match[1]))].length?[...new Set([...text.matchAll(/\[(S[1-9])\]/gu)].map(match=>match[1]))]:["S1"]}))}):text,reasoning:"PRIVATE_REASONING_MUST_NOT_LEAK"}}],usage:{prompt_tokens:100,completion_tokens:100,total_tokens:200,cost:.0001}});
 };
 

@@ -16,7 +16,8 @@ const auth = createAuth(db, {
   GOOGLE_CLIENT_ID: "test.apps.googleusercontent.com", GOOGLE_CLIENT_SECRET: "test-only",
 });
 beforeAll(async () => {
-  await pg.exec(await readFile("drizzle/0000_auth_foundation.sql", "utf8"));
+  const journal=JSON.parse(await readFile("drizzle/meta/_journal.json","utf8"));
+  for(const entry of journal.entries)await pg.exec(await readFile(`drizzle/${entry.tag}.sql`,"utf8"));
   await db.insert(schema.user).values({ id: "alice", name: "Alice", email: "alice@example.test", emailVerified: true });
 });
 afterAll(() => pg.close());

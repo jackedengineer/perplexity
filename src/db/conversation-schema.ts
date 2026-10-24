@@ -15,6 +15,7 @@ export const conversations = pgTable("conversations", {
   creationFingerprint: text("creation_fingerprint").notNull(),
   title: varchar("title", { length: 160 }).notNull(),
   revision: integer("revision").notNull().default(0),
+  deletedAt: timestamp("deleted_at", { withTimezone: true, precision: 3 }),
   nextSequence: integer("next_sequence").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
@@ -43,6 +44,7 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
 }, (table) => [
   // Ownership remains in application queries; RLS protects the runtime write boundary.
+  pgPolicy("messages_deleted_conversation_delete", { for: "delete", using: sql`EXISTS (SELECT 1 FROM conversations c WHERE c.id = messages.conversation_id AND c.deleted_at IS NOT NULL)` }),
   pgPolicy("messages_runtime_read", { for: "select", using: sql`true` }),
   pgPolicy("messages_reviewed_question_insert", { for: "insert", withCheck: sql`
     role = 'USER' AND kind = 'QUESTION' AND approved_at IS NOT NULL AND policy_version IS NOT NULL

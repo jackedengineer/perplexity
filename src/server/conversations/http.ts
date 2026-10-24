@@ -1,9 +1,10 @@
+import { requireEmptyBody } from "@/server/runs/recovery-http";
 import { ZodError } from "zod";
 import { conversationId, createInput, historyInput, listInput, renameInput } from "./contracts";
 import { ConversationError } from "./errors";
 import type { ConversationRepository } from "./repository";
 
-type Operation = "create" | "list" | "get" | "history" | "rename";
+type Operation = "create" | "list" | "get" | "history" | "rename" | "remove" | "export";
 type Dependencies = {
   repository: () => ConversationRepository;
   origin: () => string;
@@ -47,7 +48,7 @@ export function createConversationHttp(dependencies: Dependencies) {
       const start = performance.now();
       let response: Response;
       try {
-        if (["create", "rename"].includes(operation) && request.headers.get("origin") !== new URL(dependencies.origin()).origin) {
+        if (["create", "rename", "remove"].includes(operation) && request.headers.get("origin") !== new URL(dependencies.origin()).origin) {
           throw new ConversationError("INVALID_ORIGIN");
         }
         const identity = await dependencies.identity(request);
@@ -62,7 +63,15 @@ export function createConversationHttp(dependencies: Dependencies) {
           response = Response.json({ ...await repository.list(subject, listInput.parse(query)), requestId });
         } else {
           if (!conversationId.safeParse(id).success) throw new ConversationError("NOT_FOUND");
-          if (operation === "rename") {
+          if (operation === "remove") {
+            if (new URL(request.url).search) throw new ConversationError("INVALID_INPUT");
+            try { await requireEmptyBody(request); } catch { throw new ConversationError("INVALID_INPUT"); }
+            await repository.remove(subject,id!);
+            response = new Response(null,{status:204});
+          } else if (operation === "export") {
+            if (new URL(request.url).search) throw new ConversationError("INVALID_INPUT");
+            response = Response.json(await repository.exportData(subject,id!),{headers:{"Content-Disposition":`attachment; filename="conversation-${id}.json"`,"X-Content-Type-Options":"nosniff"}});
+          } else if (operation === "rename") {
             const conversation = await repository.rename(subject, id!, renameInput.parse(await readJson(request)));
             response = Response.json({ conversation, requestId });
           } else {

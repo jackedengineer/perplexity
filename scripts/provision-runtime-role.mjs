@@ -39,6 +39,10 @@ try {
   await pool.query("GRANT SELECT ON provider_usage_resolutions TO perplex_web; GRANT SELECT, INSERT ON run_reconciliations TO perplex_web");
   await pool.query("GRANT SELECT, INSERT ON request_rate_buckets TO perplex_web; GRANT UPDATE (attempts) ON request_rate_buckets TO perplex_web");
   await pool.query("GRANT SELECT,INSERT ON message_feedback TO perplex_web; GRANT UPDATE(rating,reason,version,updated_at) ON message_feedback TO perplex_web");
+  await pool.query("GRANT DELETE ON source_passages, messages, input_safety_reviews, output_safety_reviews, run_plans, run_retrievals TO perplex_web");
+  await pool.query("GRANT SELECT ON credit_grants, credit_ledger, guest_links, guest_trials TO perplex_web");
+  await pool.query("GRANT INSERT ON guest_trials TO perplex_web");
+  await pool.query("GRANT EXECUTE ON FUNCTION public.ensure_free_credits(uuid), public.link_guest_account(text,text) TO perplex_web");
   await pool.query("COMMIT");
   const runtimeUrl = new URL(process.env.DATABASE_URL);
   runtimeUrl.username = role;

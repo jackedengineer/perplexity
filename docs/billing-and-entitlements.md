@@ -1,5 +1,10 @@
 # Payments, model access and pricing
 
+> October 24 implementation scope: free-only trials and model/usage controls are
+> described in [guest access and credits](guest-access-and-credits.md). Razorpay,
+> paid tiers and Premium trials are deferred until the website is hosted. The
+> pricing and paid-flow sections below remain proposals, not enabled features.
+
 Status: proposed design revision, 2026-10-22. Seller: India-based. Initial customers: mainly India. Small scale is intentional; billing correctness, security, failure recovery and cost accounting remain in scope. No payment account, subscription, live checkout or charge has been created.
 
 ## 1. Provider choice

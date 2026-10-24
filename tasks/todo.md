@@ -214,9 +214,9 @@ T21 implementation: [evaluation protocol](../evals/README.md). The 138 safety la
 
 ### T22 — Implement conversation deletion and retention
 
-- [ ] Add owner-scoped deletion that fences active runs and removes dependent messages, citations and evidence; define aggregate audit/usage retention without retaining raw content.
-- [ ] Implement configured evidence/safety TTL cleanup and private data export; document provider and backup-retention boundaries.
-- [ ] Verify: deletion racing with generation cannot resurrect content; deleted evidence cannot be retrieved by ID; TTL expiration keeps citation URLs while honestly removing verification excerpts.
+- [x] Add owner-scoped deletion that fences active runs and removes dependent messages, citations and evidence; define aggregate audit/usage retention without retaining raw content.
+- [x] Implement configured evidence/safety TTL cleanup and private data export; document provider and backup-retention boundaries.
+- [x] Verify: deletion racing with generation cannot resurrect content; deleted evidence cannot be retrieved by ID; TTL expiration keeps citation URLs while honestly removing verification excerpts.
 - Dependencies: T21. Files: `src/server/runs/delete-conversation.ts`, `src/server/db/retention.ts`, `src/app/api/conversations/[id]/route.ts`, `tests/integration/deletion.test.ts`, `docs/operations.md`.
 
 ### T23 — Prepare CI, preview and production recovery
@@ -274,24 +274,31 @@ Build these after T24 and before optional T25–T27. Existing task IDs remain st
 - [ ] Verify: expired/revoked/absolute-expired/freshness cases, correct `Set-Cookie` before SSE, concurrent tabs and no credential material in logs/UI; updating expiry must not be mislabeled token rotation.
 - Dependencies: T24, T04. Files: `src/server/auth/config.ts`, `src/server/auth/session.ts`, `src/server/runs/finalize.ts`, `tests/integration/session-lifecycle.test.ts`, `tests/e2e/session.spec.ts`.
 
+Implementation checkpoint (October 24): free-only guest identity, linking,
+model selection, fixed grants/ledger, and usage UI are implemented and tested.
+See [current scope and evidence](../docs/guest-access-and-credits.md). T29's public
+bot challenge and hosted Google linking acceptance remain open. T30–T31 paid and
+Premium verification stays deferred with T32–T36; unchecked broad acceptance
+items below intentionally include that unimplemented scope.
+
 ### T29 — Add anonymous trial and safe account linking
 
 - [ ] Enable Better Auth anonymous identities and a 30-day quota-only trial handle; enforce 3 Economy answers plus verified bot challenges, trusted-edge abuse controls and a global free-spend ceiling.
-- [ ] Implement idempotent guest-to-registered conversation/usage attribution with active-run fencing and safe plugin deletion configuration; do not treat session presence as registered entitlement.
+- [x] Implement idempotent guest-to-registered conversation/usage attribution with active-run fencing and safe plugin deletion configuration; do not treat session presence as registered entitlement.
 - [ ] Verify: guest reload/expiry, new cookie attempts, shared IP behavior, migration failure/retry and old guest revocation; signup cannot repeatedly mint/reset the monthly free grant.
 - Dependencies: T28. Files: `src/server/auth/anonymous.ts`, `src/server/auth/link-guest.ts`, `src/server/db/schema.ts`, `src/server/runs/free-budget.ts`, `tests/integration/guest-linking.test.ts` plus generated SQL.
 
 ### T30 — Add entitled model catalog and selector
 
 - [ ] Define server-owned model keys, tested upstream IDs, tier/cost bands, token/search limits and fallbacks; expose only current eligible entries through `/api/models`.
-- [ ] Add selector and fixed credit-cost display; validate `modelKey` again on submission and preserve it in admission/idempotency metadata. Internal safety/planner roles remain unselectable.
+- [x] Add selector and fixed credit-cost display; validate `modelKey` again on submission and preserve it in admission/idempotency metadata. Internal safety/planner roles remain unselectable.
 - [ ] Verify: raw provider IDs, forged tier/price and over-budget fallbacks fail; guest/free/paid selectors reflect current DB entitlements and disabled model states.
 - Dependencies: T29. Files: `src/server/ai/catalog.ts`, `src/server/billing/entitlements.ts`, `src/app/api/models/route.ts`, `src/components/chat/model-selector.tsx`, `tests/integration/model-entitlements.test.ts`.
 
 ### T31 — Implement answer-credit ledger and usage display
 
-- [ ] Add unique period grants, append-only customer-credit entries, per-run reservations and separate monetary provider-spend accounting; atomically enforce period/daily/concurrency/rate budgets.
-- [ ] Implement `/api/usage`, clear reset timestamps and approved-result settlement versus blocked/failed credit release; count unbilled abuse attempts and safety costs against operator budgets.
+- [x] Add unique period grants, append-only customer-credit entries, per-run reservations and separate monetary provider-spend accounting; atomically enforce period/daily/concurrency/rate budgets.
+- [x] Implement `/api/usage`, clear reset timestamps and approved-result settlement versus blocked/failed credit release; count unbilled abuse attempts and safety costs against operator budgets.
 - [ ] Verify: concurrent reserve/settle races, guest-link attribution, free/paid period boundaries, expired reservations and mixed 2/5/15-credit requests; no double grant/debit or negative admitted balance.
 - Dependencies: T30, T05. Files: `src/server/db/schema.ts`, `src/server/billing/credits.ts`, `src/server/runs/admit.ts`, `src/app/api/usage/route.ts`, `tests/integration/credits.test.ts` plus generated SQL.
 

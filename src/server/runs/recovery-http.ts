@@ -35,7 +35,7 @@ export function createRecoveryHttp(dependencies:Dependencies) {
  };
 }
 
-async function requireEmptyBody(request:Request) {
+export async function requireEmptyBody(request:Request) {
  if(!request.body)return;
  const reader=request.body.getReader(),signal=AbortSignal.any([request.signal,AbortSignal.timeout(2000)]);
  const cancel=()=>{void reader.cancel().catch(()=>undefined);};signal.addEventListener('abort',cancel,{once:true});

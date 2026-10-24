@@ -33,6 +33,7 @@ export const sourcePassages = pgTable("source_passages",{
   uniqueIndex("passage_run_source_id_unique").on(t.runId,t.sourceId,t.id),
   uniqueIndex("passage_source_unique").on(t.sourceId),uniqueIndex("passage_run_id_unique").on(t.runId,t.id),
   check("passage_content_valid",sql`length(${t.text}) BETWEEN 1 AND 1000 AND length(trim(${t.text})) > 0 AND ${t.contentKind} IN ('SEARCH_PASSAGE','EXTRACTED_PAGE') AND ${t.contentHash} = encode(sha256(convert_to(${t.text},'UTF8')),'hex')`),
+  pgPolicy("passages_expired_delete",{for:"delete",using:sql`EXISTS (SELECT 1 FROM run_retrievals r JOIN runs q ON q.id=r.run_id WHERE r.run_id = source_passages.run_id AND r.expires_at < clock_timestamp() AND q.status NOT IN ('RECEIVED','CHECKING_INPUT','PLANNING','SEARCHING','PREPARING_EVIDENCE','GENERATING','CHECKING_OUTPUT'))`}),
   pgPolicy("passages_runtime_read",{ for: "select",using: sql`true` }),
   pgPolicy("passages_reviewed_insert",{ for: "insert",withCheck: sql`EXISTS (SELECT 1 FROM run_retrievals r WHERE r.run_id = ${t.runId} AND r.status = 'READY' AND r.query_verdict = 'ALLOW' AND r.evidence_verdict = 'ALLOW')` }),
 ]).enableRLS();

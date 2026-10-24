@@ -1,6 +1,6 @@
 type AuthSession = {
   session: { id: string; token: string; createdAt: Date; expiresAt: Date };
-  user: { id: string; name: string; email: string; emailVerified: boolean };
+  user: { id: string; name: string; email: string; emailVerified: boolean; isAnonymous?: boolean | null };
 };
 type SessionStore = {
   getSession: (headers: Headers) => Promise<AuthSession | null>;
@@ -19,7 +19,7 @@ export async function loadApplicationSession(store: SessionStore, headers: Heade
     sessionId: result.session.id,
     user: {
       id: result.user.id, name: result.user.name,
-      email: result.user.email, emailVerified: result.user.emailVerified,
+      isAnonymous: result.user.isAnonymous ?? false, email: result.user.email, emailVerified: result.user.emailVerified,
     },
   };
 }
