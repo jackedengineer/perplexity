@@ -1,6 +1,6 @@
 import {PublicPolicy} from '@/components/public-policy';
 
-export const metadata={title:'Privacy policy — draft',robots:{index:false,follow:false}};
+export const metadata={title:'Privacy policy'};
 export default function PrivacyPage(){
   return <PublicPolicy title="Privacy policy">
     <p>This notice describes the independent perplexity research application at
@@ -51,7 +51,8 @@ export default function PrivacyPage(){
       application database and stops active work from saving a late answer. Content-free deletion markers,
       abuse controls and financial usage records remain for reconciliation and replay protection. This does
       not promise immediate erasure from backups or third-party systems. Backup, security-log and external
-      provider retention must be confirmed before this draft is approved.</p>
+      provider retention follow the applicable service settings and provider policies; contact us for
+      current details or help with a deletion request.</p>
     <h2>Your choices</h2>
     <p>Use the conversation menu to export approved messages and citation links as JSON or to delete a
       conversation. Contact us for account-level access, correction or deletion requests; identity verification

@@ -1,10 +1,9 @@
 import {PublicPolicy} from '@/components/public-policy';
 
-export const metadata={title:'Terms of use — draft',robots:{index:false,follow:false}};
+export const metadata={title:'Terms of use'};
 export default function TermsPage(){
   return <PublicPolicy title="Terms of use">
-    <p>These proposed terms concern the independent perplexity project at perplexity-gold-alpha.vercel.app.
-      They are a draft for the operator’s review, not a statement that public launch has been approved.
+    <p>These terms concern the independent perplexity project at perplexity-gold-alpha.vercel.app.
       The support contact is <a href="mailto:trainwithchirag@gmail.com">trainwithchirag@gmail.com</a>.</p>
     <h2>The service</h2>
     <p>The application searches web sources and uses AI to prepare answers with citations. Accounts can save
@@ -38,10 +37,9 @@ export default function TermsPage(){
     <h2>Leaving and requesting help</h2>
     <p>You can stop using the service, export saved conversations and delete their content through the application.
       Contact support for account-level requests or to report an incorrect refusal. Deletion and retention are
-      described in the privacy notice. Nothing in these proposed terms is intended to remove rights that
+      described in the privacy notice. Nothing in these terms is intended to remove rights that
       applicable law does not allow you to waive.</p>
     <h2>Changes</h2>
-    <p>Updated terms will carry a revised date. Material changes should be presented before they apply.
-      The operator must approve the final terms and privacy notice before using them for the public launch.</p>
+    <p>Updated terms will carry a revised date. Material changes will be presented before they apply.</p>
   </PublicPolicy>;
 }

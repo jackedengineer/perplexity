@@ -14,8 +14,7 @@ export function PublicPolicy({title,children}:{title:string;children:ReactNode})
       <Link className="back-link" href="/">← Home</Link></header>
     <p className="eyebrow">Your questions. Your choices.</p>
     <h1>{title}</h1>
-    <aside className="policy-draft">Draft for owner review · 24 October 2026.
-      This proposed document has not been approved for the public launch.</aside>
+    <p className="policy-draft">Effective 24 October 2026.</p>
     <article>{children}</article>
     <footer><p>Questions? <a href="mailto:trainwithchirag@gmail.com">trainwithchirag@gmail.com</a></p>
       <PolicyLinks /><p>Independent research project. Not affiliated with Perplexity AI.</p></footer>
