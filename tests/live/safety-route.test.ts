@@ -1,9 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { parse } from 'dotenv';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, it } from 'vitest';
-import { parseSafetyModel } from '@/server/ai/models';
+import { safetyRouteConfig } from './safety-route-config';
 import { createOpenRouterSafetyProvider } from '@/server/safety/openrouter';
 import { createInputGate } from '@/server/safety/input';
 import { INPUT_SAFETY_PROMPT } from '@/server/safety/prompt';
@@ -14,9 +13,7 @@ import { CURRENT_PROMPT_VERSIONS, loadCorpus } from '../../evals/report';
 // Opt-in only. No automatic retries; unknown receipts retain their full claim.
 it('checks every semantic safety fixture within the existing $1 key cap', async () => {
   if (process.env.LIVE_SAFETY_ROUTE !== '1') throw Error('Explicit paid opt-in required');
-  const env = parse(await readFile('.env.launch.local', 'utf8'));
-  const config = parseSafetyModel(env);
-  if (!config) throw Error('Explicit safety route required');
+  const config = await safetyRouteConfig();
   const metadata = async () => {
     const response = await fetch('https://openrouter.ai/api/v1/key', {
       headers: { Authorization: `Bearer ${config.apiKey}` },
