@@ -43,11 +43,7 @@ async function readResponse(response: Response) {
 }
 export function createOpenRouterSafetyProvider(config: SafetyModelConfig, request: typeof fetch = fetch, prompt: string = INPUT_SAFETY_PROMPT): SafetyProvider {
   let usage: ProviderUsage | undefined;
-  // Reallocate the same 2,250-microUSD ceiling for the input policy: 21,216
-  // bytes at .1 plus 320 output tokens at .4 = 2,249.6 microUSD.
-  const inputPolicy = prompt === INPUT_SAFETY_PROMPT;
-  const requestBytes = inputPolicy ? 21216 : SAFETY_REQUEST_BYTES;
-  const serialize = (input: import("./provider").SafetyInput) => JSON.stringify({ model: config.modelId, stream: false,temperature:0, usage: { include: true },max_completion_tokens: inputPolicy ? 320 : 384,
+  const serialize = (input: import("./provider").SafetyInput) => JSON.stringify({ model: config.modelId, stream: false,temperature:0, usage: { include: true },max_completion_tokens: 384,
         tools: [], tool_choice: "none", plugins: [],
         ...(!isVerifiedNonReasoningModel(config.modelId) ? {reasoning: { enabled: false, exclude: true }} : {}),
         provider: { only: [config.provider], allow_fallbacks: false, require_parameters: true, data_collection: "deny", zdr: true,
@@ -57,12 +53,12 @@ export function createOpenRouterSafetyProvider(config: SafetyModelConfig, reques
       });
   return {
     usage: ()=>usage,
-    accepts: input => Buffer.byteLength(serialize(input),"utf8") <= requestBytes,
+    accepts: input => Buffer.byteLength(serialize(input),"utf8") <= SAFETY_REQUEST_BYTES,
     modelId: config.modelId,
     async classify(input,signal) {
       usage = undefined;
       const body = serialize(input);
-      if (Buffer.byteLength(body,"utf8") > requestBytes) throw new SafetyProviderError("PROVIDER_UNAVAILABLE");
+      if (Buffer.byteLength(body,"utf8") > SAFETY_REQUEST_BYTES) throw new SafetyProviderError("PROVIDER_UNAVAILABLE");
       let response: Response;
       try {
         response = await request("https://openrouter.ai/api/v1/chat/completions",{

@@ -33,7 +33,7 @@ it("uses one isolated, tool-free, nonstreaming strict-schema request with fixed 
   expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
   expect(options).toMatchObject({ method: "POST", cache: "no-store", redirect: "error", credentials: "omit" });
   const body = JSON.parse(options!.body as string);
-  expect(body).toMatchObject({ model: "test/classifier-v1", stream: false, temperature: 0, max_completion_tokens: 320, tools: [], tool_choice: "none",
+  expect(body).toMatchObject({ model: "test/classifier-v1", stream: false, temperature: 0, max_completion_tokens: 384, tools: [], tool_choice: "none",
     provider: { only: ["test-provider"], allow_fallbacks: false, require_parameters: true, data_collection: "deny", zdr: true },
     response_format: { type: "json_schema", json_schema: { strict: true, schema: { additionalProperties: false } } } });
   expect(body.messages.map((item: { role: string })=>item.role)).toEqual(["system","user"]);
@@ -94,7 +94,7 @@ it.each([config(),{...config(),modelId:'a/'+ 'b'.repeat(126),provider:'p'.repeat
  const text=questionTextSchema.parse('🌈'.repeat(4000));
  await createOpenRouterSafetyProvider(model,fetcher).classify({text,context:[]},new AbortController().signal);
  const bytes=Buffer.byteLength(String(fetcher.mock.calls[0][1]?.body),'utf8');
- expect(Math.ceil(bytes*.1+JSON.parse(String(fetcher.mock.calls[0][1]?.body)).max_completion_tokens*.4)).toBeLessThanOrEqual(2250);
+ expect(Math.ceil(bytes*.1+384*.4)).toBeLessThanOrEqual(2250);
  expect(fetcher).toHaveBeenCalledOnce();
 });
 it("caps chunked response bytes even when stream cancellation does not settle", async()=>{
