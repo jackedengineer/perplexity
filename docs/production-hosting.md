@@ -1,5 +1,8 @@
 # Production hosting and enablement checkpoint — 24 October 2026
 
+> Historical rollback checkpoint. The later [research recovery checkpoint](research-guest-launch.md)
+> records the active deployment, successful hosted research and remaining guest gates.
+
 The application is hosted at https://perplexity-gold-alpha.vercel.app. Production
 AI verification failed, so the app was rolled back to the working deployment
 with research unavailable and guest access disabled. This report supersedes the
