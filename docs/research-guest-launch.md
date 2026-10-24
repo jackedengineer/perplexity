@@ -51,14 +51,17 @@ Turnstile configuration is installed, but `ENABLE_GUEST_TRIALS=false` remains.
 Payments remain disabled. Google remains External / Testing with one test user.
 
 The OpenRouter key retains its non-resetting **$1** cap and expires October 29
-at 18:12 UTC. The last metadata observation reported $0.158242125 used and
-$0.841757875 remaining. The final attempted browser request was rejected at
-admission and created no new provider run. Provider cap metadata is not the
-same as the app's per-user or operator reservation balance.
+at 18:12 UTC. The October 24 16:42 UTC metadata observation reported
+$0.167717870 used and $0.832282130 remaining. The cap and expiry were verified
+again after testing. Provider cap metadata is not the same as the app's per-user
+or operator reservation balance.
 
 The `production-research-v1` DAY and PERIOD windows each bound the same spend
 to $0.40; they are not additive. Both end October 25 at 15:34:44 UTC. Earlier
-unknown-cost holds remain reserved. No budget was reset to make a test pass.
+unknown-cost holds remain reserved. With explicit owner approval, only the test
+owner's active DAY provider limit increased from $0.25 to $0.40. Every other
+column, including settled spend and unknown holds, remained unchanged. Normal
+plan defaults and the $1 PERIOD limit remain unchanged; no spend was reset.
 
 ## Verification and its limits
 
@@ -73,7 +76,7 @@ unknown-cost holds remain reserved. No budget was reset to make a test pass.
   green command. These plans were deterministic, not broad model-planner proof.
 - A separate model-backed planner request completed through DeepInfra with
   HTTP 200. This does not establish ongoing provider availability.
-- The final 72-case current-version safety sample produced 71 matching
+- The original 72-case input-v9 safety sample produced 71 matching
   decisions, all required harmful stops/category routes and zero unavailable
   results. The benign `quoted-injection-allow` fixture was refused. The strict
   exact-match test therefore **failed**. Earlier failures remain preserved.
@@ -97,16 +100,54 @@ The answer run recorded 760 microUSD known cost. Unknown Tavily USD cost retaine
 claims of actual provider spend. No fabricated receipt released a hold.
 
 Cancellation exposed a stale displayed-credit bug, now fixed and deployed.
-The final hosted attempt to verify that UI fix was denied with “Your available
-research allowance has been reached.” It did not create a new run. Local desktop
-and mobile regression tests pass, but the post-fix hosted cancellation check is
-still pending. The inspected browser console had no warning/error entries.
+After the approved test-owner allowance change, a real browser request for
+“Why does snow look white?” was stopped. The display changed from 38 credits to
+36 plus two reserved, then returned to 38 without a reload. Durable status was
+CANCELLED, with zero answer credits charged and no answer/citations. Known cost
+was 122 microUSD; 49,878 microUSD remains held conservatively for unknown cost.
+
+A synthetic owner-scoped run exercised actual hosted stale-run recovery without
+calling any provider. Its deadline was deliberately expired after real atomic
+admission. The browser displayed the timeout state, retained 38 answer credits,
+and the database recorded TIMED_OUT with the entire 50,000-microUSD reservation
+released. There were zero provider calls, zero known cost and zero unknown holds
+for this canary. The subsequent authenticated maintenance request returned HTTP
+200 with zero pending records. This verifies manual invocation and idempotence,
+not delivery of the scheduled cron trigger.
+
+The export action displayed “Export downloaded”; the downloaded file contents
+were not inspected. Unauthenticated export, private run status and maintenance
+requests each returned 401 without saved answer content. This verifies signed-out
+boundaries, not cross-user authorization. The inspected browser console had no
+warning/error entries. Individual HTTP timings were 140–1,019 ms for these
+protected endpoints; these are single observations, not latency percentiles.
+
+### Deferred false refusal and rejected experiments
+
+The owner accepted deferring the original benign quoted-injection refusal to
+prioritize launch. Runtime input safety remains exactly input-v9; the prompt,
+transport and runtime unit tests were restored after experimentation. No later
+safety candidate was deployed and no privacy, cost or refusal guard was relaxed.
+
+This is a bounded acceptance, not a claim that only one possible prompt fails.
+Expanded diagnostic variants also exposed benign false refusals and category
+mismatches. Experimental input-v10–v16 candidates introduced distress-routing,
+category or availability regressions. Even when focused fixtures passed, larger
+samples failed; none qualifies as a passing replacement. The alternative Google
+route had no endpoint satisfying the existing ZDR constraint, which was retained.
+Other routes did not pass the diagnostic. Further paid safety tuning is deferred.
+
+The new opt-in diagnostic preserves each run's prompt hash, revision, route,
+responses, verdicts and cap metadata in ignored artifacts. A selected-case or
+alternate-route result is diagnostic evidence only and cannot certify the full
+production safety corpus. Historical version IDs remain accepted by evaluation
+report parsing; this does not activate those versions in the application.
 
 ## Remaining gates and owner inputs
 
-1. Complete the remaining safety/quality review and hosted cancellation check
-   in a valid bounded allowance window. Reconcile unknown costs only with
-   verified receipts. Keep the $1 key cap unchanged.
+1. Complete independent safety/quality acceptance beyond the explicitly deferred
+   benign refusal. Hosted cancellation now passes. Reconcile unknown costs only
+   with verified receipts; keep the $1 key cap unchanged.
 2. Exercise hosted Turnstile challenge acceptance and rejection, guest quotas,
    ownership isolation and guest-to-Google history transfer before broad public
    access. Local mocked checks are not substitutes for these hosted checks.
@@ -121,8 +162,9 @@ still pending. The inspected browser console had no warning/error entries.
 5. Complete Google branding and public audience publication, then verify a
    non-test-user callback and guest-history transfer. The existing owner login
    does not establish public eligibility.
-6. Finish hosted stale-run repair/cron, cross-user privacy, retention, alerting
-   and representative latency checks. Previous restore/rollback evidence keeps
+6. Hosted stale-run repair and manual maintenance invocation now pass. Finish
+   scheduled cron delivery, cross-user privacy, retention, alerting and
+   representative latency checks. Previous restore/rollback evidence keeps
    its original limited scope. Razorpay remains a later, disabled integration.
 
 Guests have **not** been enabled: the user's condition that checks pass is still
@@ -139,3 +181,12 @@ Ignored evidence includes `research-launch-check-final.log`,
 Full final safety observations live under
 `.artifacts/safety-route/d4fe5504-bb47-40b0-9c36-f8ba8d82b57a/`.
 No credentials or private maintenance files are included in Git.
+
+Additional ignored evidence: `pr13-approved-test-allowance.json`,
+`pr13-hosted-cancellation-restored.png`, `pr13-hosted-recovery-final.png`,
+`pr13-hosted-recovery-canary.json`, `pr13-hosted-recovery-sweep.json`,
+`pr13-hosted-unauth-smoke.json`, `pr13-final-key-metadata.json`,
+`pr13-deferred-final-check.log` and `pr13-deferred-final-build.log`.
+The rejected input-v16 full sample is preserved under
+`.artifacts/safety-route/4349992f-0cdb-4948-83c5-b620d157433e/`;
+focused attempts are under `.artifacts/injection-intent/`.
