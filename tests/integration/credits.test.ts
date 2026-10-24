@@ -46,3 +46,11 @@ it('retires expired guest content without deleting registered or linked history'
  expect((await repo.get(registered.authSubject,saved.conversation.id)).title).toBe('Saved to account');
  expect(await cleanExpiredGuests(db,performance.now()+5000)).toEqual({conversations:0});
 });
+it('honors existing operator-issued free windows without resetting or overlapping their limits',async()=>{
+ const p=await person();
+ await db.insert(schema.usageBuckets).values((['PERIOD','DAY'] as const).map(kind=>({userId:p.id,kind,startsAt:new Date(Date.now()-1000),endsAt:new Date(Date.now()+86400000),entitlementVersion:'legacy-reviewed-grant',creditLimit:10,settledCredits:5,providerLimitMicroUsd:100000n})));
+ await db.execute(sql`SELECT ensure_free_credits(${p.id}::uuid)`);
+ const budgets=await db.select().from(schema.usageBuckets).where(eq(schema.usageBuckets.userId,p.id));
+ expect(budgets).toHaveLength(2);expect(budgets.every(b=>b.creditLimit===10&&b.settledCredits===5)).toBe(true);
+ expect(await db.select().from(schema.creditGrants).where(eq(schema.creditGrants.userId,p.id))).toEqual([]);
+});

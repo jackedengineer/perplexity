@@ -141,6 +141,13 @@
       "when": 1792822483126,
       "tag": "0019_fair_electro",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792823872357,
+      "tag": "0020_preserve_manual_free_grants",
+      "breakpoints": true
     }
   ]
 }
