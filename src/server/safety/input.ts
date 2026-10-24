@@ -30,6 +30,7 @@ export function createInputGate(provider: SafetyProvider | undefined,stage:Safet
       if (options.signal.aborted) return unavailable("CANCELLED");
       if (!Number.isFinite(remaining) || remaining <= 0) return unavailable("TIMEOUT");
       if (!provider) return unavailable("CONFIGURATION_UNAVAILABLE");
+      if(provider.accepts&&!provider.accepts(parsed.data))return unavailable("INVALID_INPUT");
       modelId = provider.modelId;
       const classifierDeadline = Date.now()+remaining;
       const controller = new AbortController();
