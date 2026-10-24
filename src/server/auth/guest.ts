@@ -1,3 +1,4 @@
+import {verifyGuestChallenge} from './challenge';
 import {createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
 import {isIP} from 'node:net';
 import {eq} from 'drizzle-orm';
@@ -30,10 +31,11 @@ export async function guestSignIn(request:Request,db:AdmissionDatabase,env:Recor
   const policy={userMinute:1,userDay:3,anonymousMinute:10,anonymousDay:100};
   const limiter=createRequestLimiter(db,'guest-creation-v1',policy);
   await limiter.consume(null);await limiter.consume(digest(secret,'address:'+address));
+  await verifyGuestChallenge(request.headers.get('x-perplex-bot-token'),env,request.signal);
   const value=randomBytes(32).toString('hex'),signature=digest(secret,value);
   const forwarded=new Headers(request.headers);forwarded.set('x-perplex-guest-validated',guestAuthorization(secret));
   // The anonymous endpoint takes no client fields. Never forward arbitrary user attributes.
-  forwarded.set('content-type','application/json');forwarded.delete('content-length');
+  forwarded.set('content-type','application/json');forwarded.delete('content-length');forwarded.delete('x-perplex-bot-token');
   const response=await handler(new Request(request.url,{method:'POST',headers:forwarded,body:'{}',signal:request.signal}));
   if(!response.ok)return response;
   const body=await response.clone().json();

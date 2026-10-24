@@ -1,7 +1,7 @@
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {drizzle} from 'drizzle-orm/pglite';
-import {afterAll,beforeAll,expect,it} from 'vitest';
+import {afterAll,beforeAll,expect,it,vi} from 'vitest';
 import * as schema from '@/db/schema';
 import {createAuth} from '@/lib/auth-factory';
 import {guestSignIn,trustedGuestAddress} from '@/server/auth/guest';
@@ -25,4 +25,12 @@ it('creates a DB-backed guest session and a durable trial cookie without grantin
 });
 it('does not trust client IP headers on an unconfigured public hosting platform',()=>{
  expect(()=>trustedGuestAddress(new Request('https://example.org',{headers:{'x-vercel-forwarded-for':'127.0.0.1'}}),{NODE_ENV:'production',BETTER_AUTH_URL:'https://example.org'})).toThrow();
+});
+
+it('rejects a public guest request before creating an identity when bot verification is absent',async()=>{
+ const handler=vi.fn();const before=await db.select().from(schema.user);
+ const publicEnv={...env,NODE_ENV:'production',VERCEL:'1',BETTER_AUTH_URL:'https://perplex.example'};
+ const incoming=new Request('https://perplex.example/api/auth/sign-in/anonymous',{method:'POST',headers:{origin:'https://perplex.example','x-vercel-forwarded-for':'198.51.100.9','content-type':'application/json'},body:'{}'});
+ expect((await guestSignIn(incoming,db,publicEnv,handler)).status).toBe(503);
+ expect(handler).not.toHaveBeenCalled();expect(await db.select().from(schema.user)).toEqual(before);
 });
