@@ -24,9 +24,9 @@ public guest access and public Google sign-in are still gated.
   evidence-v5, output-v8, answer-v9 and planner-v6.
 - Cancellation refreshes the displayed credit balance after durable settlement,
   including saved-status recovery. It never grants an optimistic refund.
-- `/privacy` and `/terms` are explicitly marked drafts for owner review, using
+- `/privacy` and `/terms` use
   the requested name `perplexity` and `trainwithchirag@gmail.com`. They are
-  available in the branch preview, not yet used for Google publication.
+  approved by the owner and now published at their production URLs.
 
 Migration 0021 adds planner-v6 to the database allowlist and has been applied to
 development and production. Its generated Drizzle snapshot is the mechanical
@@ -34,10 +34,27 @@ exception to small focused commit sizes. No existing financial records changed.
 
 ## Active hosted configuration
 
-Production source is `ea73c7f4cecd558664d70a3a0ecd0685613a29d9`, deployment
-`BpnJ6z5eFmdSDiPju4Y47SHupqs3`, promoted through Vercel and observed Ready with
-the `perplexity-gold-alpha.vercel.app` alias. Policy drafts are in the later
-`21a1076` branch preview and are deliberately not represented as approved terms.
+Production source is `77b65955c9bb3bbc606d4b60103c3de32abf8667`, deployment
+`HTZYocLMr9mctFutXGkG3dYZwRRT`, promoted through Vercel with the
+`perplexity-gold-alpha.vercel.app` alias. CI verification and Vercel deployment
+both succeeded for that source. The owner approved publishing the policies;
+`/privacy` and `/terms` now return 200, display their effective date, and have no
+draft banner. Their links work in the real browser with no observed console
+warnings/errors. Public contact stays `trainwithchirag@gmail.com`; Google support
+uses the separately approved `ichiragbhugra@gmail.com`.
+
+Google branding is saved with app name `perplexity` and all three production URLs.
+The final Google “Push to production” confirmation is prepared and awaits the
+browser-required action-time approval; audience is still External / Testing.
+Protected guest staging is prepared for the branch alias
+`perplexity-git-codex-research-gue-382f59-chiragbhugras-projects.vercel.app`.
+Unauthenticated requests to the preview redirect to Vercel SSO. Its proposed
+configuration uses the development database and a distinct auth/HMAC secret,
+with the existing capped model credentials. No preview configuration has been
+saved yet. Adding that exact hostname to Turnstile and its callback to the
+existing development OAuth client also awaits action-time approval. No public
+guest switch has been enabled. A direct production anonymous-sign-in request
+returns 503 without a session cookie; the public sign-in page hides guest entry.
 
 | Role | Model | Pinned provider |
 | --- | --- | --- |
@@ -151,15 +168,10 @@ report parsing; this does not activate those versions in the application.
 2. Exercise hosted Turnstile challenge acceptance and rejection, guest quotas,
    ownership isolation and guest-to-Google history transfer before broad public
    access. Local mocked checks are not substitutes for these hosted checks.
-3. Review the policy drafts, including operator identity and backup, security-log
-   and provider retention details. Publish approved pages and use their stable
-   production URLs in Google branding.
-4. Make `trainwithchirag@gmail.com` eligible as Google support contact. The
-   current signed-in account's dropdown offers only its own email and no managed
-   Google Groups; the requested address cannot currently be selected. Sign in
-   with the supplied address and appropriate project access, or provide an
-   eligible managed support group. No IAM permissions were silently changed.
-5. Complete Google branding and public audience publication, then verify a
+3. Policy publication and Google branding are complete. Keep retention disclosures
+   aligned with actual provider settings as the service evolves.
+4. The owner approved the eligible Google support address; no IAM change is needed.
+5. Confirm public Google audience publication, then verify a
    non-test-user callback and guest-history transfer. The existing owner login
    does not establish public eligibility.
 6. Hosted stale-run repair and manual maintenance invocation now pass. Finish
@@ -190,3 +202,8 @@ Additional ignored evidence: `pr13-approved-test-allowance.json`,
 The rejected input-v16 full sample is preserved under
 `.artifacts/safety-route/4349992f-0cdb-4948-83c5-b620d157433e/`;
 focused attempts are under `.artifacts/injection-intent/`.
+
+Published-policy evidence: `pr13-approved-policy-hosted-check.json`,
+`pr13-published-privacy.png`, `pr13-policy-approved-lint.log`,
+`pr13-policy-approved-build.log`. No paid model call was made during this
+publication checkpoint; the last verified key usage remains $0.167717870.
