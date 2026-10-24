@@ -135,10 +135,12 @@ it.each(["missing-review","long-query","stale-policy"])("rejects %s canonical in
   expect((await p.service.retrieve(subject,runId,signal())).kind).toBe("DENIED"); expect(p.query.classify).not.toHaveBeenCalled(); expect(p.search.search).not.toHaveBeenCalled();
 });
 it("checks the admitted stage allocation before either classifier or Tavily",async()=>{
-  const p = pipeline(),[reservation] = await db.select().from(schema.usageReservations);
-  await db.delete(schema.usageReservations).where(eq(schema.usageReservations.runId,runId));
-  await db.update(schema.runs).set({ providerReserveMicroUsd: 10000n }).where(eq(schema.runs.id,runId));
-  await db.insert(schema.usageReservations).values({ ...reservation,providerReserveMicroUsd: 10000n });
+  const p = pipeline();
+  // Owner-only corrupt-snapshot fixture. Keep the append-only credit audit intact.
+  await db.transaction(async tx=>{
+    await tx.update(schema.runs).set({ providerReserveMicroUsd: 10000n }).where(eq(schema.runs.id,runId));
+    await tx.update(schema.usageReservations).set({ providerReserveMicroUsd: 10000n }).where(eq(schema.usageReservations.runId,runId));
+  });
   expect(await p.service.retrieve(subject,runId,signal())).toEqual({ kind: "DENIED",code: "BUDGET_EXCEEDED" });
   expect(p.query.classify).not.toHaveBeenCalled(); expect(p.search.search).not.toHaveBeenCalled();
 });

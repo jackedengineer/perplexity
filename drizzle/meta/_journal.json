@@ -134,6 +134,13 @@
       "when": 1792821905988,
       "tag": "0018_illegal_colonel_america",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792822483126,
+      "tag": "0019_fair_electro",
+      "breakpoints": true
     }
   ]
 }

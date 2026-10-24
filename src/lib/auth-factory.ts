@@ -1,3 +1,8 @@
+import { anonymous } from "better-auth/plugins/anonymous";
+import { createAuthMiddleware } from "better-auth/api";
+import { guestAuthorization } from "@/server/auth/guest";
+import { linkGuest } from "@/server/billing/link-guest";
+import type { AdmissionDatabase } from "@/server/runs/usage";
 import { betterAuth } from "better-auth/minimal";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import * as schema from "@/db/schema";
@@ -12,7 +17,14 @@ export function createAuth(
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins: [env.BETTER_AUTH_URL],
-    plugins: [{
+    plugins: [anonymous({disableDeleteAnonymousUser:true,onLinkAccount:async({anonymousUser,newUser})=>{
+      if(!newUser.user.isAnonymous)await linkGuest(database as AdmissionDatabase,anonymousUser.user.id,newUser.user.id);
+    }}), {
+      id:"guard-anonymous-creation",
+      hooks:{before:[{matcher:ctx=>ctx.path==="/sign-in/anonymous",handler:createAuthMiddleware(async ctx=>{
+        if(ctx.headers?.get("x-perplex-guest-validated")!==guestAuthorization(env.BETTER_AUTH_SECRET))throw new Error("Guest admission required");
+      })}]},
+    }, {
       id: "same-origin-mutations",
       onRequest: async (request) => {
         if (!["GET", "HEAD"].includes(request.method) &&

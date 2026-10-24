@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, lte, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import * as schema from "@/db/schema";
 import { admissionAttemptBuckets as attempts, operatorUsageBuckets as operator, usageBuckets as user } from "@/db/schema";
@@ -16,7 +16,7 @@ export async function consumeAttempts(tx: AdmissionTransaction, userId: string, 
   return result.length === 2;
 }
 export async function loadBudgets(tx: AdmissionTransaction, userId: string, budgetKey: string, now: Date) {
-  const users = await tx.select().from(user).where(and(eq(user.userId,userId),lte(user.startsAt,now),gt(user.endsAt,now)))
+  const users = await tx.select().from(user).where(and(eq(user.userId,userId),isNull(user.retiredAt),lte(user.startsAt,now),gt(user.endsAt,now)))
     .orderBy(user.id).limit(3).for("update");
   if (!users.length) throw new AdmissionError("BUDGET_EXCEEDED");
   const operators = await tx.select().from(operator).where(and(eq(operator.budgetKey,budgetKey),lte(operator.startsAt,now),gt(operator.endsAt,now)))

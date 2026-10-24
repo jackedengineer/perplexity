@@ -49,7 +49,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
           if (run.status !== "PLANNING") return { kind: terminal.has(run.status) ? "RUN_ALREADY_FINISHED" : "RUN_IN_PROGRESS",runId } as const;
           if (signal.aborted || run.deadlineAt <= now) throw new RetrievalError();
           if (conversation.revision !== run.admittedRevision) throw new AdmissionError("CONFLICT");
-          if (run.policyVersion !== SAFETY_POLICY.version || run.catalogVersion !== "fast-v1" || run.priceVersion !== "standard-v1") throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
+          if (run.policyVersion !== SAFETY_POLICY.version || !(["fast-v1:standard-v1","trials-v1:credits-v1"].includes(`${run.catalogVersion}:${run.priceVersion}`))) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
           const [reservation] = await tx.select().from(usageReservations).where(and(eq(usageReservations.runId,runId),eq(usageReservations.userId,run.userId)));
           if (!reservation || reservation.providerReserveMicroUsd < RETRIEVAL_LIMITS.reserveMicroUsd) throw new AdmissionError("BUDGET_EXCEEDED");
           const [review] = await tx.select().from(inputSafetyReviews).where(and(eq(inputSafetyReviews.runId,runId),eq(inputSafetyReviews.decision,"ALLOW"),eq(inputSafetyReviews.attemptVersion,run.attemptVersion)));
@@ -72,7 +72,8 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
         if (prepared.kind !== "CLAIMED") return prepared;
         claim = prepared.run;
         const options = { signal,deadlineAt: prepared.run.deadlineAt };
-        const queries=prepared.plan?.action==='ANSWER'?prepared.plan.retrieval.queries:[prepared.query];
+        const plannedQueries=prepared.plan?.action==='ANSWER'?prepared.plan.retrieval.queries:[prepared.query];
+        const queries=prepared.run.modelKey.startsWith('economy-')?plannedQueries.slice(0,1):plannedQueries;
         if(queries.length>2||queries.length===2&&(!dependencies.querySecondGate||!dependencies.searchSecond))throw new AdmissionError('CONFIGURATION_UNAVAILABLE');
         for(const [index,query] of queries.entries()){
           const gate=index===0?queryGate:dependencies.querySecondGate!;
@@ -99,7 +100,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
         let extractionFailures=0;
         let selected:RankedResult[]=plan?rankEvidenceResults(response.results,plan.standaloneQuestion,new Date(),filters):response.results;
         // Preserve enough of the absolute deadline for answer, output safety and persistence.
-        if(dependencies.extract&&selected.length&&prepared.run.deadlineAt.getTime()-Date.now()>extractionMinimumRemainingMs){
+        if(!prepared.run.modelKey.startsWith('economy-')&&dependencies.extract&&selected.length&&prepared.run.deadlineAt.getTime()-Date.now()>extractionMinimumRemainingMs){
           await db.transaction(tx=>checkpoint(tx,subject,runId,prepared.run,stage,signal));
           try{
             const extracted=await dependencies.extract.extract(selected.slice(0,2).map(r=>r.url),options);

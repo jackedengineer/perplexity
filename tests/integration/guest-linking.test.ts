@@ -1,0 +1,27 @@
+import {readFile} from 'node:fs/promises';
+import {randomUUID} from 'node:crypto';
+import {PGlite} from '@electric-sql/pglite';
+import {drizzle} from 'drizzle-orm/pglite';
+import {eq,sql} from 'drizzle-orm';
+import {afterAll,beforeAll,expect,it} from 'vitest';
+import * as schema from '@/db/schema';
+import {seedCompletion,completionSession} from '../helpers/completion';
+import {linkGuest} from '@/server/billing/link-guest';
+import {createConversationRepository} from '@/server/conversations/repository';
+const pg=new PGlite(),db=drizzle(pg,{schema});
+beforeAll(async()=>{const j=JSON.parse(await readFile('drizzle/meta/_journal.json','utf8'));for(const e of j.entries)await pg.exec(await readFile(`drizzle/${e.tag}.sql`,'utf8'));});
+afterAll(()=>pg.close());
+it('moves guest history, fences active work, preserves holds, revokes sessions, and links once',async()=>{
+ const p=await seedCompletion(db);await db.update(schema.user).set({isAnonymous:true}).where(eq(schema.user.id,p.subject));
+ const target=randomUUID();await db.insert(schema.user).values({id:target,name:'Registered',email:`${target}@example.test`,emailVerified:true});
+ await completionSession(db,p.subject);
+ await linkGuest(db,p.subject,target);await linkGuest(db,p.subject,target);
+ expect(await db.select().from(schema.guestLinks)).toHaveLength(1);
+ expect(await db.select().from(schema.session).where(eq(schema.session.userId,p.subject))).toEqual([]);
+ const repo=createConversationRepository(db);
+ expect((await repo.get(target,p.conversation.id)).id).toBe(p.conversation.id);
+ await expect(repo.get(p.subject,p.conversation.id)).rejects.toMatchObject({code:'NOT_FOUND'});
+ const [run]=await db.select().from(schema.runs).where(eq(schema.runs.id,p.runId));expect(run.status).toBe('CANCELLED');
+ expect((await db.select().from(schema.usageBuckets).where(eq(schema.usageBuckets.userId,run.userId))).every(b=>b.retiredAt!==null)).toBe(true);
+ await expect(db.execute(sql`SELECT ensure_free_credits(${p.profile.id}::uuid)`)).rejects.toThrow();
+});

@@ -11,7 +11,7 @@ import { citedDraftSchema,renderCitedDraft } from "./cited-draft";
 export type DraftInput = { question: string;interpretation?:string;answerLanguage?:string;evidence: EvidencePackage };
 export type PrivateDraft = { text: string;usage: ProviderUsage };
 export interface AnswerProvider { readonly modelId?: string;generate(input: DraftInput,options: ExecutionOptions): Promise<PrivateDraft>; usage?(): ProviderUsage | undefined }
-export function createAnswerProvider(config: SafetyModelConfig,request: typeof fetch = fetch): AnswerProvider {
+export function createAnswerProvider(config: SafetyModelConfig,request: typeof fetch = fetch,maxOutputTokens:600|1200=1200): AnswerProvider {
   let usage: ProviderUsage | undefined;
   const boundedFetch = boundedModelFetch(request);
   const router = createOpenRouter({ apiKey: config.apiKey,compatibility: "strict",fetch: async(url,init)=>{
@@ -39,7 +39,7 @@ export function createAnswerProvider(config: SafetyModelConfig,request: typeof f
           usage: { include: true },extraBody: { plugins: [] },
         }),output: Output.object({schema:citedDraftSchema(evidence)}),system: ANSWER_PROMPT,prompt: JSON.stringify({ question: question.data,answerLanguage:language.data,...(input.interpretation&&input.interpretation!==question.data?{interpretation:input.interpretation}:{}),
           passages: evidence.passages.map(p=>({ sourceId: p.sourceId,text: p.text,publishedAt:evidence.sources.find(s=>s.sourceId===p.sourceId)?.publishedAt??null,retrievedAt:evidence.sources.find(s=>s.sourceId===p.sourceId)?.retrievedAt,contentKind:p.contentKind })) }),
-          maxOutputTokens: 1200,maxRetries: 0,abortSignal: signal,timeout: 12000,tools: {},toolChoice: "none",
+          maxOutputTokens,maxRetries: 0,abortSignal: signal,timeout: 12000,tools: {},toolChoice: "none",
           experimental_telemetry: { isEnabled: false,recordInputs: false,recordOutputs: false },
         });
         const meta = result.providerMetadata?.openrouter?.usage;
