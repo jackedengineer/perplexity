@@ -1,5 +1,17 @@
 @import url("./tokens.css");
 
+.policy-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 24px; font-size: 13px; margin-top: 24px; }
+.policy-links a { padding: 12px 0; text-decoration: underline; text-underline-offset: 4px; }
+.policy-page { width: min(100% - 40px, 760px); margin: auto; padding: 32px 0 48px; line-height: 1.75; }
+.policy-page header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 64px; }
+.policy-page h1 { font: 400 clamp(40px, 7vw, 64px)/1.12 Georgia, serif; margin: 16px 0 28px; }
+.policy-page h2 { font-size: 22px; line-height: 1.35; margin-top: 36px; }
+.policy-page article a, .policy-page footer a { text-decoration: underline; text-underline-offset: 4px; overflow-wrap: anywhere; }
+.policy-page li { margin: 12px 0; }
+.policy-draft { border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; background: var(--accent-soft); font-size: 14px; }
+.policy-page footer { border-top: 1px solid var(--line); margin-top: 48px; padding-top: 24px; color: var(--muted); font-size: 13px; }
+.policy-page footer .policy-links { justify-content: flex-start; }
+
 * { box-sizing: border-box; }
 html { color-scheme: light; background: var(--paper); color: var(--ink); }
 body { margin: 0; font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }

@@ -3,8 +3,8 @@ import{expect,it,vi}from'vitest';
 import{createPlannerProvider}from'@/server/ai/planner-provider';
 import{parsePlannerModel}from'@/server/ai/models';
 import type{PlannerInput}from'@/server/ai/plan';
-const input=():PlannerInput=>({original:{id:randomUUID(),text:'Explain photosynthesis'},context:[],now:'2026-10-23T09:00:00.000Z',timezone:'Asia/Kolkata',locale:null});
-const plan={action:'ANSWER',standaloneQuestion:'Explain photosynthesis',intent:'EXPLAIN',explicitConstraints:[],disclosedAssumptions:[],retrieval:{required:true,queries:['photosynthesis explanation'],freshness:'ANY',startDate:null,endDate:null},answerLanguage:'en'};
+const input=():PlannerInput=>({original:{id:randomUUID(),text:'Research photosynthesis'},context:[],now:'2026-10-23T09:00:00.000Z',timezone:'Asia/Kolkata',locale:null});
+const plan={action:'ANSWER',standaloneQuestion:'Research photosynthesis',intent:'EXPLAIN',explicitConstraints:[],disclosedAssumptions:[],retrieval:{required:true,queries:['photosynthesis explanation'],freshness:'ANY',startDate:null,endDate:null},answerLanguage:'en'};
 const config={apiKey:'synthetic-provider-key',modelId:'mistralai/mistral-small-3.2-24b-instruct',provider:'deepinfra/fp8'};
 const options=()=>({signal:new AbortController().signal,deadlineAt:new Date(Date.now()+45000)});
 const response=(value:unknown={plan},finish_reason='stop')=>Response.json({id:'test-planner',model:config.modelId,created:1,choices:[{index:0,finish_reason,message:{role:'assistant',content:JSON.stringify(value)}}],usage:{prompt_tokens:200,completion_tokens:60,total_tokens:260,cost:.000027}});
@@ -40,7 +40,7 @@ it('resolves one exact user-topic pricing reference locally, with no paid call o
  const fetcher=vi.fn<typeof fetch>(),provider=createPlannerProvider(config,fetcher),i=input();i.original.text='What about its pricing?';i.context=[{id:randomUUID(),role:'USER',text:'Explain Neon'}];
  expect(await provider.plan(i,options())).toMatchObject({plan:{action:'ANSWER',standaloneQuestion:'What about Neon pricing?'},usage:{costMicroUsd:0n},engine:'CONTEXT_RULE'});expect(fetcher).not.toHaveBeenCalled();
  i.context.push({id:randomUUID(),role:'USER',text:'Explain Supabase'});fetcher.mockResolvedValue(response({plan:{action:'CLARIFY',question:'Which product do you mean?',reasonCode:'AMBIGUOUS_REFERENCE'}}));
- expect((await provider.plan(i,options())).plan.action).toBe('CLARIFY');expect(fetcher).toHaveBeenCalledOnce();
+ expect((await provider.plan(i,options())).plan.action).toBe('CLARIFY');expect(fetcher).not.toHaveBeenCalled();
 });
 it('creates one neutral clarification for exact unresolved references without a paid planning attempt',async()=>{
  const fetcher=vi.fn<typeof fetch>(),provider=createPlannerProvider(config,fetcher);
@@ -55,4 +55,13 @@ it('fits a maximum multibyte original plus selected history inside the unchanged
  const bytes=Buffer.byteLength(String(fetcher.mock.calls[0][1]?.body),'utf8');
  expect(bytes).toBeLessThanOrEqual(PLANNER_LIMITS.wireBytes);
  expect(Math.ceil(PLANNER_LIMITS.wireBytes*.075+1024*.2)).toBeLessThanOrEqual(2000);
+});
+
+it('plans short standalone questions locally before any paid call or timeout',async()=>{
+ const fetcher=vi.fn<typeof fetch>();
+ for(const text of ['What causes a rainbow? Give a short explanation with reliable sources.','What is a rainbow?','Explain electric current','Compare Neon and Supabase']){
+  const i=input();i.original.text=text;
+  expect(await createPlannerProvider(config,fetcher).plan(i,options())).toMatchObject({plan:{action:'ANSWER',standaloneQuestion:text,retrieval:{queries:[text]}},engine:'CONTEXT_RULE',usage:{costMicroUsd:0n}});
+ }
+ expect(fetcher).not.toHaveBeenCalled();
 });

@@ -148,6 +148,13 @@
       "when": 1792823872357,
       "tag": "0020_preserve_manual_free_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792855702368,
+      "tag": "0021_left_jack_power",
+      "breakpoints": true
     }
   ]
 }

@@ -35,8 +35,8 @@ export function useResearch(conversationId: string,revision: number,initialRunId
         await new Promise<void>(resolve=>{const aborted=()=>{clearTimeout(timer);resolve();};const timer=setTimeout(()=>{abort.signal.removeEventListener("abort",aborted);resolve();},pause);abort.signal.addEventListener("abort",aborted,{once:true});});pause=Math.min(5000,pause*1.5);
       }
     } catch { /* Keep the fixed failure and the same intent available for a manual recovery. */ }
-    finally {if(!resolved&&!abort.signal.aborted){setError(current=>current||"Could not confirm the saved status. Check the same request again.");setStage(null);}recovery.current=null;setRecovering(false);setPending(false);busy.current=false;}
-  },[conversationId,router,controller]);
+    finally {if(!resolved&&!abort.signal.aborted){setError(current=>current||"Could not confirm the saved status. Check the same request again.");setStage(null);}if(resolved)refreshUsage();recovery.current=null;setRecovering(false);setPending(false);busy.current=false;}
+  },[conversationId,router,controller,refreshUsage]);
   const chat=useChat<ResearchMessage>({id:conversationId,transport:controller.transport,
     onData(part){
       if(part.type==='data-run')controller.recordRevision(part.data.runId,part.data.revision);
@@ -66,7 +66,9 @@ export function useResearch(conversationId: string,revision: number,initialRunId
       if(status&&["COMPLETED","NEEDS_CLARIFICATION"].includes(status.state)&&status.answer){setCommitted(status.answer);setError("");router.refresh();}
       else setError(status?.terminalReason==="CANCELLED"?"Research stopped. You can start a new search.":status?.terminalReason==="TIMED_OUT"?"This research request timed out. You can start a new search.":"Stop requested. Check the same request for its saved status.");
     }catch{setError("Cancellation could not be confirmed. Check the same request for its saved status.");}
-    finally{stopping.current=false;setCancelling(false);busy.current=false;setPending(false);setStage(null);}
+    // Stream abort can finish before cancellation settles the server reservation.
+    // Refresh again after that response, including status-only recovery paths.
+    finally{refreshUsage();stopping.current=false;setCancelling(false);busy.current=false;setPending(false);setStage(null);}
   }
   return {submit,retry:controller.getRunId()?recover:send,recover,stop:!cancelling&&(pending||recovering)?()=>void stop():undefined,question,pending:pending||recovering||cancelling,stage,label:cancelling?"Stopping research":recovering?"Checking saved result":stage?PUBLIC_STAGE_LABELS[stage]:"Checking request",error,committed,revision:committed?.revision??controller.getRevision()??revision};
 }

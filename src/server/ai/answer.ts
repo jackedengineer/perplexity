@@ -1,7 +1,6 @@
 import { generateText,Output } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { localeSchema,questionTextSchema } from "@/server/contracts/chat";
-import { validateEvidence } from "@/server/search/evidence";
+import {draftPrompt,prepareDraftInput} from "./draft-input";
 import type { EvidencePackage } from "@/server/contracts/pipeline";
 import { isVerifiedNonReasoningModel,type SafetyModelConfig } from "./models";
 import { ANSWER_PROMPT } from "./prompts/answer";
@@ -10,7 +9,7 @@ import { providerUsage, type ProviderUsage } from "./usage";
 import { citedDraftSchema,renderCitedDraft } from "./cited-draft";
 export type DraftInput = { question: string;interpretation?:string;answerLanguage?:string;evidence: EvidencePackage };
 export type PrivateDraft = { text: string;usage: ProviderUsage };
-export interface AnswerProvider { readonly modelId?: string;generate(input: DraftInput,options: ExecutionOptions): Promise<PrivateDraft>; usage?(): ProviderUsage | undefined }
+export interface AnswerProvider { readonly modelId?: string;prepare?(input:DraftInput):DraftInput;generate(input: DraftInput,options: ExecutionOptions): Promise<PrivateDraft>; usage?(): ProviderUsage | undefined }
 export function createAnswerProvider(config: SafetyModelConfig,request: typeof fetch = fetch,maxOutputTokens:600|1200=1200): AnswerProvider {
   let usage: ProviderUsage | undefined;
   const boundedFetch = boundedModelFetch(request);
@@ -25,20 +24,17 @@ export function createAnswerProvider(config: SafetyModelConfig,request: typeof f
   return {
     modelId: config.modelId,
     usage: ()=>usage,
+    prepare: prepareDraftInput,
     async generate(input,options) {
       usage = undefined;
-      const evidence = validateEvidence(input.evidence),question = questionTextSchema.safeParse(input.question);
-      const language=localeSchema.safeParse(input.answerLanguage??'en');
-      if(input.interpretation!==undefined&&!questionTextSchema.safeParse(input.interpretation).success)throw new AnswerError();
-      if (!evidence?.sources.length || !question.success||!language.success) throw new AnswerError();
+      input=prepareDraftInput(input);const evidence=input.evidence;
       return boundedWork(options,12000,async(signal)=>{
         const result = await generateText({ model: router.chat(config.modelId,{
           provider: { only: [config.provider],allow_fallbacks: false,require_parameters: true,data_collection: "deny",zdr: true,
             max_price: { prompt: 0.5,completion: 2,request: 0 } },
           ...(!isVerifiedNonReasoningModel(config.modelId) ? {reasoning: { enabled: false as const,exclude: true as const,effort: "none" as const }} : {}),
           usage: { include: true },extraBody: { plugins: [] },
-        }),output: Output.object({schema:citedDraftSchema(evidence)}),system: ANSWER_PROMPT,prompt: JSON.stringify({ question: question.data,answerLanguage:language.data,...(input.interpretation&&input.interpretation!==question.data?{interpretation:input.interpretation}:{}),
-          passages: evidence.passages.map(p=>({ sourceId: p.sourceId,text: p.text,publishedAt:evidence.sources.find(s=>s.sourceId===p.sourceId)?.publishedAt??null,retrievedAt:evidence.sources.find(s=>s.sourceId===p.sourceId)?.retrievedAt,contentKind:p.contentKind })) }),
+        }),output: Output.object({schema:citedDraftSchema(evidence)}),system: ANSWER_PROMPT,prompt: draftPrompt(input),
           maxOutputTokens,maxRetries: 0,abortSignal: signal,timeout: 12000,tools: {},toolChoice: "none",
           experimental_telemetry: { isEnabled: false,recordInputs: false,recordOutputs: false },
         });

@@ -44,7 +44,7 @@ export function createProviderCalls(db: AdmissionDatabase,subject: string,runId:
   };
 }
 export function recordSafetyProvider(calls: ReturnType<typeof createProviderCalls>,stage: "INPUT_SAFETY" | "QUERY_SAFETY" | "QUERY_SECOND" | "EVIDENCE_SAFETY" | "OUTPUT_SAFETY",provider: SafetyProvider): SafetyProvider {
-  return { modelId: provider.modelId,usage: provider.usage,
+  return { modelId: provider.modelId,usage: provider.usage,accepts: provider.accepts,
     async classify(input,signal) {
       const claim = await calls.begin(stage,provider.modelId,signal),id=claim.id,budget=providerDeadline(claim,signal);
       try {

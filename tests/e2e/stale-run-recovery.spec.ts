@@ -20,9 +20,12 @@ test('reload discovers an active run and Stop durably cancels it without resubmi
   const run=await seed(f,identity.id);let posts=0;page.on('request',r=>{if(r.url().endsWith('/api/chat'))posts++;});
   await page.goto(`/search/${run.conversationId}`);await expect(page.getByRole('status').filter({hasText:'Checking saved result'})).toBeVisible();
   await page.reload();await expect(page.getByRole('button',{name:'Stop research'})).toBeVisible();
+  await expect(page.locator('.usage-summary')).toContainText('35 credits left');
   const response=page.waitForResponse(r=>r.url().endsWith(`/api/runs/${run.runId}/cancellation`));
   await page.getByRole('button',{name:'Stop research'}).click();expect((await response).status()).toBe(200);
   await expect(page.getByRole('main').getByRole('alert')).toContainText('Research stopped.');
+  await expect(page.locator('.usage-summary')).toContainText('40 credits left');
+  await expect(page.locator('.usage-summary')).not.toContainText('reserved');
   expect((await f.owner.select().from(schema.runs).where(eq(schema.runs.id,run.runId)))[0]).toMatchObject({status:'CANCELLED',attemptVersion:2});
   expect((await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,run.runId)))[0]).toMatchObject({creditsCharged:0,heldProviderMicroUsd:0n});
   expect(posts).toBe(0);await expect(page.locator('.answer-prose')).toHaveCount(0);await expect(page.getByText('PRIVATE_PENDING_QUESTION_MUST_NOT_APPEAR')).toHaveCount(0);

@@ -2,10 +2,11 @@
 import {useCallback,useEffect,useId,useState} from 'react';
 import {feedbackView,type FeedbackView} from '@/server/feedback/view';
 import {Icon} from './icons';
+import {queueFeedbackRead} from './feedback-read-queue';
 export default function AnswerFeedback({messageId}:{messageId:string}){
  const [saved,setSaved]=useState<FeedbackView|null>(null),[pending,setPending]=useState(false),[error,setError]=useState(''),id=useId();
  const load=useCallback(async(signal?:AbortSignal)=>{
-  const response=await fetch(`/api/messages/${messageId}/feedback`,{credentials:'same-origin',cache:'no-store',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(8000)]):AbortSignal.timeout(8000)});
+  const response=await queueFeedbackRead(()=>fetch(`/api/messages/${messageId}/feedback`,{credentials:'same-origin',cache:'no-store',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(8000)]):AbortSignal.timeout(8000)}),signal);
   if(!response.ok)throw Error('Feedback unavailable');if(signal?.aborted)return;setSaved(feedbackView.parse(await response.json()));setError('');
  },[messageId]);
  useEffect(()=>{const controller=new AbortController();queueMicrotask(()=>{if(!controller.signal.aborted)void load(controller.signal).catch(()=>{if(!controller.signal.aborted)setError('Feedback couldn’t load.');});});return()=>controller.abort();},[load]);

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentSession } from "@/lib/current-session";
 import { GoogleSignIn } from "@/components/google-sign-in";
+import {PolicyLinks} from '@/components/public-policy';
 
 export const metadata = { title: "Welcome back" };
 export default async function SignIn({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
@@ -14,7 +15,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
   const { error } = await searchParams;
   return <main id="main" className="auth-layout">
     <section className="auth-story" aria-label="Welcome to Perplex">
-      <Link href="/" className="wordmark">perplex<span aria-hidden="true">✳</span></Link>
+      <Link href="/" className="wordmark">perplexity<span aria-hidden="true">✳</span></Link>
       <div className="story-copy"><p className="eyebrow">A space for the curious</p>
         <h1>Every answer<br />starts with<br /><em>a little wonder.</em></h1>
         <p>Follow a thought. Find a new perspective.<br />Make the unfamiliar feel a little clearer.</p>
@@ -32,6 +33,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
         <GoogleSignIn initialError={Boolean(error)} />
         {!identity && guestEnabled && <GuestSignIn siteKey={process.env.TURNSTILE_SITE_KEY} />}
         <p className="privacy-note">We use your name and email to create your account.<br />Your Google password stays with Google.</p>
+        <PolicyLinks />
       </div>
       <p className="panel-footer">A quieter place to think a little bigger.</p>
     </section>
