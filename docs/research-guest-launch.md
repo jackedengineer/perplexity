@@ -3,7 +3,9 @@
 This checkpoint supersedes the active-state portions of
 [production-hosting.md](production-hosting.md). Earlier failed samples remain
 valid historical evidence. Research now completes for the signed-in test owner;
-public guest access and public Google sign-in are still gated.
+Google public sign-in is enabled; the hosted guest-flow checks now pass. The
+owner approved and deployed the production guest switch; canonical guest smoke
+and owner Google history transfer both pass.
 
 ## Delivered changes
 
@@ -35,7 +37,7 @@ exception to small focused commit sizes. No existing financial records changed.
 ## Active hosted configuration
 
 Production source is `77b65955c9bb3bbc606d4b60103c3de32abf8667`, deployment
-`HTZYocLMr9mctFutXGkG3dYZwRRT`, promoted through Vercel with the
+`H3iPd4cxC2qT5J29bL5FWMGVPeap`, redeployed through Vercel with the
 `perplexity-gold-alpha.vercel.app` alias. CI verification and Vercel deployment
 both succeeded for that source. The owner approved publishing the policies;
 `/privacy` and `/terms` now return 200, display their effective date, and have no
@@ -44,17 +46,24 @@ warnings/errors. Public contact stays `trainwithchirag@gmail.com`; Google suppor
 uses the separately approved `ichiragbhugra@gmail.com`.
 
 Google branding is saved with app name `perplexity` and all three production URLs.
-The final Google “Push to production” confirmation is prepared and awaits the
-browser-required action-time approval; audience is still External / Testing.
-Protected guest staging is prepared for the branch alias
-`perplexity-git-codex-research-gue-382f59-chiragbhugras-projects.vercel.app`.
-Unauthenticated requests to the preview redirect to Vercel SSO. Its proposed
-configuration uses the development database and a distinct auth/HMAC secret,
-with the existing capped model credentials. No preview configuration has been
-saved yet. Adding that exact hostname to Turnstile and its callback to the
-existing development OAuth client also awaits action-time approval. No public
-guest switch has been enabled. A direct production anonymous-sign-in request
-returns 503 without a session cookie; the public sign-in page hides guest entry.
+After explicit action-time approval, Google now reports External / **In production**.
+Basic profile/email scopes are unchanged. The eligible support address is
+`ichiragbhugra@gmail.com`; the policy contact remains `trainwithchirag@gmail.com`.
+
+Protected guest staging ran on source `3b53401` in deployment
+`5PH1cxFBEaWUtgyWZxXsQRuhCL64`, with the development database and distinct
+Better Auth/HMAC secrets. Its 20 server settings were scoped only to
+`codex/research-guest-launch`, not global Preview or Production. The exact branch
+hostname was added to Turnstile and its callback to the existing development
+OAuth client with owner approval. Turnstile remains Managed with pre-clearance
+off. The preview retains Vercel authentication protection.
+
+After the hosted checks below, the owner explicitly approved the production-only
+`ENABLE_GUEST_TRIALS=true` change and redeployment. Deployment `H3iPd4cxC2qT5J29bL5FWMGVPeap` is Ready from the unchanged production
+source `77b6595`. Canonical `/sign-in` returns 200 with the guest entry, and a
+real Managed Turnstile verification created a production guest with six credits.
+The canonical guest answer and owner Google linking smoke both pass. No access
+gate or budget was bypassed.
 
 | Role | Model | Pinned provider |
 | --- | --- | --- |
@@ -64,12 +73,11 @@ returns 503 without a session cookie; the public sign-in page hides guest entry.
 | Enabled economy answers | GPT-4.1 nano | `azure` |
 
 There are no automatic provider retries or fallback expansion. Production
-Turnstile configuration is installed, but `ENABLE_GUEST_TRIALS=false` remains.
-Payments remain disabled. Google remains External / Testing with one test user.
+Turnstile configuration is installed. Payments remain disabled.
 
 The OpenRouter key retains its non-resetting **$1** cap and expires October 29
-at 18:12 UTC. The October 24 16:42 UTC metadata observation reported
-$0.167717870 used and $0.832282130 remaining. The cap and expiry were verified
+at 18:12 UTC. The October 24 18:32 UTC metadata observation reported
+$0.170844500 used and $0.829155500 remaining. The cap and expiry were verified
 again after testing. Provider cap metadata is not the same as the app's per-user
 or operator reservation balance.
 
@@ -139,6 +147,81 @@ boundaries, not cross-user authorization. The inspected browser console had no
 warning/error entries. Individual HTTP timings were 140–1,019 ms for these
 protected endpoints; these are single observations, not latency percentiles.
 
+### Hosted guest flow — protected preview
+
+Real Turnstile verification accepted the hosted origin and created one guest.
+An invalid synthetic token was rejected by the real Cloudflare endpoint and the
+application verifier; this negative check did not exercise the full hosted route.
+Three real guest answers (rainbow, blue sky, floating ice) completed with three
+rendered citations each, five source entries, and two credits charged per run.
+Admission-to-persistence durations were 10.617, 10.542 and 14.560 seconds. These
+are three observations, not latency percentiles or TTFT measurements. Their
+planner stages were deterministic SKIPPED, not model-backed planning samples.
+
+The UI counted down 6 → 4 → 2 → 0 credits. A fourth request displayed the allowance
+error; database inspection confirmed exactly three runs, with no fourth provider
+execution. A synthetic foreign conversation returned the unavailable screen
+without its title or contents. The cited and additional-source groups rendered.
+The ice answer included redundant literal `S1`/`S3` labels beside proper citation
+links; this remains an answer-formatting limitation, not a passed polish check.
+
+Guest-to-Google linking succeeded through the registered development callback.
+All three conversations, runs and reservations moved to the registered owner;
+there was exactly one link carrying six used credits, and the old guest had zero
+sessions. The signed-in UI showed 32 credits (40 minus two earlier credits and
+six guest credits), expanded model selection, and the transferred history. A
+transferred answer survived reload. Known costs (761, 746 and 817 microUSD) and
+unknown-cost holds (49,239, 49,254 and 49,183) remained unchanged after linking.
+Signing out and trying another guest trial displayed a denial; the durable trial
+marker remained. This proves reuse protection in the same browser, not immunity
+to clients discarding cookies or changing networks.
+
+The preview operator budget `hosted-guests-20261024` has DAY and PERIOD windows
+of $0.20 each, bounding the same spend, expiring October 25 at 18:16:35 UTC. It uses
+the same non-resetting $1 key. Production operator budgets and old holds were not
+changed. Before the production guest smoke, each production window had $0.25
+available under its existing $0.40 ceiling. Unknown-cost holds are not receipts.
+
+Ignored evidence includes `pr13-hosted-guest-linked.json`,
+`pr13-hosted-guest-prelink.json`, `pr13-turnstile-live-rejection.json`,
+`pr13-hosted-guest-key-final.json`, and the guest answer, isolation, quota,
+linked-history and repeat-trial screenshots. Console capture included third-party
+Turnstile-style obfuscated messages and an earlier pre-redeployment React error;
+this is not a claim of a completely clean captured console.
+
+### Canonical public guest smoke — October 25 IST
+
+Production deployment `H3iPd4cxC2qT5J29bL5FWMGVPeap` is Ready and serves the
+canonical domain with guests enabled. Unauthenticated `/sign-in`, `/privacy`
+and `/terms` returned 200. Real Managed Turnstile admission gave a new guest six
+credits and only the nano model option. One rainbow answer completed in 10.178
+seconds with five clickable citations and five source entries. Its source panel
+worked, reload preserved the answer, and the balance changed to four credits.
+Durable run `6491f68e-7b27-475e-88f9-e91496074721` is COMPLETED, with two credits
+charged, 811 microUSD known cost and 49,189 microUSD unknown cost held. The
+planner was deterministically SKIPPED. Earlier production cancellation/recovery
+checks apply to the unchanged application source; this smoke did not rerun them.
+
+Production Google linking then moved the conversation to the existing owner,
+carried two used guest credits exactly once, and revoked the guest session.
+The UI showed 36 remaining free-plan credits, and the transferred answer remained
+accessible. This tests the actual production OAuth callback, using the owner
+account; a separate previously unlisted Google account was not tested.
+
+The production operator windows now each have $0.20 available (same exposure,
+not additive): 198,184 microUSD reserved and 1,816 settled under each $0.40
+ceiling. At 50,000 microUSD reserved per research run, that is capacity for only
+four additional reservations absent cost reconciliation. These windows expire
+October 25 at **21:04 IST**; research fails closed when capacity or time expires.
+The $1 key expires October 29 at 18:12 UTC. Public guest entry is enabled, but
+these intentionally bounded settings are not an indefinite service allowance.
+No budgets were enlarged, old holds released or spend counters reset.
+
+Production evidence: `pr13-production-guest-answer.png`,
+`pr13-production-guest-linked.json`, `pr13-production-guest-final-budget.json`
+and `research-accounting-bead1a59-d56c-4b33-b18a-e904bd7e8d33.json` in ignored
+`.artifacts`. Source-only documentation updates do not alter that deployed build.
+
 ### Deferred false refusal and rejected experiments
 
 The owner accepted deferring the original benign quoted-injection refusal to
@@ -165,17 +248,17 @@ report parsing; this does not activate those versions in the application.
 1. Complete independent safety/quality acceptance beyond the explicitly deferred
    benign refusal. Hosted cancellation now passes. Reconcile unknown costs only
    with verified receipts; keep the $1 key cap unchanged.
-2. Exercise hosted Turnstile challenge acceptance and rejection, guest quotas,
-   ownership isolation and guest-to-Google history transfer before broad public
-   access. Local mocked checks are not substitutes for these hosted checks.
+2. Hosted Turnstile, guest quota, ownership isolation, repeat-trial denial and
+   Google history transfer checks pass. Canonical post-deployment smoke also
+   passes; guests are enabled within the finite budget windows above.
 3. Policy publication and Google branding are complete. Keep retention disclosures
    aligned with actual provider settings as the service evolves.
 4. The owner approved the eligible Google support address; no IAM change is needed.
-5. Confirm public Google audience publication, then verify a
-   non-test-user callback and guest-history transfer. The existing owner login
-   does not establish public eligibility.
+5. Google audience publication and owner history transfer pass. A separate
+   non-test Google account has not completed a callback in this session; public
+   eligibility is configured, but that independent account check remains pending.
 6. Hosted stale-run repair and manual maintenance invocation now pass. Finish
-   scheduled cron delivery, cross-user privacy, retention, alerting and
+   scheduled cron delivery, retention, alerting and
    representative latency checks. Previous restore/rollback evidence keeps
    its original limited scope. Razorpay remains a later, disabled integration.
 
