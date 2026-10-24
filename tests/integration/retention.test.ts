@@ -1,0 +1,24 @@
+import {readFile} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+import {drizzle} from 'drizzle-orm/pglite';
+import {eq} from 'drizzle-orm';
+import {afterAll,beforeAll,expect,it} from 'vitest';
+import * as schema from '@/db/schema';
+import {seedCompletion,prepareCompletion} from '../helpers/completion';
+import {createFinalization} from '@/server/runs/finalize';
+import {cleanExpiredContent} from '@/server/conversations/retention';
+const pg=new PGlite(),db=drizzle(pg,{schema});
+beforeAll(async()=>{const j=JSON.parse(await readFile('drizzle/meta/_journal.json','utf8'));for(const e of j.entries)await pg.exec(await readFile(`drizzle/${e.tag}.sql`,'utf8'));});
+afterAll(()=>pg.close());
+it('removes expired excerpts only after the run is terminal and keeps source URLs',async()=>{
+ const p=await seedCompletion(db);await prepareCompletion(db,p);
+ await db.update(schema.runRetrievals).set({createdAt:new Date(Date.now()-172800000),expiresAt:new Date(Date.now()-86400000)}).where(eq(schema.runRetrievals.runId,p.runId));
+ await cleanExpiredContent(db);
+ expect(await db.select().from(schema.sourcePassages)).toHaveLength(1);
+ await createFinalization(db).fail(p.subject,p.runId,'PROVIDER_UNAVAILABLE');
+ await cleanExpiredContent(db);
+ expect(await db.select().from(schema.sourcePassages)).toEqual([]);
+ expect(await db.select().from(schema.runSources)).toHaveLength(1);
+ expect(await db.select().from(schema.runSettlements)).toHaveLength(1);
+ expect(await cleanExpiredContent(db)).toMatchObject({passages:0});
+});

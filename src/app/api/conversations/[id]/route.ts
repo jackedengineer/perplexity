@@ -8,3 +8,7 @@ export async function GET(request: Request, context: Context) {
 export async function PATCH(request: Request, context: Context) {
   return conversationHttp.handle(request, "rename", (await context.params).id);
 }
+
+export async function DELETE(request: Request, context: Context) {
+  return conversationHttp.handle(request, "remove", (await context.params).id);
+}

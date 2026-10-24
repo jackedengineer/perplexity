@@ -34,7 +34,7 @@ export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, 
         // Transaction-scoped only: compatible with a pooled connection and multiple app processes.
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'run-admission:'+owner.id}::text,0))`);
         const [conversation] = await tx.select().from(conversations).where(and(eq(conversations.id,request.conversationId),eq(conversations.userId,owner.id))).for("update");
-        if (!conversation) return denied("NOT_FOUND");
+        if (!conversation || conversation.deletedAt) return denied("NOT_FOUND");
         const [existing] = await tx.select().from(runs).where(and(eq(runs.userId,owner.id),eq(runs.clientRequestId,request.clientRequestId))).limit(1);
         if (existing) {
           if (!matchesFingerprint(request,existing,{ hmac: existing.payloadHmac, keyId: existing.hmacKeyId, version: existing.payloadVersion },config)) return denied("IDEMPOTENCY_MISMATCH");

@@ -32,11 +32,11 @@ type Operation = Parameters<typeof http.handle>[1];
 function request(owner: string | null, operation: Operation, body?: unknown, extra: Record<string, string> = {}, query = "") {
   const token = `${owner}-session`;
   const signature = createHmac("sha256", secret).update(token).digest("base64");
-  const method = operation === "create" ? "POST" : operation === "rename" ? "PATCH" : "GET";
+  const method = operation === "create" ? "POST" : operation === "rename" ? "PATCH" : operation === "remove" ? "DELETE" : "GET";
   return new Request(`http://localhost:3000/api/conversations${query}`, {
     method, headers: { "content-type": "application/json", origin: "http://localhost:3000",
       ...(owner ? { cookie: `perplex.session_token=${encodeURIComponent(`${token}.${signature}`)}` } : {}), ...extra },
-    body: method === "GET" ? undefined : typeof body === "string" ? body : JSON.stringify(body),
+    body: method === "GET" || method === "DELETE" ? undefined : typeof body === "string" ? body : JSON.stringify(body),
   });
 }
 beforeAll(async () => {
@@ -55,7 +55,7 @@ afterAll(() => pg.close());
 
 it("requires valid sessions for every operation", async () => {
   for (const owner of [null, "expired", "absolute", "revoked"]) {
-    for (const operation of ["create", "list", "get", "history", "rename"] as const) {
+    for (const operation of ["create", "list", "get", "history", "rename", "remove", "export"] as const) {
       const response = await http.handle(request(owner, operation, { clientRequestId: randomUUID() }), operation, randomUUID());
       expect(response.status).toBe(401);
       expect(response.headers.get("cache-control")).toContain("no-store");
@@ -74,7 +74,7 @@ it("creates, replays and reloads an owned conversation without exposing ownershi
   expect(own.status).toBe(200);
   expect(JSON.stringify(await own.json())).not.toMatch(/authSubject|userId|creationFingerprint/u);
   for (const id of [conversation.id, randomUUID()]) {
-    for (const operation of ["get", "history", "rename"] as const) {
+    for (const operation of ["get", "history", "rename", "remove", "export"] as const) {
       const response = await http.handle(request("bob", operation, { title: "Stolen", expectedRevision: 0 }), operation, id);
       expect(response.status).toBe(404);
       expect((await response.json()).error).toEqual({ code: "NOT_FOUND", message: "This conversation is unavailable." });
@@ -102,4 +102,15 @@ it("returns safe database-outage errors and request correlation", async () => {
   expect(response.headers.get("x-request-id")).toMatch(/^[\da-f-]{36}$/u);
   expect(response.headers.get("server-timing")).toMatch(/^conversations;dur=/u);
   expect(JSON.stringify(events)).not.toMatch(/NEVER_EXPOSE|session_token/u);
+});
+it('accepts an empty DELETE stream but rejects a nonempty body and foreign origins',async()=>{
+ const created=await repository.create('alice',{clientRequestId:randomUUID(),title:'Disposable deletion'});
+ const id=created.conversation.id;
+ const base=request('alice','remove');
+ const empty=new Request(base.url,{method:'DELETE',headers:base.headers,body:''});
+ expect((await http.handle(empty,'remove',id)).status).toBe(204);
+ expect((await http.handle(request('alice','get'),'get',id)).status).toBe(404);
+ expect((await http.handle(request('alice','remove',undefined,{origin:'https://foreign.example'}),'remove',id)).status).toBe(403);
+ const invalid=new Request(base.url,{method:'DELETE',headers:base.headers,body:'do not accept me'});
+ expect((await http.handle(invalid,'remove',id)).status).toBe(422);
 });

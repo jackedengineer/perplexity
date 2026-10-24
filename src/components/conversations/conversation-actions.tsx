@@ -12,6 +12,8 @@ export function ConversationActions({ conversation,renameUnavailable=false }: { 
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
+  const deleteDialog = useRef<HTMLDialogElement>(null);
+  const deleteHeading = useId();
   const input = useRef<HTMLTextAreaElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [title, setTitle] = useState(conversation.title);
@@ -34,6 +36,30 @@ export function ConversationActions({ conversation,renameUnavailable=false }: { 
       setError(failure instanceof ConversationRequestError ? failure.message : "We couldn’t save that change. Please try again.");
     } finally { setPending(false); }
   }
+  async function remove() {
+    if (pending) return;
+    setPending(true); setError("");
+    try {
+      const response = await fetch(`/api/conversations/${conversation.id}`, {method:"DELETE",credentials:"same-origin",signal:AbortSignal.timeout(15_000)});
+      if (!response.ok && response.status !== 404) throw new ConversationRequestError(response.status);
+      deleteDialog.current?.close(); router.replace("/library"); router.refresh();
+    } catch (failure) {
+      if (failure instanceof ConversationRequestError && failure.status === 401) router.replace("/sign-in");
+      setError("Couldn’t delete this conversation. Please try again.");
+    } finally { setPending(false); }
+  }
+  async function exportData() {
+    if (pending) return;
+    setPending(true); setCopyStatus("Preparing export…");
+    try {
+      const response = await fetch(`/api/conversations/${conversation.id}/export`, {credentials:"same-origin",cache:"no-store",signal:AbortSignal.timeout(15_000)});
+      if (!response.ok) throw new ConversationRequestError(response.status);
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a"); link.href = url; link.download = `conversation-${conversation.id}.json`; link.click();
+      setTimeout(() => URL.revokeObjectURL(url),1000); setCopyStatus("Export downloaded");
+    } catch {setCopyStatus("Couldn’t export this conversation. Please try again.");}
+    finally {setPending(false);}
+  }
   async function copy() {
     try { await navigator.clipboard.writeText(`${location.origin}/search/${conversation.id}`); setCopyStatus("Private link copied"); }
     catch { setCopyStatus("Couldn’t copy the link"); }
@@ -53,8 +79,18 @@ export function ConversationActions({ conversation,renameUnavailable=false }: { 
       <p className="conversation-menu-title">{conversation.title}</p>
       <button role="menuitem" onClick={rename} disabled={renameUnavailable} title={renameUnavailable?"Finish the active research request before renaming.":undefined}>Rename</button>
       <button role="menuitem" onClick={() => void copy()}><Icon name="link" size={16} />Copy private link</button>
+      <button role="menuitem" disabled={pending} onClick={() => void exportData()}>Export conversation</button>
+      <button role="menuitem" onClick={() => { menu.current?.hidePopover(); setError(""); deleteDialog.current?.showModal(); }}>Delete conversation</button>
       <p className="menu-hint" role="status">{copyStatus || "Only your account can open this conversation."}</p>
     </div>
+    <dialog ref={deleteDialog} className="research-dialog rename-dialog" aria-labelledby={deleteHeading} onClose={() => trigger.current?.focus()} onCancel={event => {if(pending)event.preventDefault();}}>
+      <form onSubmit={event => {event.preventDefault(); void remove();}} aria-busy={pending}>
+        <div className="dialog-heading"><h2 id={deleteHeading}>Delete this conversation?</h2></div>
+        <p>This permanently removes its messages and sources, and stops any active answer. Usage records are kept for billing. You can export a copy first.</p>
+        <div className="rename-feedback" aria-live="polite">{error && <p role="alert">{error}</p>}</div>
+        <div className="dialog-footer"><button type="button" className="research-button" disabled={pending} autoFocus onClick={() => deleteDialog.current?.close()}>Keep conversation</button><button className="research-button primary" disabled={pending}>{pending ? "Deleting…" : "Delete conversation"}</button></div>
+      </form>
+    </dialog>
     <dialog ref={dialog} onClose={() => trigger.current?.focus()} className="research-dialog rename-dialog" aria-labelledby={headingId} onCancel={(event) => { if (pending) event.preventDefault(); }}
       onClick={(event) => { if (event.target === event.currentTarget && !pending) dialog.current?.close(); }}>
       <form onSubmit={(event) => { event.preventDefault(); void save(); }} aria-busy={pending}>

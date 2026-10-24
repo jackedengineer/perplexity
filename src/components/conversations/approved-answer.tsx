@@ -85,7 +85,7 @@ export function SourcesPanel({ answer,open,onToggle }: { answer: PublicAnswer | 
     {Boolean(answer.additionalSources?.length)&&<h3 className="source-group-title">Cited in the answer</h3>}
     {cards(answer.sources,true)}
     {Boolean(answer.additionalSources?.length)&&<><h3 className="source-group-title">Additional retrieved sources</h3><p className="source-support-note">Reviewed for display; these sources were not cited in the answer.</p>{cards(answer.additionalSources!,false)}</>}
-    <p className="source-support-note">Citations identify the sources used. Factual support hasn’t been independently checked.</p>
+    <p className="source-support-note">Citations identify the sources used. Factual support hasn’t been independently checked. Research excerpts expire after 30 days; source links remain available.</p>
   </div>;
   return <aside className={`answer-sources ${open ? "sources-open" : ""}`} aria-label="Answer sources">
     <button className="sources-toggle" onClick={onToggle} aria-expanded={open} aria-controls="approved-source-list">Sources<span className="toolbar-spacer" /><span className="source-total">{total}</span><Icon name={open ? "down" : "chevron"} size={14} /></button>
