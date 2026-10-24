@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { writeFile } from "node:fs/promises";
 import { observeChatWire } from "./wire-observer";
 import { test,expect } from "@playwright/test";
@@ -9,7 +10,7 @@ import { eq,inArray } from "drizzle-orm";
 async function provision(f: ReturnType<typeof createNeonFixture>,subject: string) {
   const [profile]=await f.owner.insert(schema.appUsers).values({authSubject:subject}).returning();
   const window={startsAt:new Date(Date.now()-86400000),endsAt:new Date(Date.now()+86400000)};
-  await f.owner.insert(schema.usageBuckets).values((["DAY","PERIOD"] as const).map(kind=>({userId:profile.id,kind,...window,entitlementVersion:"test-t11",creditLimit:100,providerLimitMicroUsd:1000000n})));
+  await f.owner.execute(sql`SELECT ensure_free_credits(${profile.id}::uuid)`);
   // Only this dedicated test namespace; refuse to overwrite any existing buckets.
   const operators=await f.owner.insert(schema.operatorUsageBuckets).values((["DAY","PERIOD"] as const).map(kind=>({budgetKey:process.env.T11_TEST_BUDGET_KEY!,kind,...window,providerLimitMicroUsd:1000000n}))).returning({id:schema.operatorUsageBuckets.id});
   return operators.map(row=>row.id);

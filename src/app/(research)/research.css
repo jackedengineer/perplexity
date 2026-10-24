@@ -164,3 +164,11 @@
   .library-row { padding: 12px 8px; gap: 10px; }
   .conversation-menu { top: 108px; }
 }
+
+.model-selector select { max-width: 190px; border: 0; border-radius: 7px; padding: 7px 4px; color: inherit; font: inherit; font-size: 12px; background: transparent; cursor: pointer; transition: background .15s ease; }
+.model-selector select:hover { background: var(--r-hover); }
+.model-selector select:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.model-selector select:disabled { opacity: .55; cursor: default; }
+.usage-summary { color: var(--r-muted); font-size: 11px; line-height: 1.5; margin: 7px 10px 1px; }
+@media (max-width: 480px) { .model-selector select { max-width: 155px; } .usage-summary { font-size: 10px; } }
+@media (prefers-reduced-motion: reduce) { .model-selector select { transition: none; } }

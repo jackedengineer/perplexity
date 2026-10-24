@@ -33,7 +33,7 @@ for(const stage of ['answer','safety'] as const)test(`a ${stage} stage deadline 
  try{
   const [profile]=await f.owner.insert(schema.appUsers).values({authSubject:identity.id}).returning();
   const window={startsAt:new Date(Date.now()-86400000),endsAt:new Date(Date.now()+86400000)};
-  await f.owner.insert(schema.usageBuckets).values((['PERIOD','DAY'] as const).map(kind=>({userId:profile.id,kind,...window,entitlementVersion:'test-t19',creditLimit:10,providerLimitMicroUsd:100000n})));
+  await f.owner.execute(sql`SELECT ensure_free_credits(${profile.id}::uuid)`);
   operatorIds=(await f.owner.insert(schema.operatorUsageBuckets).values((['PERIOD','DAY'] as const).map(kind=>({budgetKey:process.env.T11_TEST_BUDGET_KEY!,kind,...window,providerLimitMicroUsd:100000n}))).returning({id:schema.operatorUsageBuckets.id})).map(r=>r.id);
   await page.goto('/workspace');await page.getByRole('textbox',{name:'Ask a question'}).fill(`${stage==='safety'?'t19-safety-deadline':'t19-deadline'} Explain why rainbows form.`);
   const pending=page.waitForResponse(r=>r.url().endsWith('/api/chat'));await page.getByRole('button',{name:'Submit question'}).click();

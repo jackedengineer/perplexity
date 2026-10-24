@@ -1,4 +1,6 @@
 "use client";
+import {useModelAccess} from "./model-access";
+import type {ModelKey} from "@/server/ai/catalog";
 import { useCallback,useEffect,useRef,useState } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
@@ -7,6 +9,7 @@ import { committedAnswerView,runStateView,type CommittedAnswer,type ResearchMess
 import { createResearchTransport,safeResearchMessage,savedFailureMessage } from "./research-transport";
 export function useResearch(conversationId: string,revision: number,initialRunId:string|null=null) {
   const router=useRouter();
+  const {key:modelKey,refresh:refreshUsage}=useModelAccess();
   const [controller]=useState(()=>createResearchTransport(()=>router.replace("/sign-in"),fetch,initialRunId));
   const stopping=useRef(false),stopRequested=useRef(false);
   const [cancelling,setCancelling]=useState(false);
@@ -41,18 +44,18 @@ export function useResearch(conversationId: string,revision: number,initialRunId
       if(part.type==="data-answer"){const saved=committedAnswerView.parse(part.data);if(saved.conversationId!==conversationId||saved.runId!==controller.getRunId())throw new Error("Saved answer mismatch");setCommitted(saved);setStage(null);setError("");}
     },
     onError(failure){if(stopRequested.current)return;setError(safeResearchMessage(failure.message));setPending(false);busy.current=false;if(controller.getRunId())void recover();},
-    onFinish({isAbort,isError}){setPending(false);busy.current=false;if(!isAbort&&!isError)router.refresh();},
+    onFinish({isAbort,isError}){refreshUsage();setPending(false);busy.current=false;if(!isAbort&&!isError)router.refresh();},
   });
   const {clearError,sendMessage,stop:stopChat}=chat;
   const send=useCallback(async()=>{
     const intent=controller.getIntent();if(!intent||busy.current||stopping.current)return;stopRequested.current=false;busy.current=true;setPending(true);setError("");setStage(null);clearError();
     await sendMessage({text:intent.message.text});
   },[clearError,sendMessage,controller]);
-  const submit=useCallback(async(text: string,clientRequestId=crypto.randomUUID())=>{
+  const submit=useCallback(async(text: string,clientRequestId=crypto.randomUUID(),selectedModel:ModelKey=modelKey)=>{
     if(busy.current||!text.trim())return;
-    if(!controller.getIntent()){controller.setIntent({conversationId,clientRequestId,expectedRevision:revision,message:{text},mode:"FAST",modelKey:"fast-default"});setQuestion(text);}
+    if(!controller.getIntent()){controller.setIntent({conversationId,clientRequestId,expectedRevision:revision,message:{text},mode:"FAST",modelKey:selectedModel});setQuestion(text);}
     await send();
-  },[conversationId,revision,send,controller]);
+  },[conversationId,revision,send,controller,modelKey]);
   useEffect(()=>()=>{void stopChat();recovery.current?.abort();},[stopChat]);
   async function stop(){
     if(stopping.current)return;stopping.current=true;stopRequested.current=true;setCancelling(true);

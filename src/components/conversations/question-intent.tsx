@@ -1,6 +1,6 @@
 "use client";
 import { createContext,useContext,useMemo,useRef,type ReactNode } from "react";
-export type PendingQuestion = { conversationId: string;text: string;clientRequestId: string };
+export type PendingQuestion = { conversationId: string;text: string;clientRequestId: string;modelKey?:import("@/server/ai/catalog").ModelKey };
 type IntentContext = { stage: (question: PendingQuestion)=>void;consume: (id: string)=>PendingQuestion | null };
 const Questions = createContext<IntentContext | null>(null);
 // In-memory handoff across client navigation. Unapproved questions never become titles or browser storage.

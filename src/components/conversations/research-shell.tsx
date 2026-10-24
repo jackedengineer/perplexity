@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import {useModelAccess} from "./model-access";
 import { SessionControls } from "@/components/session-controls";
 import type { Conversation } from "@/server/conversations/contracts";
 import { Icon, ResearchMark, type IconName } from "./icons";
@@ -9,6 +10,7 @@ import { Icon, ResearchMark, type IconName } from "./icons";
 export function ResearchShell({ children, recent, name, initialCollapsed }: {
   children: React.ReactNode; recent: Conversation[]; name: string; initialCollapsed: boolean;
 }) {
+  const {data}=useModelAccess();
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(initialCollapsed);
@@ -84,7 +86,7 @@ export function ResearchShell({ children, recent, name, initialCollapsed }: {
     <dialog className="mobile-navigation" aria-label="Navigation" ref={mobileNav} onClick={(event) => { if (event.target === event.currentTarget) mobileNav.current?.close(); }}>{sidebar(false, true)}</dialog>
     <dialog className="research-dialog account-dialog" aria-labelledby="account-heading" ref={account} onClick={(event) => { if (event.target === event.currentTarget) account.current?.close(); }}>
       <div className="dialog-heading"><h2 id="account-heading">Your account</h2><button className="research-icon-button" aria-label="Close account menu" onClick={() => account.current?.close()}><Icon name="close" size={17} /></button></div>
-      <p>{name}</p><p className="research-muted">Your conversations are private.</p><SessionControls />
+      <p>{name}</p>{data?.usage.tier==="GUEST"&&<Link href="/sign-in">Sign in with Google to save guest history</Link>}<p className="research-muted">Your conversations are private.</p><SessionControls />
     </dialog>
   </div>;
 }

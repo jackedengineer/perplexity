@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {randomUUID} from 'node:crypto';
 import {test,expect} from '@playwright/test';
 import {eq} from 'drizzle-orm';
@@ -7,8 +8,7 @@ import {createNeonFixture} from '../live/admission-fixture';
 async function seed(f:ReturnType<typeof createNeonFixture>,subject:string) {
  const [profile]=await f.owner.insert(schema.appUsers).values({authSubject:subject}).returning();
  const [conversation]=await f.owner.insert(schema.conversations).values({userId:profile.id,creationRequestId:randomUUID(),creationFingerprint:'synthetic-t18',title:'Recovery verification'}).returning();
- const window={startsAt:new Date(Date.now()-86400000),endsAt:new Date(Date.now()+86400000)};
- await f.owner.insert(schema.usageBuckets).values((['PERIOD','DAY'] as const).map(kind=>({userId:profile.id,kind,...window,entitlementVersion:'test',creditLimit:10,providerLimitMicroUsd:100000n})));
+  await f.owner.execute(sql`SELECT ensure_free_credits(${profile.id}::uuid)`);
  await f.budgets();
  const result=await f.admission.admit(subject,{conversationId:conversation.id,clientRequestId:randomUUID(),expectedRevision:0,mode:'FAST',modelKey:'fast-default',message:{text:'PRIVATE_PENDING_QUESTION_MUST_NOT_APPEAR'}});
  if(result.kind!=='ADMITTED')throw new Error('Synthetic T18 admission failed');
