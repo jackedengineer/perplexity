@@ -48,7 +48,7 @@ For small-volume operation, the database owner can periodically delete rows wher
 unblock a request. Automated retention remains T22. Test fixtures clean up only
 captured synthetic subject digests using the pinned development owner connection.
 
-## Provider claims
+## Historical v1 provider claims
 
 | Stage | Time ceiling | Reserved micro-USD |
 | --- | ---: | ---: |
@@ -149,3 +149,5 @@ as well as unchanged deadlines and provider counts on replay. An interrupted
 fixture run left two test-budget rows; only its captured disposable identity,
 budget IDs and subject counter digest were removed before rerunning. No real
 user allowance or production data was changed.
+
+The T12–T17 extension adds a 2,000-microUSD planner claim to v1 and introduces v2 for new admissions: ten possible claims totaling 49,750 microUSD, within the same 50,000 reserve. The immutable call budget version is bound to the run at insertion; old receipts retain their original ceilings. See the [current retrieval profile](retrieval.md). T12–T13 and T15–T17 are implemented; human planning/quality acceptance and public/paid launch gates remain open.

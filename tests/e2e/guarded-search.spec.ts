@@ -24,7 +24,7 @@ test("a public question shows guarded progress, committed citations and exact re
     await page.getByRole("textbox",{name:"Ask a question"}).fill("Why do rainbows form?");
     const responsePromise=page.waitForResponse(response=>response.url().endsWith("/api/chat"));
     await page.getByRole("button",{name:"Submit question"}).click();
-    await expect(page.getByRole("status").filter({hasText:/Checking request|Searching the web|Preparing an answer/u})).toBeVisible({timeout:15000});
+    await expect(page.getByRole("status").filter({hasText:/Checking request|Understanding your question|Searching the web|Preparing an answer/u})).toBeVisible({timeout:15000});
     expect(await page.locator(".answer-prose").count()).toBe(0);
     await page.screenshot({path:`.artifacts/t11-progress-${info.project.name}.png`});
     const response=await responsePromise;expect(response.status()).toBe(200);
@@ -36,8 +36,10 @@ test("a public question shows guarded progress, committed citations and exact re
     await writeFile(`.artifacts/launch-stream-${info.project.name}.json`,JSON.stringify({timing:response.request().timing(),serverTiming:response.headers()["server-timing"],contentType:response.headers()["content-type"],cacheControl:response.headers()["cache-control"]},null,2));
     const submitted=requests[0] as {clientRequestId:string;conversationId:string};expect(Object.keys(submitted).sort()).toEqual(["clientRequestId","conversationId","expectedRevision","message","mode","modelKey"]);
     await expect(page.locator("h1")).toHaveText("Why do rainbows form?");expect(requests).toHaveLength(1);
+    const feedback=page.getByRole('button',{name:'Helpful answer',exact:true});await expect(feedback).toBeEnabled();await feedback.click();await expect(feedback).toHaveAttribute('aria-pressed','true');
     const rendered=await page.locator(".answer-prose").textContent();
     await page.reload();await expect(page.locator(".answer-prose")).toHaveText(rendered??"");
+    await expect(page.getByRole('button',{name:'Helpful answer',exact:true})).toHaveAttribute('aria-pressed','true');
     await page.waitForTimeout(100); // Flush paint observers for the saved-answer lab sample.
     await writeFile(`.artifacts/launch-answer-performance-${info.project.name}.json`,JSON.stringify(await page.evaluate(()=>({
       ...window.t11Rendering,jsTransferBytes:performance.getEntriesByType("resource").filter(r=>r.name.includes(".js")).reduce((n,r)=>n+(r as PerformanceResourceTiming).transferSize,0),
@@ -81,17 +83,22 @@ test("a public question shows guarded progress, committed citations and exact re
     }
     expect(errors).toEqual([]);
     // Same HTTP intent recovers the existing answer rather than another provider attempt.
-    const duplicate=await context.request.post("/api/chat",{headers:{Origin:"http://localhost:3001"},data:submitted});expect(duplicate.status()).toBe(200);expect(await duplicate.text()).toContain('"type":"data-answer"');
     const [run]=await f.owner.select().from(schema.runs).where(eq(schema.runs.clientRequestId,submitted.clientRequestId));
-    expect(await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id))).toHaveLength(6);
+    const beforeCalls=await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id));
+    expect(beforeCalls.filter(call=>call.stage!=="EXTRACT").map(call=>call.stage).sort()).toEqual(["INPUT_SAFETY","PLANNER","QUERY_SAFETY","SEARCH","EVIDENCE_SAFETY","ANSWER","OUTPUT_SAFETY"].sort());
+    expect(beforeCalls.filter(call=>call.stage==="EXTRACT").length).toBeLessThanOrEqual(1);
+    expect(beforeCalls.length).toBeLessThanOrEqual(8); // Extraction is optional under the absolute deadline.
+    const duplicate=await context.request.post("/api/chat",{headers:{Origin:"http://localhost:3001"},data:submitted});expect(duplicate.status()).toBe(200);expect(await duplicate.text()).toContain('"type":"data-answer"');
+    const afterCalls=await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id));
+    expect(afterCalls.map(call=>call.id).sort()).toEqual(beforeCalls.map(call=>call.id).sort());
     expect(await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,run.id))).toHaveLength(1);
     const stranger=await browser.newContext({baseURL:"http://localhost:3001"});const other=await identityFixture(stranger,"Other reader");
-    try {expect((await stranger.request.get(`/api/runs/${run.id}`)).status()).toBe(404);}finally{await other.cleanup();await stranger.close();}
+    try {expect((await stranger.request.get(`/api/runs/${run.id}`)).status()).toBe(404);const [approved]=await f.owner.select().from(schema.outputReviews).where(eq(schema.outputReviews.runId,run.id));expect((await stranger.request.put(`/api/messages/${approved.messageId}/feedback`,{headers:{Origin:'http://localhost:3001'},data:{rating:'NOT_HELPFUL',reason:'FALSE_REFUSAL',expectedVersion:0}})).status()).toBe(404);}finally{await other.cleanup();await stranger.close();}
   } finally {
     if(requests.length&&info.status!=="passed"){const value=requests[0] as {clientRequestId:string};const [run]=await f.owner.select().from(schema.runs).where(eq(schema.runs.clientRequestId,value.clientRequestId));if(run){console.info({state:run.status,ageMs:Date.now()-run.createdAt.getTime()});console.info((await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id))).map(c=>({stage:c.stage,status:c.status,durationMs:c.finishedAt?c.finishedAt.getTime()-c.startedAt.getTime():null})));}}
     await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
 });
-for(const scenario of ["input-block","output-block","invalid-citation","search-failure","no-evidence"] as const){
+for(const scenario of ["input-block","output-block","invalid-citation","search-failure","search-deadline","no-evidence"] as const){
   test(`public ${scenario} keeps private content out of the stream and history`,async({page,context},info)=>{
     const identity=await identityFixture(context),f=createNeonFixture();let buckets:string[]=[];
     const errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));await observeChatWire(page);
@@ -115,12 +122,25 @@ for(const scenario of ["input-block","output-block","invalid-citation","search-f
       }
       if(scenario==="input-block"){expect(calls.map(call=>call.stage)).toEqual(["INPUT_SAFETY"]);expect(bytes).not.toContain('"type":"data-stage"');}
       if(scenario==="invalid-citation")expect(calls.some(call=>call.stage==="OUTPUT_SAFETY")).toBe(false);
-      if(scenario==="search-failure")expect(calls.some(call=>call.stage==="ANSWER")).toBe(false);
+      if(scenario==="search-failure"||scenario==="search-deadline")expect(calls.some(call=>call.stage==="ANSWER")).toBe(false);
+      if(scenario==="search-deadline"){
+        expect(run.status).toBe('TIMED_OUT');expect(calls.find(call=>call.stage==='SEARCH')?.status).toBe('UNKNOWN');
+        expect(bytes).toContain('Research exceeded its time limit. Please start a new search.');
+        await expect(page.locator('.research-failure [role=alert]')).toHaveText('This research request timed out. You can start a new search.');
+      }
       const history=await context.request.get(`/api/conversations/${submitted.conversationId}/messages`);expect(history.status()).toBe(200);
       expect(await history.text()).not.toMatch(/UNREVIEWED_PRIVATE_DRAFT|PRIVATE_REASONING_MUST_NOT_LEAK|PRIVATE_UPSTREAM_MUST_NOT_LEAK/);
       if(scenario==="input-block")expect((await history.json()).items).toEqual([]);
       expect(errors).toEqual([]);expect((await new AxeBuilder({page}).withTags(["wcag2a","wcag2aa","wcag21aa"]).analyze()).violations).toEqual([]);
       await page.screenshot({path:`.artifacts/t11-${scenario}-${info.project.name}.png`,fullPage:true});
+      if(scenario==='input-block'||scenario==='search-failure'){
+        // No reload: the failed admission already advanced the conversation revision.
+        const nextRequest=page.waitForRequest(request=>request.url().endsWith('/api/chat'));
+        await page.getByRole('textbox',{name:'Ask a question'}).fill('Why do rainbows form?');
+        await page.getByRole('button',{name:'Submit question'}).click();
+        expect((await nextRequest).postDataJSON().expectedRevision).toBe(run.admittedRevision);
+        await expect(page.locator('.answer-prose')).toContainText('A rainbow appears',{timeout:60000});
+      }
     }finally{await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
   });
 }
@@ -144,4 +164,45 @@ test("stop cancels the admitted request and replay cannot restart paid work",asy
     await expect(page.locator(".answer-prose")).toHaveCount(0);expect(errors).toEqual([]);
     await page.screenshot({path:`.artifacts/t11-stopped-${info.project.name}.png`});
   }finally{await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
+});
+
+test('clarification is saved privately and a reply continues the same conversation',async({page,context})=>{
+ const identity=await identityFixture(context),f=createNeonFixture();let buckets:string[]=[];
+ try{
+  buckets=await provision(f,identity.id);await page.goto('/workspace');
+  await page.getByRole('textbox',{name:'Ask a question'}).fill('Is it better?');
+  await page.getByRole('button',{name:'Submit question'}).click();
+  await expect(page.locator('.answer-prose')).toHaveText('Which products are you comparing?',{timeout:60000});
+  const path=new URL(page.url()).pathname,id=path.split('/').at(-1)!;
+  const [first]=await f.owner.select().from(schema.runs).where(eq(schema.runs.conversationId,id));
+  expect(first.status).toBe('NEEDS_CLARIFICATION');
+  expect((await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,first.id))).map(c=>c.stage).sort()).toEqual(['INPUT_SAFETY','OUTPUT_SAFETY','PLANNER']);
+  expect((await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,first.id)))[0].creditsCharged).toBe(0);
+  await page.reload();await expect(page.locator('.answer-prose')).toHaveText('Which products are you comparing?');
+  await page.getByRole('textbox',{name:'Ask a question'}).fill('Neon and Supabase');await page.getByRole('button',{name:'Submit question'}).click();
+  await expect(page.locator('.answer-prose')).toHaveCount(2,{timeout:60000});expect(new URL(page.url()).pathname).toBe(path);
+  await page.reload();await expect(page.getByRole('article',{name:'Your question'})).toHaveCount(2);
+  expect(await f.owner.select().from(schema.runPlans).where(eq(schema.runPlans.conversationId,id))).toHaveLength(2);
+  await page.getByRole('textbox',{name:'Ask a question'}).fill('Neon and Supabase');await page.getByRole('button',{name:'Submit question'}).click();
+  // An intentionally repeated question is a new turn, not a hidden transport replay.
+  await expect(page.getByRole('article',{name:'Your question'})).toHaveCount(3);
+  await expect(page.locator('.answer-prose')).toHaveCount(3,{timeout:60000});
+  await page.screenshot({path:'.artifacts/t13-clarification-followup.png',fullPage:true});
+ }finally{await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
+});
+
+test('conflicting reports keep separate citations and approved additional source metadata',async({page,context},info)=>{
+ const identity=await identityFixture(context),f=createNeonFixture();let buckets:string[]=[];
+ try{
+  buckets=await provision(f,identity.id);await page.goto('/workspace');
+  await page.getByRole('textbox',{name:'Ask a question'}).fill('Compare the conflicting source reports');await page.getByRole('button',{name:'Submit question'}).click();
+  await expect(page.locator('.answer-prose')).toContainText('The reports disagree',{timeout:60000});
+  await expect(page.locator('.answer-prose a')).toHaveCount(2);await page.getByRole('button',{name:'Sources',exact:true}).click();
+  const surface=info.project.name==='mobile'?page.getByRole('dialog',{name:'Answer sources'}):page.getByRole('complementary',{name:'Answer sources'});
+  await expect(surface.getByRole('heading',{name:'Additional retrieved sources',exact:true})).toBeVisible();await expect(surface.getByRole('link')).toHaveCount(3);
+  await expect(surface.getByText(/Factual support hasn’t been independently checked/).filter({visible:true})).toBeVisible();
+  await expect(surface.getByText(/provider estimate/).filter({visible:true})).toHaveCount(2);
+  await page.screenshot({path:`.artifacts/t16-conflicting-${info.project.name}.png`,fullPage:true});
+  await page.reload();await expect(page.locator('.answer-prose')).toContainText('The reports disagree');
+ }finally{await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
 });

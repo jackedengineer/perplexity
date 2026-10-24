@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { expect,it,vi } from "vitest";
+import { createOpenRouterSafetyProvider,SAFETY_REQUEST_BYTES } from "@/server/safety/openrouter";
+import { createInputGate } from "@/server/safety/input";
+import { OUTPUT_SAFETY_PROMPT } from "@/server/safety/output";
 import { buildEvidence } from "@/server/search/evidence";
 import { createReleaseGate,isApprovedResponse,NO_EVIDENCE_TEXT } from "@/server/safety/release";
 const allow = { decision: "ALLOW",categoryCodes: [],policyVersion: "v1" };
@@ -14,6 +17,7 @@ it("approves and freezes the entire visible payload, with canonical same-run cit
   expect(Object.isFrozen(result.response)).toBe(true); expect(Object.isFrozen(result.response.sources[0])).toBe(true);
   expect(result.response.sources[0]).toMatchObject({ sourceId: "S1",number: 1,supportStatus: "NOT_CHECKED" });
   expect(result.response.sources[0].passageIds).toEqual([value.evidence.passages[0].passageId]);
+  expect(JSON.parse(provider.classify.mock.calls[0][0].context[0].text)).toMatchObject({responseKind:"ANSWER",originalQuestion:value.question});
   const supplied = JSON.stringify(provider.classify.mock.calls[0][0]); expect(supplied).toContain("Water refracts sunlight [S1]."); expect(supplied).toContain("https://example.org/rainbows");
 });
 it.each(["Invented [S9]", "No citations here", "<script>alert(1)</script> [S1]", "[click](javascript:alert(1)) [S1]", "![image](https://evil.org) [S1]", "<https://evil.org> [S1]", "https://evil.org [S1]", "sk-or-v1-"+"a".repeat(64)+" [S1]"])("deterministically blocks unsafe %s before the classifier",async(markdown)=>{
@@ -37,6 +41,7 @@ it("routes no-evidence and clarification responses through the same semantic gat
     expect(result.kind).toBe("APPROVED");
   }
   expect(provider.classify).toHaveBeenCalledTimes(2);
+  expect(provider.classify.mock.calls.map(call=>JSON.parse(call[0].context[0].text).responseKind)).toEqual(["NO_EVIDENCE","CLARIFICATION"]);
   expect((await createReleaseGate(provider).approve({ ...value,kind: "NO_EVIDENCE",markdown: "Invented knowledge" },options())).kind).toBe("DENIED");
 });
 it("inspects visible source titles and stops unsafe metadata despite benign answer text",async()=>{
@@ -47,7 +52,7 @@ it.each(["[S1](https://evil.org)", "[S1][ref]\n\n[ref]: https://evil.org", "Wate
   const provider = model(),result = await createReleaseGate(provider).approve({ ...input(),markdown },options());
   expect(result.kind).toBe("DENIED"); expect(provider.classify).not.toHaveBeenCalled();
 });
-it("numbers repeated citations by first appearance and publishes only cited sources",async()=>{
+it("numbers repeated citations by first appearance and separately approves additional sources",async()=>{
   const value = input(); value.evidence = buildEvidence(value.runId,[
     { title: "One",url: "https://example.org/one",content: "First source",score: 0.9 },
     { title: "Two",url: "https://example.org/two",content: "Second source",score: 0.8 },
@@ -55,7 +60,7 @@ it("numbers repeated citations by first appearance and publishes only cited sour
   ],new Date()); value.markdown = "Second [S2], first [S1], second again [S2].";
   const result = await createReleaseGate(model()).approve(value,options()); if (result.kind !== "APPROVED") throw new Error("Expected approval");
   expect(result.response.sources.map(s=>[s.sourceId,s.number])).toEqual([["S2",1],["S1",2]]);
-  expect(JSON.stringify(result.response)).not.toContain("Unused");
+  expect(result.response.additionalSources).toMatchObject([{sourceId:"S3",title:"Unused"}]);
 });
 it("bounds clarification text and rejects unsafe extra fields before classification",async()=>{
   const provider = model(),value = input();value.evidence.sources=[];value.evidence.passages=[];
@@ -134,4 +139,20 @@ it("provider diagnostics cannot escape through the output failure result",async(
   const provider = model();provider.classify.mockRejectedValue(new Error("PRIVATE answer and key"));
   const result = await createReleaseGate(provider).approve(input(),options());
   expect(result.kind).toBe("DENIED");expect(JSON.stringify(result)).not.toContain("PRIVATE");
+});
+
+it.each(['ALLOW','BLOCK'] as const)('inspects all five long source records within the cost ceiling before %s',async decision=>{
+ const value=input();value.question='Explain light. '.repeat(266);
+ value.evidence=buildEvidence(value.runId,Array.from({length:5},(_,i)=>({title:`Source ${i} `+'t'.repeat(200),url:`https://example.org/${i}/`+'u'.repeat(850),content:'Light is refracted.',score:.9})),new Date());
+ expect(value.evidence.sources).toHaveLength(5);expect(Buffer.byteLength(JSON.stringify(value.evidence))).toBeLessThanOrEqual(7500);
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(Response.json({choices:[{finish_reason:'stop',message:{role:'assistant',content:JSON.stringify({classification:decision==='ALLOW'?'ALLOW':['FRAUD'],policyVersion:'v1'})}}]}));
+ const provider=createOpenRouterSafetyProvider({apiKey:'synthetic-key-only',modelId:'test/output',provider:'test-provider'},fetcher,OUTPUT_SAFETY_PROMPT);
+ const result=await createReleaseGate(provider).approve(value,options());expect(result.kind).toBe(decision==='ALLOW'?'APPROVED':'DENIED');
+ expect(fetcher).toHaveBeenCalledOnce();const wire=String(fetcher.mock.calls[0][1]?.body),packet=JSON.parse(JSON.parse(wire).messages[1].content);
+ expect(Buffer.byteLength(wire)).toBeLessThanOrEqual(SAFETY_REQUEST_BYTES);expect(Math.ceil(Buffer.byteLength(wire)*.1+384*.4)).toBeLessThanOrEqual(2250);
+ expect(JSON.parse(packet.context[0].text).originalQuestion).toBe(value.question);
+ expect(wire).not.toMatch(/passageIds|contentHashes/);
+ expect((await createInputGate(model()).evaluate(packet,options())).reason).toBe('INVALID_INPUT');
+ for(const source of value.evidence.sources)expect(packet.context.some((turn:{text:string})=>{const supplied=JSON.parse(turn.text);return supplied.url===source.url&&supplied.title===source.title;})).toBe(true);
+ if(result.kind==='APPROVED'){expect(result.response.sources).toHaveLength(1);expect(result.response.additionalSources).toHaveLength(4);}
 });

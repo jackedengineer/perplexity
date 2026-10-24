@@ -4,7 +4,7 @@ import { guardVerdictSchema, SAFETY_POLICY, type GuardVerdict } from "./policy";
 import {INPUT_SAFETY_PROMPT_VERSION} from './prompt';
 import {SAFETY_PROMPT_VERSIONS} from './versions';
 import { inspectInput } from "./deterministic";
-import { INPUT_DETECTOR_VERSION, safetyInputSchema, SafetyProviderError, type InputReason, type SafetyProvider } from "./provider";
+import { INPUT_DETECTOR_VERSION, safetyInputSchema, outputSafetyInputSchema, SafetyProviderError, type InputReason, type SafetyProvider } from "./provider";
 
 export type InputCheck = { verdict: GuardVerdict; reason: InputReason; detectorVersion: typeof INPUT_DETECTOR_VERSION;
   modelId: string | null; durationMs: number };
@@ -19,7 +19,7 @@ export function createInputGate(provider: SafetyProvider | undefined,stage:Safet
       const result = (verdict: GuardVerdict, reason: InputReason): InputCheck => ({ verdict, reason,
         detectorVersion: INPUT_DETECTOR_VERSION, modelId, durationMs: Math.max(0,Math.round(performance.now()-started)) });
       const unavailable = (reason: InputReason) => result({ decision: "UNAVAILABLE", retryable: false, policyVersion: SAFETY_POLICY.version },reason);
-      const parsed = safetyInputSchema.safeParse(value);
+      const parsed = (stage==="safety.output"?outputSafetyInputSchema:safetyInputSchema).safeParse(value);
       if (!parsed.success) return unavailable("INVALID_INPUT");
       try {
         const category = inspectInput(parsed.data);

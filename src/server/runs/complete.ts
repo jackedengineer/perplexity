@@ -3,7 +3,7 @@ import {traceStage} from '@/server/telemetry/trace';
 import { z } from "zod";
 import type { PublicStage } from "@/server/contracts/progress";
 import { and,eq } from "drizzle-orm";
-import { inputSafetyReviews,messages,outputReviews,runs } from "@/db/schema";
+import { inputSafetyReviews,messages,outputReviews,runs,runPlans } from "@/db/schema";
 import type { AdmissionDatabase } from "./usage";
 import { lockOwnedRun } from "./lock";
 import { AdmissionError } from "./errors";
@@ -36,7 +36,10 @@ export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { ans
         const [message] = await tx.select().from(messages).where(and(eq(messages.id,review.acceptedMessageId),eq(messages.conversationId,run.conversationId)));
         const question = questionTextSchema.safeParse(message?.parts[0]?.text);
         if (!question.success || !message?.approvedAt || message.parts.length !== 1 || message.policyVersion !== run.policyVersion) throw new AdmissionError("SAFETY_UNAVAILABLE");
-        return { kind: "READY",run,question: question.data } as const;
+        const [planning]=await tx.select().from(runPlans).where(eq(runPlans.runId,runId));
+        const interpretation=planning?.plan.action==='ANSWER'?planning.plan.standaloneQuestion:undefined;
+        const answerLanguage=planning?.plan.action==='ANSWER'?planning.plan.answerLanguage:'en';
+        return { kind: "READY",run,question: question.data,interpretation,answerLanguage } as const;
       });
       if (loaded.kind === "SAVED") return { kind: "ALREADY_COMMITTED",runId,messageId: loaded.messageId };
       const evidence = await createRetrieval(db).load(subject,runId);
@@ -51,7 +54,7 @@ export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { ans
       let draft;
       try {
         if(budget.signal.aborted){await calls.finish(callId,'SKIPPED',{costMicroUsd:0n,inputTokens:0,outputTokens:0,actualModel:null});throw new AdmissionError('DEADLINE_EXCEEDED');}
-        draft = await traceStage("answer.draft",()=>generatePrivateDraft({ question: loaded.question,evidence },dependencies.answer,{ signal:budget.signal,deadlineAt:claim.deadlineAt }),()=>({promptVersion:ANSWER_PROMPT_VERSION}));
+        draft = await traceStage("answer.draft",()=>generatePrivateDraft({ question: loaded.question,interpretation:loaded.interpretation,answerLanguage:loaded.answerLanguage,evidence },dependencies.answer,{ signal:budget.signal,deadlineAt:claim.deadlineAt }),()=>({promptVersion:ANSWER_PROMPT_VERSION}));
         await calls.finish(callId,draft.kind === "NO_EVIDENCE" ? "SKIPPED" : "SUCCEEDED",draft.usage);
         if(budget.signal.aborted)throw new AdmissionError('DEADLINE_EXCEEDED');
       } catch {

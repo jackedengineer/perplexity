@@ -71,7 +71,7 @@ export function createChatHttp(dependencies: Dependencies) {
                 if (result.kind === "DENIED") throw new AdmissionError(result.code);
               }
               const saved = await backend.load(identity,run.id);
-              if (signal.aborted || saved.state !== "COMPLETED" || !saved.answer) throw new AdmissionError("RUN_ALREADY_FINISHED");
+              if (signal.aborted || !["COMPLETED","NEEDS_CLARIFICATION"].includes(saved.state) || !saved.answer) throw new AdmissionError("RUN_ALREADY_FINISHED");
               const answer = saved.answer;
               // The SDK writer suppresses closed-stream errors. Record only after
               // the approved chunk is enqueued into the public response below.

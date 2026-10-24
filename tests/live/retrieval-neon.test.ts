@@ -6,6 +6,10 @@ import { createMessageAcceptance } from "@/server/runs/accept-message";
 import { createInputGate } from "@/server/safety/input";
 import { createEvidenceGate } from "@/server/safety/evidence";
 import { createRetrieval } from "@/server/search/retrieve";
+import {planRun} from '@/server/runs/plan';
+import {submissionSchema} from '@/server/contracts/chat';
+import {fakePlanner} from '../helpers/completion';
+import {createProviderCalls,recordPlannerProvider} from '@/server/runs/provider-calls';
 import { hashPassage } from "@/server/search/evidence";
 import { createNeonFixture, simultaneously } from "./admission-fixture";
 const f = createNeonFixture();
@@ -20,6 +24,7 @@ async function fixture() {
   if (admitted.kind !== "ADMITTED") throw new Error("Synthetic admission failed");
   const acceptance = createMessageAcceptance(f.runtime,f.keys,createInputGate(provider()));
   expect((await acceptance.accept(person.subject,admitted.run.id,person.request,signal())).kind).toBe("ACCEPTED");
+  await planRun(f.runtime,person.subject,admitted.run.id,submissionSchema.parse(person.request),recordPlannerProvider(createProviderCalls(f.runtime,person.subject,admitted.run.id),fakePlanner()),signal());
   return { ...person,runId: admitted.run.id };
 }
 function pipeline() {

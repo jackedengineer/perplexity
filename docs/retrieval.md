@@ -195,3 +195,23 @@ T08 consumes the private package; T09 must validate final source metadata,
 citations, links and answer safety; T10 must account for all provider attempts
 and settle usage. T13 adds intent-preserving planning and safe follow-up context.
 No public launch or production deployment is certified by this slice.
+
+## T15–T16 bounded extraction and ranking
+
+New admissions use accounting profile v2. Up to two distinct planned queries each receive their own safety and paid-call claim; both query guards complete before either search starts. Searches run concurrently under the same absolute 45-second deadline. A successful sibling can supply evidence when another search fails; the failed attempt remains billed/unknown in the immutable ledger.
+
+Selected top pages (at most two) go only to Tavily's fixed Extract endpoint, never an arbitrary server fetch. Basic plain-text extraction requests usage and has no retries. Only exact selected URLs are accepted. Whole bounded page text is inspected before exact passage selection; rejected page URLs cannot fall back to their search snippets. A transport outage can retain original snippets, labeled SEARCH_PASSAGE. Every final selected passage goes through the semantic evidence gate before synthesis/persistence. Extraction is skipped if fewer than 20 seconds remain for drafting, output safety and persistence.
+
+Lexical window ranking considers the original standalone interpretation, title overlap, explicitly mentioned domains and known publication dates. Missing/future dates stay unknown. Tracking variants and exact normalized syndication are deduplicated after scoring, so the preferred original can beat a mirror. No hard domain quota discards the sole authoritative source. Opposing amounts and negations remain separate; this is not an automated factual contradiction detector. Excerpts remain at most 1,000 UTF-16 characters and the entire evidence package stays below 7,500 UTF-8 bytes (a conservative context-token ceiling).
+
+Profile v2 ceilings in microUSD: planner 2,000; each of five possible safety calls 2,250; each of two searches and one extraction 8,000; answer 12,500. Sum 49,750, within the unchanged 50,000 reservation. Safety requests now have a 20,960-byte wire ceiling alongside price/output limits. No model can expand caps. A database insertion trigger binds each immutable provider budget version to its run; historical v1 receipts/caps are preserved. Unknown search/extraction USD costs remain held until verified reconciliation. Operator reports include both searches and extraction credits, including unknown outcomes.
+
+Official protocol references: [Search](https://docs.tavily.com/documentation/api-reference/endpoint/search) and [Extract](https://docs.tavily.com/documentation/api-reference/endpoint/extract). Fixtures verify bounded routing, selection, partial failure, exact excerpts, dangerous tails, duplicate originals, dates, two-query ordering and cancellation. Live provider quality remains independently evaluated.
+
+## Approved source transparency
+
+New responses separate cited sources from additional retrieved sources. All displayed titles, URLs, dates and excerpt-kind labels share the complete output guard, canonical payload hash and same-run persistence checks. Additional sources are never inserted into the citation table or described as supporting the answer. Public views contain approved display metadata only; excerpts and hashes remain private. Optional fields have no schema defaults, preserving the exact hashes and reload behavior of older saved responses.
+
+Known publication and retrieval dates are presented separately. Missing publication dates are stated explicitly. The support label remains NOT_CHECKED. The answer model receives those dates and selected passages, is instructed to describe disagreements with each source and to leave unresolved claims uncertain. Citation ID validation is not factual verification; independent support review remains an evaluation gate.
+
+Tavily documents `published_date` as its estimate of publication **or update** time, rather than verified original publication. New source panels explicitly call it a provider-estimated source date, and the answer prompt preserves that distinction. Recent filters use day/week when those words are explicit, otherwise month; undated sources remain eligible unless an explicit ISO range requires filtering. An oversized extracted page is unavailable independently, allowing its usable sibling to proceed. Unused oversized page text never enters evidence or synthesis.

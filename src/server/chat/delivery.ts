@@ -25,9 +25,9 @@ export function createAnswerDelivery(db: AdmissionDatabase) {
       await createRunRecovery(db).expire(identity,runId);return load(identity,runId,false);
     }
     const base = { runId: row.id,conversationId: row.conversationId,revision: row.revision };
-    if (row.status !== "COMPLETED") {
+    if (!["COMPLETED","NEEDS_CLARIFICATION"].includes(row.status)) {
       const state = row.status === "RECEIVED" || row.status === "CHECKING_INPUT" ? "CHECKING_REQUEST"
-        : ["PLANNING","SEARCHING","PREPARING_EVIDENCE"].includes(row.status) ? "SEARCHING"
+        : row.status === "PLANNING" ? "PLANNING" : ["SEARCHING","PREPARING_EVIDENCE"].includes(row.status) ? "SEARCHING"
         : row.status === "GENERATING" ? "PREPARING_ANSWER" : row.status === "CHECKING_OUTPUT" ? "CHECKING_ANSWER" : "UNAVAILABLE";
       return runStateView.parse({ ...base,state,...(row.status==="CANCELLED"||row.status==="TIMED_OUT"?{terminalReason:row.status}:{}) });
     }
@@ -36,7 +36,7 @@ export function createAnswerDelivery(db: AdmissionDatabase) {
       const canonical = serializeApprovedPayload(row.payload);
       if (canonical.payload.runId !== runId || canonical.bodyHash !== row.bodyHash || canonical.payloadHash !== row.payloadHash || canonical.payload.markdown !== row.parts[0].text) throw new Error("Invalid saved answer");
       const answer = committedAnswerView.parse({ ...base,messageId: row.messageId,text: canonical.payload.markdown,answer: presentAnswer(canonical.payload),createdAt: row.createdAt!.toISOString() });
-      return { ...base,state: "COMPLETED",answer };
+      return { ...base,state: row.status === "NEEDS_CLARIFICATION" ? "NEEDS_CLARIFICATION" : "COMPLETED",answer };
     } catch { throw new AdmissionError("OUTPUT_BLOCKED"); }
   }
   return {load};

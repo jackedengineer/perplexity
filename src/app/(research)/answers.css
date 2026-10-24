@@ -23,7 +23,7 @@
 .answer-citation:hover, .answer-citation:focus-visible { color: #e6ecee; background: #384045; }
 .citation-tooltip { display: block; position: fixed; z-index: 70; overflow: auto; padding: 12px; border: 1px solid #3c454b; border-radius: 10px; box-shadow: 0 8px 24px #0005; background: #20262a; color: #e0e5e7; white-space: normal; font: 400 13px/20px Arial, Helvetica, sans-serif; }
 .citation-tooltip small { display: block; color: #b0bac0; font-size: 11px; margin-top: 5px; }
-.answer-actions { display: flex; align-items: center; gap: 4px; margin: 12px -10px 0; color: #a3acb2; font-family: Arial, Helvetica, sans-serif; }
+.answer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 12px -10px 0; color: #a3acb2; font-family: Arial, Helvetica, sans-serif; }
 .answer-source-count { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 8px; background: transparent; color: #b2bbc1; min-height: 40px; padding: 0 10px; cursor: pointer; font-size: 12px; transition: background-color 120ms ease-out, transform 120ms ease-out; }
 .answer-source-count:hover { background: var(--r-hover); }
 .answer-source-count:active { transform: scale(.96); }
@@ -108,3 +108,15 @@
 .mobile-sources-heading .research-icon-button { min-height: 44px; }
 
 @media (max-width: 767px) { .answer-topbar .private-label { display: none; } .answer-topbar .private-pill { flex-shrink: 0; padding: 0 8px; } .answer-topbar .thread-tab, .answer-tab-button { flex-shrink: 0; } }
+.source-group-title { margin: 18px 4px 6px; color: #d5dce1; font: 500 12px/18px Arial, Helvetica, sans-serif; }
+.source-evidence-meta { display: block; margin-top: 5px; color: #acb6bc; font: 400 11px/17px Arial, Helvetica, sans-serif; }
+.answer-feedback { margin-top: 0; min-height: 36px; color: #acb6bc; font: 400 12px/18px Arial, Helvetica, sans-serif; }
+.feedback-buttons { display: flex; align-items: center; gap: 4px; min-height: 36px; }
+.feedback-buttons button[aria-pressed="true"] { color: #73c8c5; background: #263c3d; }
+.feedback-status { margin-left: 6px; }
+.feedback-reason { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 12px; }
+.feedback-reason select { max-width: 100%; border: 1px solid var(--r-line); border-radius: 8px; padding: 8px; background: #202529; color: #dadfe3; font: inherit; }
+.feedback-error { color: #e0b3a8; margin: 8px 0; }
+.feedback-retry { text-decoration: underline; color: inherit; }
+.feedback-placeholder { width: 76px; min-height: 36px; }
+@media (prefers-reduced-motion: no-preference) { .feedback-buttons button { transition: background-color 120ms, color 120ms; } }

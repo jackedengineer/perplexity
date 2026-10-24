@@ -50,7 +50,7 @@ export function ConversationHistory({ conversationId, initial,sourcesOpen: contr
     {history.nextBefore && <button className="research-button load-older" disabled={pending} onClick={() => void older()}>{pending ? "Loading earlier messages…" : "Load earlier messages"}</button>}
     <div className="history-feedback" aria-live="polite">{failed ? <p role="alert">Earlier messages couldn’t load. Please try again.</p> : <span className="sr-only">{loaded ? `${loaded} earlier messages loaded.` : ""}</span>}</div>
     {history.items.map((message) => <article className={`history-message ${message.role === "USER" ? "question-message" : "answer-message"}`} tabIndex={-1} key={message.id} aria-label={message.role === "USER" ? "Your question" : "Approved answer"}>
-      {message.answer ? <ApprovedAnswer answer={message.answer} text={message.parts.map(part=>part.text).join("\n")} onSources={()=>{setSelected(message.answer!);setSourcesOpen(true);}} /> : <>{message.role === "ASSISTANT" && <h2>Answer</h2>}{message.parts.map((part,index)=><p key={index}>{part.text}</p>)}</>}
+      {message.answer ? <ApprovedAnswer messageId={message.id} answer={message.answer} text={message.parts.map(part=>part.text).join("\n")} onSources={()=>{setSelected(message.answer!);setSourcesOpen(true);}} /> : <>{message.role === "ASSISTANT" && <h2>Answer</h2>}{message.parts.map((part,index)=><p key={index}>{part.text}</p>)}</>}
     </article>)}
     <SourcesPanel answer={currentAnswer} open={sourcesOpen} onToggle={()=>setSourcesOpen(!sourcesOpen)} />
   </div>;

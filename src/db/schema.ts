@@ -6,3 +6,5 @@ export * from "./retrieval-schema";
 export * from "./completion-schema";
 export * from "./recovery-schema";
 export * from "./rate-limit-schema";
+export * from './planning-schema';
+export * from './feedback-schema';

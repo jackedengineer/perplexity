@@ -11,7 +11,7 @@ export function createUsageReconciliation(db:AdmissionDatabase) {
       const {run,now}=await lockOwnedRun(tx,subject,runId);
       if(ACTIVE_RUN_STATUSES.some(s=>s===run.status))return 'UNCHANGED' as const;
       const [receipt]=await tx.select().from(runSettlements).where(eq(runSettlements.runId,runId));
-      if(!receipt||run.accountingVersion!==1)return 'UNRESOLVED' as const;
+      if(!receipt||![1,2].includes(run.accountingVersion))return 'UNRESOLVED' as const;
       const previous=await tx.select().from(runReconciliations).where(eq(runReconciliations.runId,runId)).orderBy(runReconciliations.version);
       const held=previous.at(-1)?.remainingHeldMicroUsd??receipt.heldProviderMicroUsd;
       const [reservation]=await tx.select().from(usageReservations).where(eq(usageReservations.runId,runId));
@@ -52,7 +52,7 @@ export function createUsageReconciliation(db:AdmissionDatabase) {
     // starve a later receipt that actually changes accounting.
     const candidates=await db.select({id:runs.id,subject:appUsers.authSubject}).from(runs)
       .innerJoin(appUsers,eq(appUsers.id,runs.userId)).innerJoin(runSettlements,eq(runSettlements.runId,runs.id))
-      .where(and(budgetKey?eq(runs.operatorBudgetKey,budgetKey):undefined,eq(runs.accountingVersion,1),sql`${runs.status} NOT IN ('RECEIVED','CHECKING_INPUT','PLANNING','SEARCHING','PREPARING_EVIDENCE','GENERATING','CHECKING_OUTPUT')`,
+      .where(and(budgetKey?eq(runs.operatorBudgetKey,budgetKey):undefined,inArray(runs.accountingVersion,[1,2]),sql`${runs.status} NOT IN ('RECEIVED','CHECKING_INPUT','PLANNING','SEARCHING','PREPARING_EVIDENCE','GENERATING','CHECKING_OUTPUT')`,
         or(and(sql`coalesce((select remaining_held_micro_usd from run_reconciliations where run_id=${runs.id} order by version desc limit 1),${runSettlements.heldProviderMicroUsd})>0`,
         sql`(
           (select coalesce(sum(coalesce(p.cost_micro_usd,c.cost_micro_usd,0)),0) from provider_calls c left join provider_usage_resolutions p on p.call_id=c.id where c.run_id=${runs.id})

@@ -22,18 +22,18 @@ export function bindRunTelemetry(value:unknown) {
 export function recordProviderObservation(value:unknown,started=false) {
  const current=storage.getStore(),parsed=providerTelemetryFieldsSchema.safeParse(value);if(!current||!parsed.success)return;
  const fields=parsed.data;if(!fields.providerCallId||!fields.providerStage)return;
- if(!current.calls.has(fields.providerCallId)&&current.calls.size>=6)return;
+ if(!current.calls.has(fields.providerCallId)&&current.calls.size>=10)return;
  const observation={...current.calls.get(fields.providerCallId),...fields};
  current.calls.set(fields.providerCallId,observation);
  recordTelemetry(started?'research.provider_started':'research.usage',observation);
 }
 export function recordRunUsage() {
  const current=storage.getStore();if(!current)return;
- const calls=[...current.calls.values()],models=calls.filter(c=>c.providerStage!=='SEARCH');
+ const calls=[...current.calls.values()],models=calls.filter(c=>!['SEARCH','SEARCH_SECOND','EXTRACT'].includes(c.providerStage??''));
  const known=calls.reduce((n,c)=>n+BigInt(c.knownCostMicroUsd??'0'),0n),unknown=calls.filter(c=>c.costState!=='KNOWN').length;
  const tokens=(key:'inputTokens'|'outputTokens')=>models.some(c=>c[key]!=null)?models.reduce((n,c)=>n+(c[key]??0),0):models.length?null:0;
  recordTelemetry('research.run_usage',{knownCostMicroUsd:String(known),costState:unknown?known>0n?'PARTIAL':'UNKNOWN':'KNOWN',unknownCalls:unknown,inputTokens:tokens('inputTokens'),outputTokens:tokens('outputTokens'),
-  searchCredits:calls.some(c=>c.providerStage==='SEARCH'&&c.outcome!=='SKIPPED'&&c.searchCredits==null)?null:calls.reduce((n,c)=>n+(c.searchCredits??0),0)});
+  searchCredits:calls.some(c=>['SEARCH','SEARCH_SECOND','EXTRACT'].includes(c.providerStage??'')&&c.outcome!=='SKIPPED'&&c.searchCredits==null)?null:calls.reduce((n,c)=>n+(c.searchCredits??0),0)});
 }
 export function recordTelemetry(event:TelemetryEvent['event'],value:unknown={}) {
  const current=storage.getStore();if(!current)return;

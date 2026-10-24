@@ -1,4 +1,5 @@
 import { expect, it, vi } from "vitest";
+import { questionTextSchema } from "@/server/contracts/chat";
 import { safetyCategorySchema } from "@/server/safety/policy";
 import { parseSafetyModel } from "@/server/ai/models";
 import { createOpenRouterSafetyProvider } from "@/server/safety/openrouter";
@@ -87,6 +88,14 @@ it("bounds serialized outbound bytes and enforces classifier price ceilings", as
   fetcher.mockClear();
   await expect(classifier.classify({ text: "x".repeat(45001),context: [] },new AbortController().signal)).rejects.toThrow("Safety classifier unavailable.");
   expect(fetcher).not.toHaveBeenCalled();
+});
+it.each([config(),{...config(),modelId:'a/'+ 'b'.repeat(126),provider:'p'.repeat(64)}])('fits maximum accepted multibyte text inside the unchanged safety cost ceiling (%o)',async model=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(json(envelope()));
+ const text=questionTextSchema.parse('🌈'.repeat(4000));
+ await createOpenRouterSafetyProvider(model,fetcher).classify({text,context:[]},new AbortController().signal);
+ const bytes=Buffer.byteLength(String(fetcher.mock.calls[0][1]?.body),'utf8');
+ expect(Math.ceil(bytes*.1+384*.4)).toBeLessThanOrEqual(2250);
+ expect(fetcher).toHaveBeenCalledOnce();
 });
 it("caps chunked response bytes even when stream cancellation does not settle", async()=>{
   let cancelled = false;

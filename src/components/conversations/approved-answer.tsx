@@ -1,8 +1,9 @@
 "use client";
-import { useEffect,useId,useRef,useState,type ReactNode } from "react";
+import { lazy,Suspense,useEffect,useId,useRef,useState,type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AnswerNode,PublicAnswer } from "@/server/answers/view";
 import { Icon } from "./icons";
+const AnswerFeedback=lazy(()=>import("./answer-feedback"));
 function Citation({ source }: { source: PublicAnswer["sources"][number] }) {
   const id=useId(),[tip,setTip]=useState<{left:number;top:number;width:number;maxHeight:number;above:boolean}|null>(null);
   function open(element: HTMLAnchorElement) {
@@ -21,7 +22,7 @@ function Citation({ source }: { source: PublicAnswer["sources"][number] }) {
     <Icon name="link" size={10}/><span>{source.domain.replace(/\.(gov|com|org|edu)$/u,"")}</span>
   </a>{tip&&createPortal(<span className="citation-tooltip" role="tooltip" id={id} style={{left:tip.left,top:tip.top,width:tip.width,maxHeight:tip.maxHeight,transform:tip.above?"translateY(-100%)":undefined}}>{source.title}<small>{source.domain} · Source {source.number}</small></span>,document.body)}</>;
 }
-export function ApprovedAnswer({ answer,text,onSources }: { answer: PublicAnswer;text: string;onSources: ()=>void }) {
+export function ApprovedAnswer({ messageId,answer,text,onSources }: {messageId:string; answer: PublicAnswer;text: string;onSources: ()=>void }) {
   const [copied,setCopied] = useState(false),[copyFailed,setCopyFailed] = useState(false);
   const copyTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   useEffect(()=>()=>{if(copyTimer.current)clearTimeout(copyTimer.current);},[]);
@@ -59,6 +60,7 @@ export function ApprovedAnswer({ answer,text,onSources }: { answer: PublicAnswer
         <span className="copy-symbol" data-active={copied} aria-hidden="true"><Icon name="check" size={17}/></span>
       </button>
       {answer.sources.length > 0 && <button className="answer-source-count" onClick={onSources}><Icon name="link" size={15} />{answer.sources.length} {answer.sources.length === 1 ? "source" : "sources"}</button>}
+      <Suspense fallback={<div className="feedback-placeholder" aria-hidden="true"/>}><AnswerFeedback messageId={messageId}/></Suspense>
       <span className="copy-feedback" role="status">{copyFailed ? "Copy is unavailable. Select the text to copy it." : copied ? "Copied" : ""}</span>
     </div>
   </div>;
@@ -73,17 +75,23 @@ export function SourcesPanel({ answer,open,onToggle }: { answer: PublicAnswer | 
     return()=>{query.removeEventListener("change",sync);window.removeEventListener("keydown",escape);dialog?.close();};
   },[open,onToggle]);
   if (!answer?.sources.length) return null;
+  const total=answer.sources.length+(answer.additionalSources?.length??0);
+  function cards(sources:PublicAnswer['sources'],cited:boolean){return sources.map(source=><a key={source.sourceId} className="source-card" href={source.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">
+    <span className="source-monogram" aria-hidden="true">{source.domain[0].toUpperCase()}</span><div><span className="source-domain">{source.domain}<span className="source-number">{cited?source.number:'Retrieved'}</span></span><h3>{source.title}</h3>
+    {source.retrievedAt&&<small className="source-evidence-meta">{source.contentKind==='EXTRACTED_PAGE'?'Page excerpt':'Search snippet'} · {source.publishedAt?`Source date ${source.publishedAt.slice(0,10)} (provider estimate)`:'Source date unavailable'}<br/>Retrieved {source.retrievedAt.slice(0,10)}</small>}
+    </div><Icon name="external" size={13}/>
+  </a>);}
   const list=<div className="source-list">
-      {answer.sources.map(source=><a key={source.sourceId} className="source-card" href={source.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">
-        <span className="source-monogram" aria-hidden="true">{source.domain[0].toUpperCase()}</span><div><span className="source-domain">{source.domain}<span className="source-number">{source.number}</span></span><h3>{source.title}</h3></div><Icon name="external" size={13} />
-      </a>)}
-      <p className="source-support-note">Citations identify the sources used. Factual support hasn’t been independently checked.</p>
-    </div>;
+    {Boolean(answer.additionalSources?.length)&&<h3 className="source-group-title">Cited in the answer</h3>}
+    {cards(answer.sources,true)}
+    {Boolean(answer.additionalSources?.length)&&<><h3 className="source-group-title">Additional retrieved sources</h3><p className="source-support-note">Reviewed for display; these sources were not cited in the answer.</p>{cards(answer.additionalSources!,false)}</>}
+    <p className="source-support-note">Citations identify the sources used. Factual support hasn’t been independently checked.</p>
+  </div>;
   return <aside className={`answer-sources ${open ? "sources-open" : ""}`} aria-label="Answer sources">
-    <button className="sources-toggle" onClick={onToggle} aria-expanded={open} aria-controls="approved-source-list">Sources<span className="toolbar-spacer" /><span className="source-total">{answer.sources.length}</span><Icon name={open ? "down" : "chevron"} size={14} /></button>
+    <button className="sources-toggle" onClick={onToggle} aria-expanded={open} aria-controls="approved-source-list">Sources<span className="toolbar-spacer" /><span className="source-total">{total}</span><Icon name={open ? "down" : "chevron"} size={14} /></button>
     <div id="approved-source-list" className="desktop-source-list" hidden={!open}>{list}</div>
     <dialog ref={mobile} className="mobile-sources-dialog" aria-label="Answer sources" onCancel={event=>{event.preventDefault();onToggle();}} onClick={event=>{if(event.target===event.currentTarget){const box=event.currentTarget.getBoundingClientRect();if(event.clientY<box.top||event.clientY>box.bottom||event.clientX<box.left||event.clientX>box.right)onToggle();}}}>
-      <div className="mobile-sources-heading"><h2>Sources <span>{answer.sources.length}</span></h2><button className="research-icon-button" aria-label="Close sources" onClick={onToggle}><Icon name="close"/></button></div>
+      <div className="mobile-sources-heading"><h2>Sources <span>{total}</span></h2><button className="research-icon-button" aria-label="Close sources" onClick={onToggle}><Icon name="close"/></button></div>
       {list}
     </dialog>
   </aside>;

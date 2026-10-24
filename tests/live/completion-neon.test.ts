@@ -17,7 +17,7 @@ it("commits reviewed history and all ledger records through the restricted role"
   const person = await fixture(),model = answer(),service = createAnswerCompletion(f.runtime,{ answer: model,output: fakeSafety() });
   const result = await service.complete(person.subject,person.sessionId,person.runId,signal());expect(result.kind).toBe("COMMITTED");
   const [receipt] = await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,person.runId));
-  expect(receipt).toMatchObject({ creditsCharged: 5,knownProviderMicroUsd: 600n,heldProviderMicroUsd: 49400n });
+  expect(receipt).toMatchObject({ creditsCharged: 5,knownProviderMicroUsd: 700n,heldProviderMicroUsd: 49300n });
   expect(await f.owner.select().from(schema.messageCitations).where(eq(schema.messageCitations.runId,person.runId))).toHaveLength(1);
   expect(await service.complete(person.subject,person.sessionId,person.runId,signal())).toEqual({ ...result,kind: "ALREADY_COMMITTED" });expect(model.generate).toHaveBeenCalledOnce();
 },60000);

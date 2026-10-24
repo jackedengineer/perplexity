@@ -1,4 +1,4 @@
-export const SAFETY_PROMPT_VERSIONS = Object.freeze({input:"input-v5",evidence:"evidence-v4",output:"output-v4"} as const);
+export const SAFETY_PROMPT_VERSIONS = Object.freeze({input:"input-v7",evidence:"evidence-v4",output:"output-v7"} as const);
 export const SAFETY_WIRE_INSTRUCTIONS = [
  "Return exactly classification and policyVersion. classification is the string ALLOW for permitted content, the string UNAVAILABLE only when unable to decide whether a safety-policy violation applies, or a nonempty array of ALL applicable stop-required category codes. Uncertainty about factual accuracy or missing evidence is not uncertainty about safety.",
  "Never mix ALLOW/UNAVAILABLE into a category array or return BLOCK. Always include SELF_HARM_DISTRESS or SELF_HARM_INSTRUCTIONS when applicable, even alongside violence, fraud or other categories: the application owns fixed-response precedence.",

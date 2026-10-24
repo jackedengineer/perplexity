@@ -88,7 +88,7 @@ export function createConversationRepository(db: PgDatabase<PgQueryResultHKT, ty
         if (!reviewDecision) return { ...row,answer: undefined,createdAt: row.createdAt.toISOString() };
         try {
           const canonical = serializeApprovedPayload(review);
-          if (reviewDecision !== "ALLOW" || runStatus !== "COMPLETED" || canonical.bodyHash !== bodyHash || canonical.payloadHash !== payloadHash ||
+          if (reviewDecision !== "ALLOW" || !["COMPLETED","NEEDS_CLARIFICATION"].includes(runStatus??"") || canonical.bodyHash !== bodyHash || canonical.payloadHash !== payloadHash ||
             row.parts.length !== 1 || canonical.payload.markdown !== row.parts[0].text) throw new Error("Invalid saved answer");
           return { ...row,answer: presentAnswer(canonical.payload),createdAt: row.createdAt.toISOString() };
         } catch { throw new ConversationError("UNAVAILABLE"); }

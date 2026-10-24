@@ -13,6 +13,7 @@ export const visibleSourceSchema = z.strictObject({
   passageIds: z.array(z.uuid()).length(1),
   contentHashes: z.array(hash).length(1),
   supportStatus: z.literal("NOT_CHECKED"),
+  retrievedAt:z.iso.datetime().optional(),contentKind:z.enum(["SEARCH_PASSAGE","EXTRACTED_PAGE"]).optional(),
 });
 // Shape validation for storage/reload; this schema is NOT a release authorization.
 export const approvedPayloadSchema = z.strictObject({
@@ -23,9 +24,11 @@ export const approvedPayloadSchema = z.strictObject({
   kind: answerKindSchema,
   markdown: questionTextSchema,
   sources: z.array(visibleSourceSchema).max(5),
+  // No defaults: absent fields must preserve canonical hashes of saved v1 answers.
+  additionalSources:z.array(visibleSourceSchema).max(5).optional(),
 }).superRefine((value,context)=>{
-  const ids = value.sources.map(s=>s.sourceId);
-  if (new Set(ids).size !== ids.length || value.sources.some((s,i)=>s.number !== i+1) ||
+  const all=[...value.sources,...value.additionalSources??[]],ids=all.map(s=>s.sourceId);
+  if (new Set(ids).size !== ids.length || all.some((s,i)=>s.number !== i+1) || all.length>5 ||
       (value.kind === "ANSWER" ? ids.length === 0 : ids.length > 0) ||
       (value.kind === "CLARIFICATION" && value.markdown.length > 800)) {
     context.addIssue({ code: "custom",message: "Inconsistent approved payload" });
