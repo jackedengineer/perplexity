@@ -1,3 +1,4 @@
+import {sanitizeAuthRequest} from "@/server/auth/request";
 import {getDb} from "@/db";
 import {guestSignIn} from "@/server/auth/guest";
 import { getAuth } from "@/lib/auth";
@@ -9,8 +10,7 @@ async function handle(request: Request) {
   const start = performance.now();
   let response: Response;
   try {
-    const forwarded=new Headers(request.headers);forwarded.delete("x-perplex-guest-validated");
-    const sanitized=new Request(request,{headers:forwarded});
+    const sanitized=sanitizeAuthRequest(request);
     response = new URL(request.url).pathname==="/api/auth/sign-in/anonymous"
       ? await guestSignIn(sanitized,getDb(),process.env,r=>getAuth().handler(r))
       : await getAuth().handler(sanitized);
