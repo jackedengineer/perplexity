@@ -1,0 +1,17 @@
+{
+  "src": "^/.*$",
+  "has": [
+    {
+      "type": "host",
+      "value": "^perplexity-ntsfg4nlo-chiragbhugras-projects\\.vercel\\.app$"
+    }
+  ],
+  "status": 302,
+  "headers": {
+    "Location": "https://perplexity-gold-alpha.vercel.app/"
+  },
+  "transforms": [
+    { "type": "request.query", "op": "delete", "target": { "key": "code" } },
+    { "type": "request.query", "op": "delete", "target": { "key": "state" } }
+  ]
+}
