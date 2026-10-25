@@ -26,11 +26,12 @@ old deployment. Project rules run before the old deployment's application routes
 - Canonical production, localhost and protected previews do not match the rule.
 - No Google client, trusted origin, cookie, Turnstile or AI budget was changed.
 
-Vercel deployment protection runs **before** these routing rules. The redirect
-works in the Vercel-authenticated browser, but unauthenticated requests currently
-still reach Vercel SSO. An exact-host protection exception is prepared, awaiting
-the user's action-time approval. Do not disable project-wide protection or
-distribute a protection-bypass secret as a public link.
+Vercel deployment protection runs **before** these routing rules. After explicit
+user approval, an exception was applied only to the retired hostname. All six
+unauthenticated probes now pass: visitors reach production without Vercel SSO.
+Standard Protection remains enabled, and the existing research preview still
+redirects unauthenticated visitors to Vercel SSO. Do not disable project-wide
+protection or distribute a protection-bypass secret as a public link.
 
 ## Verification and rollback
 
@@ -47,7 +48,6 @@ Three manifest scope checks, focused ESLint and project type checks pass. No app
 changed; build and full research tests were not rerun. Production currently shows
 Ready on source `6ed8762` (PR #13 merged).
 
-If an exception is approved, rerun the public probe and record that result here.
 Before disabling/removing this rule, **restore protection on the retired host**;
 otherwise its old application becomes reachable again. Route history supports
 rollback, but a previous revision may forward query parameters. Restore the
