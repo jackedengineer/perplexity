@@ -57,18 +57,22 @@ export function useResearch(conversationId: string,revision: number,initialRunId
     await send();
   },[conversationId,revision,send,controller,modelKey]);
   useEffect(()=>()=>{void stopChat();recovery.current?.abort();},[stopChat]);
+  const retry=useCallback(()=>{
+    if(controller.getRunId())void recover();
+    else if(stopRequested.current)router.refresh();
+    else void send();
+  },[controller,recover,router,send]);
   async function stop(){
     if(stopping.current)return;stopping.current=true;stopRequested.current=true;setCancelling(true);
-    void stopChat();recovery.current?.abort();
+    recovery.current?.abort();
     try{
       const status=await controller.cancel();
       if(status&&status.conversationId!==conversationId)throw new Error("Saved run mismatch");
       if(status&&["COMPLETED","NEEDS_CLARIFICATION"].includes(status.state)&&status.answer){setCommitted(status.answer);setError("");router.refresh();}
-      else setError(status?.terminalReason==="CANCELLED"?"Research stopped. You can start a new search.":status?.terminalReason==="TIMED_OUT"?"This research request timed out. You can start a new search.":"Stop requested. Check the same request for its saved status.");
+      else setError(!status||status.terminalReason==="CANCELLED"?"Research stopped. You can start a new search.":status.terminalReason==="TIMED_OUT"?"This research request timed out. You can start a new search.":"Stop requested. Check the same request for its saved status.");
     }catch{setError("Cancellation could not be confirmed. Check the same request for its saved status.");}
-    // Stream abort can finish before cancellation settles the server reservation.
-    // Refresh again after that response, including status-only recovery paths.
-    finally{refreshUsage();stopping.current=false;setCancelling(false);busy.current=false;setPending(false);setStage(null);}
+    // Abort only after durable cancellation; refresh the settled reservation too.
+    finally{void stopChat();refreshUsage();stopping.current=false;setCancelling(false);busy.current=false;setPending(false);setStage(null);}
   }
-  return {submit,retry:controller.getRunId()?recover:send,recover,stop:!cancelling&&(pending||recovering)?()=>void stop():undefined,question,pending:pending||recovering||cancelling,stage,label:cancelling?"Stopping research":recovering?"Checking saved result":stage?PUBLIC_STAGE_LABELS[stage]:"Checking request",error,committed,revision:committed?.revision??controller.getRevision()??revision};
+  return {submit,retry,recover,stop:!cancelling&&(pending||recovering)?()=>void stop():undefined,question,pending:pending||recovering||cancelling,stage,label:cancelling?"Stopping research":recovering?"Checking saved result":stage?PUBLIC_STAGE_LABELS[stage]:"Checking request",error,committed,revision:committed?.revision??controller.getRevision()??revision};
 }
