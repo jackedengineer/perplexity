@@ -59,13 +59,15 @@ export function createChatHttp(dependencies: Dependencies) {
         const stream = createUIMessageStream<ResearchMessage>({
           onError: ()=>createPublicError("PROVIDER_UNAVAILABLE",requestId).body.error.message,
           async execute({ writer }) {
+            // Flush owned admission metadata so hosted clients can cancel before
+            // input approval. No question, source, draft or safety verdict is sent.
+            writer.write({type:'data-run',data:{runId:run.id,revision:run.revision},transient:true});
             let outcome:PublicErrorCode|'COMPLETED' = "COMPLETED",firstProgress=true;
             return traceStage("http.delivery",async()=>{
             try {
               if (admission.kind === "ADMITTED") {
                 const result = await backend.execute(identity,run,input,signal,stage=>{
                   if(firstProgress){firstProgress=false;recordTelemetry("research.first_progress",{outcome:"SUCCEEDED",durationMs:Math.round(performance.now()-started)});}
-                  writer.write({ type: "data-run",data: { runId: run.id,revision: run.revision },transient: true });
                   writer.write({ type: "data-stage",data: { runId: run.id,stage },transient: true });
                 });
                 if (result.kind === "DENIED") throw new AdmissionError(result.code);

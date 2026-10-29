@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 // Domain payloads only; T11 will bind them to the installed AI SDK stream protocol.
-// Emit only after input approval. No provider prose or raw evidence belongs here.
+// Stage events require input approval. Owned run identity may be emitted after
+// admission to support cancellation. Neither event carries provider prose/evidence.
 export const publicStageSchema = z.enum(["PLANNING","SEARCHING", "PREPARING_ANSWER", "CHECKING_ANSWER", "SAVING_ANSWER"]);
 export type PublicStage = z.infer<typeof publicStageSchema>;
 export const PUBLIC_STAGE_LABELS = Object.freeze({

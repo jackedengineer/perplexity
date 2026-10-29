@@ -26,6 +26,17 @@ it("uses the installed SDK protocol and sends only the newest question contract"
   expect(chunks.find(c=>c.type === "source-url")).toMatchObject({url:"https://weather.gov/rainbow"});
   expect(chunks.at(-1)).toMatchObject({type:"finish",finishReason:"stop"});
 });
+it('flushes only admitted identity metadata before input checks complete',async()=>{
+ const f=fixture();let release!:()=>void;
+ f.backend.execute.mockImplementation(async()=>{await new Promise<void>(resolve=>{release=resolve;});return {kind:'DENIED',code:'INPUT_BLOCKED'};});
+ const response=await f.http.post(f.request()),reader=response.body!.getReader();
+ const first=new TextDecoder().decode((await reader.read()).value);
+ expect(first).toContain('"type":"data-run"');expect(first).toContain(f.run.id);
+ expect(first).not.toMatch(/Why do rainbows|data-stage|text-delta|source-url|Light bends/);
+ expect(f.backend.load).not.toHaveBeenCalled();release();
+ let rest='';for(;;){const next=await reader.read();if(next.done)break;rest+=new TextDecoder().decode(next.value);}
+ expect(rest).toContain('"type":"error"');expect(rest).not.toMatch(/Light bends|text-delta|source-url/);
+},1000);
 it("releases no answer/source bytes while execution and canonical loading are pending",async()=>{
   const f=fixture();let release!:()=>void;
   f.backend.execute.mockImplementation(async(_identity,_run,_input,_signal,onStage)=>{onStage("SEARCHING");await new Promise<void>(resolve=>{release=resolve;});return {kind:"COMPLETED"};});
