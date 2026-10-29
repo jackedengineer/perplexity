@@ -8,7 +8,7 @@ export default async function OperationsPage(){
  const identity=await getCurrentSession();
  if(!isOperator(identity,process.env.OPERATOR_AUTH_SUBJECTS))notFound();
  const status=await operationsStatus(getDb());
- const cron=status.maintenance.find(m=>m.name==='recovery');
+ const cron=status.maintenance.find(m=>m.name==='scheduled-recovery');
  const alerts=[
   ...(status.budgets.length!==2?['Research budget windows are missing or expired.']:[]),
   ...status.budgets.filter(b=>BigInt(b.remainingMicroUsd)<50000n).map(b=>`${b.kind} budget cannot reserve another run.`),

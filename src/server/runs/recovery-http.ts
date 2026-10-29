@@ -4,7 +4,7 @@ import { createPublicError } from '@/server/contracts/errors';
 import { AdmissionError } from './errors';
 type Dependencies={identity:(request:Request)=>Promise<ChatIdentity|null>;origin:()=>string;secret:()=>string|undefined;
   cancel:(identity:ChatIdentity,id:string)=>Promise<void>;load:(identity:ChatIdentity,id:string)=>Promise<unknown>;
-  sweep:()=>Promise<unknown>;log:(event:Record<string,unknown>)=>void};
+  sweep:(scheduled:boolean)=>Promise<unknown>;log:(event:Record<string,unknown>)=>void};
 const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
 function failure(error:unknown,id:string){const problem=createPublicError(error instanceof AdmissionError?error.code:'CONFIGURATION_UNAVAILABLE',id);return Response.json(problem.body,{status:problem.status,headers});}
 export function createRecoveryHttp(dependencies:Dependencies) {
@@ -27,7 +27,7 @@ export function createRecoveryHttp(dependencies:Dependencies) {
     const supplied=request.headers.get('authorization')??'';
     if(supplied.length>512||!timingSafeEqual(createHash('sha256').update(supplied).digest(),createHash('sha256').update('Bearer '+secret).digest()))throw new AdmissionError('UNAUTHENTICATED');
     if(request.method!=='GET'||request.body!==null||new URL(request.url).search)throw new AdmissionError('INVALID_INPUT');
-    const result=await dependencies.sweep();
+    const result=await dependencies.sweep(request.headers.get('user-agent')==='vercel-cron/1.0');
     dependencies.log({event:'runs.recovery',requestId,outcome:'COMPLETED',durationMs:Math.round(performance.now()-started)});
     return Response.json(result,{headers:{...headers,'X-Request-Id':requestId}});
    }catch(error){dependencies.log({event:'runs.recovery',requestId,outcome:error instanceof AdmissionError?error.code:'UNAVAILABLE',durationMs:Math.round(performance.now()-started)});return failure(error,requestId);}
