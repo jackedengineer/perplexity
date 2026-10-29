@@ -34,6 +34,7 @@ try {
    // Preserve the existing period identity, reservations, settled spend and ceiling.
    await c.query('UPDATE operator_usage_buckets SET ends_at=$1 WHERE id=$2',[endsAt,period.id]);
    if(!days.length)await c.query("INSERT INTO operator_usage_buckets (budget_key,kind,starts_at,ends_at,provider_limit_micro_usd) VALUES ($1,'DAY',clock_timestamp(),$2,400000)",[env.RUN_OPERATOR_BUDGET_KEY,new Date(Math.min(endsAt.getTime(),Date.now()+86400000))]);
+   else await c.query('UPDATE operator_usage_buckets SET ends_at=$1 WHERE id=$2',[new Date(Math.min(endsAt.getTime(),Date.now()+86400000)),days[0].id]);
   }
   console.log(JSON.stringify({applied:Boolean(values.apply),endsAt,periodAvailableMicroUsd:available.toString(),keyRemainingUsd:key.limit_remaining,existingSpendAndHoldsPreserved:true}));
   await c.query(values.apply?'COMMIT':'ROLLBACK');
