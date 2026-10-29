@@ -155,6 +155,13 @@
       "when": 1792855702368,
       "tag": "0021_left_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793274026843,
+      "tag": "0022_great_thaddeus_ross",
+      "breakpoints": true
     }
   ]
 }
