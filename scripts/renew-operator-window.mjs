@@ -12,7 +12,7 @@ const response=await fetch('https://openrouter.ai/api/v1/key',{
 });
 if(!response.ok)throw new Error('Provider key metadata unavailable');
 const {data:key}=await response.json();
-if(key.limit!==2||key.limit_reset!==null||!Number.isFinite(key.limit_remaining)||key.limit_remaining<0.05)throw new Error('Expected non-resetting $2 key with reservation capacity');
+if(typeof key.limit!=='number'||!Number.isFinite(key.limit)||key.limit<=0||key.limit>2||key.limit_reset!==null||!Number.isFinite(key.limit_remaining)||key.limit_remaining<0.05)throw new Error('Expected non-resetting key capped at $2 or less with reservation capacity');
 const expiry=new Date(key.expires_at).getTime();
 if(!Number.isFinite(expiry)||expiry<=Date.now()+60000)throw new Error('Key expiry must be renewed first');
 const endsAt=new Date(Math.min(expiry,Date.now()+7*86400000));

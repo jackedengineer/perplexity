@@ -1,3 +1,4 @@
+import {assertApprovedKeyCap} from '../../evals/key-budget';
 import {execFileSync} from 'node:child_process';
 import {readFile,writeFile} from 'node:fs/promises';
 import {parse} from 'dotenv';
@@ -15,14 +16,14 @@ import {buildEvidence} from '@/server/search/evidence';
 import {providerUsage} from '@/server/ai/usage';
 import {CURRENT_PROMPT_VERSIONS} from '../../evals/report';
 
-it('smokes each curated answer through live guards under the existing non-resetting $1 key cap',async()=>{
+it('smokes each curated answer through live guards under the approved non-resetting key cap',async()=>{
  if(process.env.LIVE_CATALOG_EVAL!=='1')throw Error('Explicit paid opt-in required');
  const env=parse(await readFile('.env.launch.local','utf8'));
  const safety=parseSafetyModel(env),planner=parsePlannerModel(env);if(!safety||!planner)throw Error('Missing evaluated provider roles');
  const metadata=async()=>{
   const response=await fetch('https://openrouter.ai/api/v1/key',{headers:{Authorization:`Bearer ${safety.apiKey}`},signal:AbortSignal.timeout(8000)});
   if(!response.ok)throw Error('Cap unavailable');const {data}=await response.json();
-  if(data.limit!==1||data.limit_reset!==null||data.limit_remaining<.20)throw Error('Existing cap and headroom required');
+  assertApprovedKeyCap(data,.20);
   return {limit:data.limit,usage:data.usage,remaining:data.limit_remaining};
  };
  const before=await metadata(),observations:Array<Record<string,unknown>>=[],models:Array<Record<string,unknown>>=[];

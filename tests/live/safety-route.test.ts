@@ -1,3 +1,4 @@
+import {assertApprovedKeyCap} from '../../evals/key-budget';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -11,7 +12,7 @@ import { OUTPUT_SAFETY_PROMPT } from '@/server/safety/output';
 import { CURRENT_PROMPT_VERSIONS, loadCorpus } from '../../evals/report';
 
 // Opt-in only. No automatic retries; unknown receipts retain their full claim.
-it('checks every semantic safety fixture within the existing $1 key cap', async () => {
+it('checks every semantic safety fixture within the approved non-resetting key cap', async () => {
   if (process.env.LIVE_SAFETY_ROUTE !== '1') throw Error('Explicit paid opt-in required');
   const config = await safetyRouteConfig();
   const metadata = async () => {
@@ -21,9 +22,7 @@ it('checks every semantic safety fixture within the existing $1 key cap', async 
     });
     if (!response.ok) throw Error('Key cap unavailable');
     const { data } = await response.json();
-    if (data.limit !== 1 || data.limit_reset !== null || data.limit_remaining < .2) {
-      throw Error('Existing non-resetting cap and headroom required');
-    }
+    assertApprovedKeyCap(data,.2);
     return { usage: data.usage, remaining: data.limit_remaining };
   };
   const before = await metadata(), { safety, corpusHash } = await loadCorpus();
