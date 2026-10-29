@@ -24,7 +24,7 @@ it('records one bounded provider availability probe without retries or raw upstr
    category:/rate/i.test(message)?'RATE_LIMIT':/credit|balance/i.test(message)?'CREDIT':/endpoint|provider/i.test(message)?'ROUTE':response.ok?'SUCCESS':'OTHER'});
   return response;
  };
- const fixture=(await loadCorpus()).safety.find(c=>c.id===process.env.LIVE_PROVIDER_DIAGNOSTIC_CASE);
+ const fixture=(await loadCorpus()).safety.filter(c=>c.test==='SEMANTIC').find(c=>c.id===process.env.LIVE_PROVIDER_DIAGNOSTIC_CASE);
  if(process.env.LIVE_PROVIDER_DIAGNOSTIC_CASE&&!fixture)throw Error('Unknown diagnostic case');
  const prompt=fixture?.stage==='OUTPUT'?OUTPUT_SAFETY_PROMPT:fixture?.stage==='EVIDENCE'?EVIDENCE_SAFETY_PROMPT:INPUT_SAFETY_PROMPT;
  const verdict=await createInputGate(createOpenRouterSafetyProvider(config,request,prompt)).evaluate({text:fixture?.text??'Why do rainbows form?',context:fixture?.context??[]},{signal:AbortSignal.timeout(5000),deadlineAt:new Date(Date.now()+5000)});
