@@ -1,15 +1,14 @@
-import {readFile,writeFile} from 'node:fs/promises';
-import {parse} from 'dotenv';
+import {writeFile} from 'node:fs/promises';
+import {randomUUID} from 'node:crypto';
 import {expect,it} from 'vitest';
-import {parseSafetyModel} from '@/server/ai/models';
+import {safetyRouteConfig} from './safety-route-config';
 import {createOpenRouterSafetyProvider} from '@/server/safety/openrouter';
 import {createInputGate} from '@/server/safety/input';
 import {assertApprovedKeyCap} from '../../evals/key-budget';
 import {loadCorpus} from '../../evals/report';
 it('records one bounded provider availability probe without retries or raw upstream errors',async()=>{
  if(process.env.LIVE_PROVIDER_DIAGNOSTIC!=='1')throw Error('Explicit paid diagnostic opt-in required');
- const env=parse(await readFile('.env.launch.local','utf8')),config=parseSafetyModel(env);
- if(!config)throw Error('Configured safety role required');
+ const config=await safetyRouteConfig();
  const r=await fetch('https://openrouter.ai/api/v1/key',{headers:{Authorization:`Bearer ${config.apiKey}`},signal:AbortSignal.timeout(8000)});
  if(!r.ok)throw Error('Cap metadata unavailable');const {data}=await r.json();assertApprovedKeyCap(data,.01);
  const responses:Array<{status:number;code:unknown;category:string}>=[];let calls=0;
@@ -24,6 +23,10 @@ it('records one bounded provider availability probe without retries or raw upstr
  const fixture=(await loadCorpus()).safety.find(c=>c.id===process.env.LIVE_PROVIDER_DIAGNOSTIC_CASE);
  if(process.env.LIVE_PROVIDER_DIAGNOSTIC_CASE&&!fixture)throw Error('Unknown diagnostic case');
  const verdict=await createInputGate(createOpenRouterSafetyProvider(config,request)).evaluate({text:fixture?.text??'Why do rainbows form?',context:fixture?.context??[]},{signal:AbortSignal.timeout(5000),deadlineAt:new Date(Date.now()+5000)});
- await writeFile('.artifacts/p0-provider-diagnostic.json',JSON.stringify({responses,decision:verdict.verdict.decision,calls,claimMicroUsd:2250},null,2),{mode:0o600});
+ // Keep every attempt, including failed candidates; a later probe cannot erase it.
+ const evidence=`.artifacts/p0-provider-diagnostic-${randomUUID()}.json`;
+ await writeFile(evidence,JSON.stringify({model:config.modelId,provider:config.provider,
+  responses,decision:verdict.verdict.decision,calls,claimMicroUsd:2250},null,2),{mode:0o600,flag:'wx'});
+ console.info(`Provider diagnostic evidence: ${evidence}`);
  expect(verdict.verdict.decision).toBe(fixture?.expected??'ALLOW');
 },20000);
