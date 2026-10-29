@@ -15,6 +15,7 @@ import {createFinalization} from '@/server/runs/finalize';
 import {createProviderCalls} from '@/server/runs/provider-calls';
 import {createRunRecovery} from '@/server/runs/recover';
 import type {TelemetryEvent} from '@/server/telemetry/contracts';
+import {OUTPUT_PROMPT_VERSION} from '@/server/safety/output';
 const pg=new PGlite(),db=drizzle(pg,{schema});
 let person:Awaited<ReturnType<typeof seedCompletion>>;
 beforeAll(async()=>{const journal=JSON.parse(await readFile('drizzle/meta/_journal.json','utf8'));for(const e of journal.entries)await pg.exec(await readFile(`drizzle/${e.tag}.sql`,'utf8'));});
@@ -43,7 +44,7 @@ it('captures every paid stage and safety decision without question, draft, evide
 it('counts output refusal costs and distinguishes the policy decision from infrastructure failure',async()=>{
  const p=providers();p.output={...fakeSafety(),classify:async()=>({decision:'BLOCK',categoryCodes:['FRAUD'],policyVersion:'v1'})};
  const {events,result}=await run(p);expect(result).toEqual({kind:'DENIED',code:'OUTPUT_BLOCKED'});
- expect(events.find(e=>e.event==='research.safety'&&e.stage==='safety.output')).toMatchObject({outcome:'BLOCK',categoryCodes:['FRAUD'],reason:'CLASSIFIER',promptVersion:'output-v8'});
+ expect(events.find(e=>e.event==='research.safety'&&e.stage==='safety.output')).toMatchObject({outcome:'BLOCK',categoryCodes:['FRAUD'],reason:'CLASSIFIER',promptVersion:OUTPUT_PROMPT_VERSION});
  expect(events.find(e=>e.event==='research.run_usage')).toMatchObject({knownCostMicroUsd:'600',searchCredits:1,unknownCalls:1});
  expect(await db.select().from(schema.messages)).toHaveLength(1);
 });
