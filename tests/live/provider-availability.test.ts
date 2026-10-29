@@ -5,6 +5,7 @@ import {parseSafetyModel} from '@/server/ai/models';
 import {createOpenRouterSafetyProvider} from '@/server/safety/openrouter';
 import {createInputGate} from '@/server/safety/input';
 import {assertApprovedKeyCap} from '../../evals/key-budget';
+import {loadCorpus} from '../../evals/report';
 it('records one bounded provider availability probe without retries or raw upstream errors',async()=>{
  if(process.env.LIVE_PROVIDER_DIAGNOSTIC!=='1')throw Error('Explicit paid diagnostic opt-in required');
  const env=parse(await readFile('.env.launch.local','utf8')),config=parseSafetyModel(env);
@@ -20,7 +21,9 @@ it('records one bounded provider availability probe without retries or raw upstr
    category:/rate/i.test(message)?'RATE_LIMIT':/credit|balance/i.test(message)?'CREDIT':/endpoint|provider/i.test(message)?'ROUTE':response.ok?'SUCCESS':'OTHER'});
   return response;
  };
- const verdict=await createInputGate(createOpenRouterSafetyProvider(config,request)).evaluate({text:'Why do rainbows form?',context:[]},{signal:AbortSignal.timeout(5000),deadlineAt:new Date(Date.now()+5000)});
+ const fixture=(await loadCorpus()).safety.find(c=>c.id===process.env.LIVE_PROVIDER_DIAGNOSTIC_CASE);
+ if(process.env.LIVE_PROVIDER_DIAGNOSTIC_CASE&&!fixture)throw Error('Unknown diagnostic case');
+ const verdict=await createInputGate(createOpenRouterSafetyProvider(config,request)).evaluate({text:fixture?.text??'Why do rainbows form?',context:fixture?.context??[]},{signal:AbortSignal.timeout(5000),deadlineAt:new Date(Date.now()+5000)});
  await writeFile('.artifacts/p0-provider-diagnostic.json',JSON.stringify({responses,decision:verdict.verdict.decision,calls,claimMicroUsd:2250},null,2),{mode:0o600});
- expect(verdict.verdict.decision).toBe('ALLOW');
+ expect(verdict.verdict.decision).toBe(fixture?.expected??'ALLOW');
 },20000);
