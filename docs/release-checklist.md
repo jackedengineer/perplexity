@@ -4,6 +4,24 @@ Decision: **HOLD full release acceptance.** The public site and guest entry are
 already deployed. This section supersedes historical status below. The original
 record is also retained in [the October 23 checklist](release-checklist-20261023.md).
 
+## PR #15 review corrections
+
+- [x] Quality CI passed on `1f0ff81`; its code review identified two unresolved
+  correctness findings. That result does not approve the subsequent fixes.
+- [x] Reproduce the budget lock-order inversion with independent development
+  PostgreSQL connections (`40P01`). Migration 0024 replaces the deployed function
+  with ascending-ID locks; the owner renewal command uses the same row ordering
+  and renewal advisory lock. The same concurrency regression now passes.
+- [x] Reproduce both missing fresh-role grants after migrating before creating
+  the runtime role. Share the actual provisioning SQL with a restricted-role
+  regression; renewal execution and maintenance read/write now pass, while
+  budget-ceiling updates and maintenance deletion remain denied.
+- [x] Six focused offline checks, the real development concurrency regression,
+  lint and types pass. No AI requests, budget changes or production data changes
+  were needed for these corrections. Migration 0024 is applied in development.
+- [ ] Require fresh code/security reviews and CI on the corrected PR head.
+- [ ] Apply migration 0024 to production through the reviewed owner workflow.
+
 ## Safety outage restoration — 29 October
 
 - [x] Reproduce the pinned Mistral EU route's HTTP 429 response with the valid
