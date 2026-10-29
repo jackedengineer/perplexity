@@ -24,19 +24,20 @@ try {
   await c.query("SELECT pg_advisory_xact_lock(hashtext('perplex:operator-renewal'))");
   const {rows}=await c.query('SELECT * FROM operator_usage_buckets WHERE budget_key=$1 ORDER BY ends_at DESC FOR UPDATE',[env.RUN_OPERATOR_BUDGET_KEY]);
   const period=rows.find(r=>r.kind==='PERIOD');
-  if(!period||BigInt(period.provider_limit_micro_usd)!==400000n)throw new Error('Review existing period ceiling before renewal');
+  if(!period||![200000n,400000n,1000000n].includes(BigInt(period.provider_limit_micro_usd)))throw new Error('Review existing period ceiling before renewal');
+  const ceiling=BigInt(period.provider_limit_micro_usd),dayCeiling=ceiling<400000n?ceiling:400000n;
   if(rows.filter(r=>r.kind==='PERIOD'&&new Date(r.ends_at)>new Date()).length>1)throw new Error('Overlapping period windows');
-  const available=400000n-BigInt(period.reserved_provider_micro_usd)-BigInt(period.settled_provider_micro_usd);
+  const available=ceiling-BigInt(period.reserved_provider_micro_usd)-BigInt(period.settled_provider_micro_usd);
   if(available<50000n)throw new Error('Reconcile verified receipts before renewing exhausted capacity');
   const days=rows.filter(r=>r.kind==='DAY'&&new Date(r.ends_at)>new Date());
   if(days.length>1)throw new Error('Overlapping day windows');
   if(values.apply) {
    // Preserve the existing period identity, reservations, settled spend and ceiling.
    await c.query('UPDATE operator_usage_buckets SET ends_at=$1 WHERE id=$2',[endsAt,period.id]);
-   if(!days.length)await c.query("INSERT INTO operator_usage_buckets (budget_key,kind,starts_at,ends_at,provider_limit_micro_usd) VALUES ($1,'DAY',clock_timestamp(),$2,400000)",[env.RUN_OPERATOR_BUDGET_KEY,new Date(Math.min(endsAt.getTime(),Date.now()+86400000))]);
+   if(!days.length)await c.query("INSERT INTO operator_usage_buckets (budget_key,kind,starts_at,ends_at,provider_limit_micro_usd) VALUES ($1,'DAY',clock_timestamp(),$2,$3)",[env.RUN_OPERATOR_BUDGET_KEY,new Date(Math.min(endsAt.getTime(),Date.now()+86400000)),dayCeiling.toString()]);
    else await c.query('UPDATE operator_usage_buckets SET ends_at=$1 WHERE id=$2',[new Date(Math.min(endsAt.getTime(),Date.now()+86400000)),days[0].id]);
   }
-  console.log(JSON.stringify({applied:Boolean(values.apply),endsAt,periodAvailableMicroUsd:available.toString(),keyRemainingUsd:key.limit_remaining,existingSpendAndHoldsPreserved:true}));
+  console.log(JSON.stringify({applied:Boolean(values.apply),endsAt,periodCeilingMicroUsd:ceiling.toString(),periodAvailableMicroUsd:available.toString(),keyRemainingUsd:key.limit_remaining,existingSpendAndHoldsPreserved:true}));
   await c.query(values.apply?'COMMIT':'ROLLBACK');
  }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
 }finally{await pool.end();}
