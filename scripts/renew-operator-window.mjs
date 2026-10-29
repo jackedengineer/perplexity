@@ -22,8 +22,9 @@ try {
  try {
   await c.query('BEGIN');
   await c.query("SELECT pg_advisory_xact_lock(hashtext('perplex:operator-renewal'))");
-  const {rows}=await c.query('SELECT * FROM operator_usage_buckets WHERE budget_key=$1 ORDER BY ends_at DESC FOR UPDATE',[env.RUN_OPERATOR_BUDGET_KEY]);
-  const period=rows.find(r=>r.kind==='PERIOD');
+  await c.query("SELECT pg_advisory_xact_lock(hashtextextended('perplex:operator-day:' || $1::text,0))",[env.RUN_OPERATOR_BUDGET_KEY]);
+  const {rows}=await c.query('SELECT * FROM operator_usage_buckets WHERE budget_key=$1 ORDER BY id FOR UPDATE',[env.RUN_OPERATOR_BUDGET_KEY]);
+  const period=rows.filter(r=>r.kind==='PERIOD').sort((a,b)=>new Date(b.ends_at)-new Date(a.ends_at))[0];
   if(!period||![200000n,400000n,1000000n].includes(BigInt(period.provider_limit_micro_usd)))throw new Error('Review existing period ceiling before renewal');
   const ceiling=BigInt(period.provider_limit_micro_usd),dayCeiling=ceiling<400000n?ceiling:400000n;
   if(rows.filter(r=>r.kind==='PERIOD'&&new Date(r.ends_at)>new Date()).length>1)throw new Error('Overlapping period windows');

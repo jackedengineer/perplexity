@@ -169,6 +169,13 @@
       "when": 1793274999921,
       "tag": "0023_operator_day_renewal",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793290793104,
+      "tag": "0024_operator_renewal_lock_order",
+      "breakpoints": true
     }
   ]
 }
