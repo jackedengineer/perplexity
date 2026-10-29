@@ -22,6 +22,10 @@ test("authenticated workspace renders, renews, and signs out", async ({ context,
       domain: "localhost", path: "/", httpOnly: true, sameSite: "Lax" }]);
     await page.goto("/workspace");
     await expect(page.getByRole("heading", { name: "What do you want to know?" })).toBeVisible();
+    await page.goto('/operations');
+    await expect(page.getByRole('heading',{name:'Private operations',exact:true})).toHaveCount(0);
+    await expect(page.getByText('Budget and maintenance status',{exact:true})).toHaveCount(0);
+    await page.goto('/workspace');
     await expect.poll(async () => (await db.query(
       "SELECT expires_at > now() + interval '6 days' AS renewed FROM session WHERE id=$1", [id],
     )).rows[0]?.renewed).toBe(true);
@@ -33,6 +37,8 @@ test("authenticated workspace renders, renews, and signs out", async ({ context,
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect(page).toHaveURL(/\/sign-in$/);
     expect((await db.query("SELECT id FROM session WHERE user_id=$1", [id])).rows).toHaveLength(0);
+    await page.goto('/operations');
+    await expect(page.getByRole('heading',{name:'Private operations',exact:true})).toHaveCount(0);
     await page.goto("/workspace");
     await expect(page).toHaveURL(/\/sign-in$/);
   } finally {
