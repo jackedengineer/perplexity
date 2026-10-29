@@ -4,6 +4,66 @@ Decision: **HOLD full release acceptance.** The public site and guest entry are
 already deployed. This section supersedes historical status below. The original
 record is also retained in [the October 23 checklist](release-checklist-20261023.md).
 
+## Safety outage restoration — 29 October
+
+- [x] Reproduce the pinned Mistral EU route's HTTP 429 response with the valid
+  replacement key. Preserve failed hosted requests and all unknown-cost holds.
+- [x] Fix the privacy-category and defensive-analysis classifications without
+  changing corpus labels, turning outages into ALLOW, adding fallback routes or
+  retrying inference automatically. Current prompts: input/query v11, evidence
+  v6, output v9; safety policy remains v1.
+- [x] Complete all 72 semantic cases on Mistral Small 3.2 via `venice/fp8`:
+  72/72 dispositions and required categories match, zero unavailable results.
+  There were 71 HTTP 200 calls; the other case stopped at the local detector.
+  Earlier v9/v10 samples remain failures, not replaced observations. The Qwen
+  diagnostic also failed and its candidate routing code was not retained.
+- [x] Verify a real local browser answer, progress, four canonical citations,
+  source panel and identical answer after reload. Credits changed 32 -> 27 once.
+  A separate cancellation saved CANCELLED, charged zero credits and persisted no
+  assistant message. Its initial stop response was unconfirmed; checking the
+  same request confirmed cancellation. Unknown provider costs remain held.
+- [x] Production build, type checks and lint pass after narrowing diagnostic
+  fixtures and updating the evaluation manifest's accepted prompt versions.
+- [x] Verify all 661 offline cases across batches on the final application code:
+  650 passed in the serial run; the telemetry suite's database initialization
+  exceeded 30 seconds, and all 11 cases passed in its isolated rerun. This was
+  not a single clean full-suite run. Earlier failures remain recorded. Local
+  allowances were 15 seconds per test and 30 seconds for initialization;
+  production deadlines, assertions and CI settings are unchanged.
+- [x] Save the evaluated production safety route and rebuild with the new prompts.
+  Production deployment `65DMqLWbX` is Ready and serves `e6a5e72` on
+  https://perplexity-gold-alpha.vercel.app. The branch has not been merged.
+- [x] Verify hosted research from the separate Google account: photosynthesis
+  completed with four cited sources and 40 -> 35 credits; reload retained the
+  identical answer. A tides request also completed. Durable accounting records
+  each charge once and preserves the unknown Tavily monetary-cost holds.
+- [x] Reproduce a hosted early-cancellation race: aborting before admission
+  headers arrived allowed the rainbow request to complete and charge normally.
+  Keep this failed observation. Fix by waiting for admitted identity, sending
+  durable cancellation before disconnecting, and preventing stopped intents
+  from being resubmitted by a retry. Flush only owned run identity immediately
+  after admission; stage events still require input approval.
+- [x] Add four transport regressions and a server metadata-flush regression.
+  All 45 related unit checks and six desktop/mobile transport browser checks
+  pass. These controlled checks do not substitute for hosted cancellation.
+- [x] Deploy the cancellation fix and verify early Stop on the real hosted app:
+  run `145ed501-95dc-4dbf-93ef-a4bf9c413520` saved CANCELLED, charged zero
+  credits, persisted zero assistant messages and made one provider call. The
+  saved-result action retained that state with exactly one run and one call;
+  it did not replay inference. Unknown provider cost remains held.
+- [x] Read final key metadata at 16:02 UTC: replacement usage $0.034282791,
+  remaining $1.765717209, $1.80 non-resetting cap and November 5 expiry.
+  Together with the conservative $0.20 retired-key allowance, exposure remains
+  bounded by $2. Operator period capacity is $0.45; current daily capacity is
+  $0.05 (one reservation). The daily window ends October 30 at 12:15 UTC.
+  Existing unknown-cost holds remain reserved; visible account credits are not
+  an additional provider allowance.
+
+Ignored evidence: `.artifacts/safety-route/7c6248d0-19b9-4c8e-afab-3bc151221e5c/`,
+`.artifacts/p0-restored-local-accounting.json`, `.artifacts/p0-restoration-*`,
+`.artifacts/p0-hosted-owner-cancellation-verified.json`,
+`.artifacts/p0-final-budget-and-cancellation.json`, `.artifacts/p0-final-*.log`.
+
 ## P0.1 — Bounded research availability
 
 - [x] Verify the new $2 non-resetting total allowance. Renew the existing operator
@@ -15,16 +75,22 @@ record is also retained in [the October 23 checklist](release-checklist-20261023
   keeping combined exposure <= $2. Replacement expiry: November 5, 17:18 IST.
 - [x] Save the replacement only in ignored configuration and Vercel production
   secrets. Extend the existing operator period to its expiry, preserving the
-  remaining $0.15 capacity and every financial counter. Operator/key limits are
+  then-remaining $0.15 capacity and every financial counter. Operator/key limits are
   different controls, not additive allowances.
+- [x] Apply the later explicitly approved $1.00 current operator period ceiling.
+  Preserve reserved/settled counters, the $0.40 daily ceiling and November 5
+  expiry. At approval, period capacity was $0.65. The replacement key remains
+  non-resetting at $1.80, plus <=$0.20 retired-key exposure: combined maximum $2.
 - [x] Add a restricted daily-window renewal function under an active funded
   period. It cannot create/extend a period, raise ceilings or erase holds.
   Expired/exhausted/unknown namespaces do not receive daily capacity.
 - [x] Add a clear paused-research state when app budget capacity is unavailable.
-- [ ] Complete Vercel email reauthentication and stable-main credential
-  redeployment. **The old key is disabled; research is unavailable until this finishes.**
-- [ ] Repeat hosted answer, source, progress, cancellation and reconciliation
-  checks after activation. Preserve unknown costs until verified receipts exist.
+- [x] Complete the stable-main credential redeployment (`HXA3jv5xL`, Ready).
+  The valid replacement key did not resolve the pinned provider's 429 outage.
+- [x] Repeat hosted answer, source, progress and durable cancellation checks after
+  activation. Read-only settlement verification confirms each answer charge once
+  and zero credits for the cancelled request. Unknown Tavily/aborted-call costs
+  remain held; automatic scheduled reconciliation still needs the P0.2 check.
 
 ## P0.2 — Recovery and operator visibility
 
@@ -56,19 +122,24 @@ it does not send background notifications. Earlier drills keep their limited sco
 - [x] Live catalog smoke passes. Preserve failed corpus samples: initial safety
   had 38 unavailable results; paced Mistral evaluation confirmed 30 HTTP 429s.
   Isolated benign/harmful diagnostics returned HTTP 200 and correct dispositions.
-- [x] Final offline suite: 656 tests in 82 files pass with one worker and a
-  30-second database initialization allowance. Earlier runs hit local WASM
-  startup deadlines; application deadlines and assertions stay unchanged.
-  Build, lint and types pass. Dependency audit has no high/critical findings;
-  one moderate advisory remains.
-- [ ] Complete current safety/planning acceptance without provider outages.
-  Planning observed 3/30 matching routes, 1/5 clarifications and 3/14 paired answers;
-  an E2E edit also invalidated its clean-tree assertion. Keep it diagnostic.
-  Azure nano was evaluated separately: 72 observations, six unavailable results
-  and twenty decision/category mismatches. It failed and was not deployed.
+- [x] Final application code: all 661 offline tests verified across batches as
+  described above; 390 unit tests also pass together, and 27 public-execution
+  integration tests pass together. Build, lint and types pass. The previous
+  dependency audit has no high/critical findings; one moderate advisory remains.
+- [x] Current semantic safety acceptance: 72/72 match with zero unavailable
+  results on the selected provider and current prompts (details above).
+- [ ] Complete current planning/answer-quality acceptance. The earlier diagnostic
+  observed 3/30 matching routes, 1/5 clarifications and 3/14 paired answers; an
+  E2E edit also invalidated its clean-tree assertion. Do not promote that sample
+  to acceptance evidence. Azure nano was evaluated separately: 72 observations,
+  six unavailable results and twenty decision/category mismatches. It failed
+  and was not deployed.
 - [ ] Independent safety-label/completion review and ten answers/thirty reviewed
   claims remain required by `evals/README.md`. The Moon answer misleadingly treats
   tidal locking as a cause of phases. Review against [NASA](https://science.nasa.gov/moon/moon-phases/).
+  The local ice answer also reports a 10–15% density difference; this quantitative
+  claim needs correction/review against [USGS](https://www.usgs.gov/water-science-school/science/water-density).
+  Citation validity and a successful research request do not establish factual support.
 - [ ] Require current code/security reviews and CI before merge.
 
 No paid-tier activation, production fallback expansion, inference retries or
