@@ -30,5 +30,6 @@ export function ModelSelector({disabled}:{disabled:boolean}) {
 export function UsageSummary(){const {data,error,refresh}=useModelAccess();
  if(error)return <p className="usage-summary" role="status">{error} <button type="button" className="text-button" onClick={refresh}>Retry</button></p>;
  if(!data)return null;
+ if(!data.models.length)return <p className="usage-summary" role="status">Research is temporarily paused. Your saved conversations are available. <button type="button" className="text-button" onClick={refresh}>Check availability</button></p>;
  return <p className="usage-summary">{data.usage.tier==='GUEST'?'Guest trial':'Free plan'} · {data.usage.period.remaining} credits left{data.usage.period.reserved>0?` · ${data.usage.period.reserved} reserved`:''}. Answers use credits; unsuccessful requests release them. <span title={new Date(data.usage.period.resetsAt).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}>{data.usage.tier==='GUEST'?'Trial ends':'Resets'} {new Date(data.usage.period.resetsAt).toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata',day:'numeric',month:'short'})} (IST).</span></p>;
 }
