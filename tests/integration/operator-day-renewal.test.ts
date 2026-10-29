@@ -19,3 +19,11 @@ it('never creates a period or mints capacity for an unknown namespace',async()=>
  await pg.query("SELECT ensure_operator_day('unprovisioned')");
  expect((await pg.query("SELECT * FROM operator_usage_buckets WHERE budget_key='unprovisioned'")).rows).toEqual([]);
 });
+it('does not renew expired or exhausted periods or erase their holds',async()=>{
+ await pg.exec("INSERT INTO operator_usage_buckets(budget_key,kind,starts_at,ends_at,provider_limit_micro_usd,reserved_provider_micro_usd) VALUES ('expired','PERIOD',now()-interval '2 days',now()-interval '1 day',400000,350001),('exhausted','PERIOD',now()-interval '1 day',now()+interval '1 day',400000,350001)");
+ for(const key of ['expired','exhausted']){
+  await pg.query('SELECT ensure_operator_day($1)',[key]);
+  expect((await pg.query('SELECT kind,reserved_provider_micro_usd FROM operator_usage_buckets WHERE budget_key=$1',[key])).rows).toHaveLength(1);
+  expect(Number((await pg.query<{reserved_provider_micro_usd:number}>('SELECT reserved_provider_micro_usd FROM operator_usage_buckets WHERE budget_key=$1',[key])).rows[0].reserved_provider_micro_usd)).toBe(350001);
+ }
+});
