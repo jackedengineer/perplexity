@@ -1,4 +1,83 @@
-# Release checks — 23 October 2026
+# Current release checks — 29 October 2026
+
+Decision: **HOLD full release acceptance.** The public site and guest entry are
+already deployed. This section supersedes historical status below. The original
+record is also retained in [the October 23 checklist](release-checklist-20261023.md).
+
+## P0.1 — Bounded research availability
+
+- [x] Verify the new $2 non-resetting total allowance. Renew the existing operator
+  period without resetting its $0.40 ceiling, settled spend or unknown-cost holds.
+  One hosted signed-in Moon answer completed and charged five credits once.
+- [x] Create the explicitly approved seven-day replacement key with a $1.80
+  non-resetting ceiling. Disable the old key before using its replacement; old
+  metadata now returns 401. Conservatively reserve $0.20 for retired-key spend,
+  keeping combined exposure <= $2. Replacement expiry: November 5, 17:18 IST.
+- [x] Save the replacement only in ignored configuration and Vercel production
+  secrets. Extend the existing operator period to its expiry, preserving the
+  remaining $0.15 capacity and every financial counter. Operator/key limits are
+  different controls, not additive allowances.
+- [x] Add a restricted daily-window renewal function under an active funded
+  period. It cannot create/extend a period, raise ceilings or erase holds.
+  Expired/exhausted/unknown namespaces do not receive daily capacity.
+- [x] Add a clear paused-research state when app budget capacity is unavailable.
+- [ ] Complete Vercel email reauthentication and stable-main credential
+  redeployment. **The old key is disabled; research is unavailable until this finishes.**
+- [ ] Repeat hosted answer, source, progress, cancellation and reconciliation
+  checks after activation. Preserve unknown costs until verified receipts exist.
+
+## P0.2 — Recovery and operator visibility
+
+- [x] Implement `/operations` with a verified-user subject allowlist, empty by
+  default. Display budget/key expiry, provider metadata availability, stale runs,
+  failure counts and durable maintenance status without credentials or content.
+- [x] Add fenced maintenance leases: overlapping sweeps cannot claim a lease;
+  superseded work cannot report success. Manual checks cannot certify scheduler
+  delivery. Errors or exhausted deadlines fail the sweep.
+- [x] Apply migrations 0022/0023 in development and production with restricted
+  runtime grants. Owner credentials remain outside the hosted application.
+- [x] Exercise local authenticated recovery/reconciliation/retention: HTTP 200,
+  no pending work. Browser dashboard shows manual completion while retaining the
+  warning for unverified scheduled delivery.
+- [ ] Install the production operator allowlist and deploy reviewed code.
+- [ ] Observe a real scheduled invocation after deployment: 02:00 UTC / 07:30 IST.
+- [ ] Repeat current kill-switch, restore/rollback and hosted latency checks.
+
+The owner selected a private operator dashboard. It requires visiting/refreshing;
+it does not send background notifications. Earlier drills keep their limited scope.
+
+## P0.3 — Acceptance evidence
+
+- [x] Separate non-test Google account reaches its own empty workspace and is
+  denied the original owner's conversation in the real browser.
+- [x] Eight desktop/mobile public browser regressions pass; two additional real
+  development-Neon desktop/mobile tests cover renewal, logout and operator denial.
+  The production build passes.
+- [x] Live catalog smoke passes. Preserve failed corpus samples: initial safety
+  had 38 unavailable results; paced Mistral evaluation confirmed 30 HTTP 429s.
+  Isolated benign/harmful diagnostics returned HTTP 200 and correct dispositions.
+- [x] Final offline suite: 656 tests in 82 files pass with one worker and a
+  30-second database initialization allowance. Earlier runs hit local WASM
+  startup deadlines; application deadlines and assertions stay unchanged.
+  Build, lint and types pass. Dependency audit has no high/critical findings;
+  one moderate advisory remains.
+- [ ] Complete current safety/planning acceptance without provider outages.
+  Planning observed 3/30 matching routes, 1/5 clarifications and 3/14 paired answers;
+  an E2E edit also invalidated its clean-tree assertion. Keep it diagnostic.
+  Azure nano was evaluated separately: 72 observations, six unavailable results
+  and twenty decision/category mismatches. It failed and was not deployed.
+- [ ] Independent safety-label/completion review and ten answers/thirty reviewed
+  claims remain required by `evals/README.md`. The Moon answer misleadingly treats
+  tidal locking as a cause of phases. Review against [NASA](https://science.nasa.gov/moon/moon-phases/).
+- [ ] Require current code/security reviews and CI before merge.
+
+No paid-tier activation, production fallback expansion, inference retries or
+privacy downgrade was added. The accepted historical benign refusal stays recorded.
+Ignored evidence: `.artifacts/p0-*`. Raw observations/configuration stay private.
+
+---
+
+# Historical release checks — 23 October 2026 (not current status)
 
 Decision: **HOLD public deployment.** No Vercel project/deployment was created and
 no production database content or schema was changed by this verification.
