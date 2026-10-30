@@ -1,3 +1,4 @@
+import {assertApprovedKeyCap} from '../../evals/key-budget';
 import {execFileSync} from 'node:child_process';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
@@ -20,7 +21,7 @@ import {loadPlanningCorpus,planningInput,frozenPlanningEvidence,compareFrozenPla
 import {CURRENT_PROMPT_VERSIONS} from '../../evals/report';
 import type {QueryPlan} from '@/server/contracts/pipeline';
 const git=(...args:string[])=>execFileSync('git',args,{encoding:'utf8'}).trim();
-it('evaluates the complete fixed planning corpus and paired frozen answers within the existing non-resetting $1 key cap',async()=>{
+it('evaluates the complete fixed planning corpus and paired frozen answers within the approved non-resetting key cap',async()=>{
  if(process.env.LIVE_PLANNING_EVAL!=='1'||git('status','--porcelain'))throw Error('Clean committed candidate and explicit opt-in required');
  const revision=git('rev-parse','HEAD'),env=parse(await readFile('.env.launch.local','utf8'));
  const plannerConfig=parsePlannerModel(env),safetyConfig=parseSafetyModel(env),answerConfig=parseAnswerModel(env);
@@ -28,7 +29,7 @@ it('evaluates the complete fixed planning corpus and paired frozen answers withi
  const metadata=async()=>{
   const response=await fetch('https://openrouter.ai/api/v1/key',{headers:{Authorization:`Bearer ${plannerConfig.apiKey}`},redirect:'error',cache:'no-store',signal:AbortSignal.timeout(8000)});
   if(!response.ok)throw Error('Key cap could not be verified');
-  const {data}=await response.json();if(data.limit!==1||data.limit_reset!==null||typeof data.limit_remaining!=='number')throw Error('Existing $1 non-resetting key cap required');
+  const {data}=await response.json();assertApprovedKeyCap(data,0);
   return {limit:data.limit,usage:data.usage,remaining:data.limit_remaining};
  };
  const before=await metadata();if(before.remaining<.25)throw Error('Insufficient headroom for the local $0.25 evaluation envelope');
@@ -97,6 +98,6 @@ it('evaluates the complete fixed planning corpus and paired frozen answers withi
  const after=await metadata(),report={sourceRevision:revision,plannerVersion:PLANNING_VERSION,promptVersions:CURRENT_PROMPT_VERSIONS,corpusHash,models:{planner:plannerConfig.modelId,safety:safetyConfig.modelId,answer:answerConfig.modelId},keyCap:{before,after},localEnvelopeMicroUsd:String(cap),knownAllRoleMicroUsd:String(known),bookedIncludingUnknownMicroUsd:String(booked),unknownReceipts:unknown,providerRequests:calls,directPlans,deterministicPlans,fallbackPlans,clarificationResponses,approvedClarifications,clarificationDenominator:5,pairedApproved,pairedDenominator:14,...compareFrozenPlanning(cases,observations,'LIVE_PROVIDER')};
  await writeFile(`${directory}/report.json`,JSON.stringify(report,null,2),{mode:0o600});
  console.info(JSON.stringify({event:'planning.live_complete',directory,routeMatches:report.routeMatches,directPlans,fallbackPlans,approvedClarifications,pairedApproved,calls,knownMicroUsd:String(known)}));
- expect(git('rev-parse','HEAD')).toBe(revision);expect(git('status','--porcelain')).toBe('');expect(booked).toBeLessThanOrEqual(cap);expect(after.limit).toBe(1);
+ expect(git('rev-parse','HEAD')).toBe(revision);expect(git('status','--porcelain')).toBe('');expect(booked).toBeLessThanOrEqual(cap);expect(after.limit).toBe(before.limit);
  expect(report.routeMatches).toBe(30);expect(approvedClarifications).toBe(5);expect(pairedApproved).toBe(14);
 });

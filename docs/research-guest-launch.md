@@ -262,8 +262,9 @@ report parsing; this does not activate those versions in the application.
    representative latency checks. Previous restore/rollback evidence keeps
    its original limited scope. Razorpay remains a later, disabled integration.
 
-Guests have **not** been enabled: the user's condition that checks pass is still
-unmet. This checkpoint is not a declaration of full public-launch readiness.
+Guests were enabled after the approved canonical smoke described above. This
+checkpoint does not establish full release acceptance; the current
+[release checklist](release-checklist.md) records the remaining gates.
 
 ## Local evidence
 

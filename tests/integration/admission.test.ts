@@ -116,7 +116,7 @@ it.each(["PERIOD", "DAY"] as const)("enforces independent %s customer-credit and
   expect((await db.select().from(schema.operatorUsageBuckets)).map((r)=>r.reservedProviderMicroUsd)).toEqual([0n,0n]);
 });
 it("rejects missing operator configuration and overlapping user windows", async () => {
-  await db.delete(schema.operatorUsageBuckets).where(eq(schema.operatorUsageBuckets.kind,"DAY"));
+  await db.delete(schema.operatorUsageBuckets).where(eq(schema.operatorUsageBuckets.kind,"PERIOD"));
   expect(await admission.admit("alice", input())).toEqual({ kind: "DENIED", code: "CONFIGURATION_UNAVAILABLE" });
   const [bucket] = await db.select().from(schema.usageBuckets);
   await db.insert(schema.usageBuckets).values({ ...bucket, id: randomUUID(), startsAt: new Date(bucket.startsAt.getTime()+1) });

@@ -14,20 +14,38 @@ export function createResearchTransport(onUnauthenticated: ()=>void,request: typ
   // Event-driven transport state is deliberately independent of React's render state.
   let intent: SubmitQuery|null=null,runId: string|null=uuid(initialRunId);
   let revision:number|null=null;
+  let dispatched=false,cancellationRequested=false,pendingHeaders:Promise<void>|null=null;
   const recordRevision=(id:unknown,value:unknown)=>{
     if(id!==runId||!runId||typeof value!=='number'||!Number.isSafeInteger(value)||value<0||value>2147483647)return false;
     revision=Math.max(revision??0,value);return true;
   };
   const transport=new DefaultChatTransport<ResearchMessage>({api:"/api/chat",credentials:"same-origin",
-    prepareSendMessagesRequest:()=>{if(!intent)throw new Error("Question missing");return {body:intent};},
+    prepareSendMessagesRequest:()=>{if(!intent)throw new Error("Question missing");if(cancellationRequested)throw new Error('Research stopped.');return {body:intent};},
     fetch:async(url,options)=>{
+      if(cancellationRequested)throw new Error('Research stopped.');
+      dispatched=true;
+      let finishHeaders!:()=>void;
+      const headersReady=new Promise<void>(resolve=>{finishHeaders=resolve;});pendingHeaders=headersReady;
+      try {
       const response=await request(url,options),identified=uuid(response.headers.get("x-run-id"));
       if(identified){if(runId&&identified!==runId)throw new Error('Saved run mismatch');runId=identified;
         const header=response.headers.get('x-run-revision');if(header!==null&&/^\d+$/u.test(header))recordRevision(runId,Number(header));}
+      finishHeaders();
       if(!response.ok){if(response.status===401)onUnauthenticated();const problem=await response.clone().json().catch(()=>null);throw new Error(safeResearchMessage(problem?.error?.message));}return response;
+      }finally{finishHeaders();if(pendingHeaders===headersReady)pendingHeaders=null;}
     },
   });return {transport,async cancel(){
-    if(!runId)return null;
+    cancellationRequested=true;
+    // Keep the HTTP request alive until its admitted identity can be cancelled.
+    // A disconnect alone does not reliably stop work on hosted runtimes.
+    if(!runId&&pendingHeaders){
+      const ready=pendingHeaders;
+      await new Promise<void>((resolve,reject)=>{
+        const timer=setTimeout(()=>reject(new Error('Cancellation could not be confirmed.')),8000);
+        void ready.then(()=>{clearTimeout(timer);resolve();});
+      });
+    }
+    if(!runId){if(dispatched)throw new Error('Cancellation could not be confirmed.');return null;}
     const response=await request(`/api/runs/${runId}/cancellation`,{method:"POST",credentials:"same-origin",cache:"no-store",signal:AbortSignal.timeout(8000)});
     if(response.status===401)onUnauthenticated();
     if(!response.ok)throw new Error("Cancellation could not be confirmed. Check the same request for its saved status.");

@@ -16,10 +16,11 @@ export async function consumeAttempts(tx: AdmissionTransaction, userId: string, 
   return result.length === 2;
 }
 export async function loadBudgets(tx: AdmissionTransaction, userId: string, budgetKey: string, now: Date) {
+  await tx.execute(sql`SELECT ensure_operator_day(${budgetKey})`);
   const users = await tx.select().from(user).where(and(eq(user.userId,userId),isNull(user.retiredAt),lte(user.startsAt,now),gt(user.endsAt,now)))
     .orderBy(user.id).limit(3).for("update");
   if (!users.length) throw new AdmissionError("BUDGET_EXCEEDED");
-  const operators = await tx.select().from(operator).where(and(eq(operator.budgetKey,budgetKey),lte(operator.startsAt,now),gt(operator.endsAt,now)))
+  const operators = await tx.select().from(operator).where(and(eq(operator.budgetKey,budgetKey),lte(operator.startsAt,sql`clock_timestamp()`),gt(operator.endsAt,sql`clock_timestamp()`)))
     .orderBy(operator.id).limit(3).for("update");
   const period = users.find((bucket)=>bucket.kind === "PERIOD"), day = users.find((bucket)=>bucket.kind === "DAY");
   const operatorPeriod = operators.find((bucket)=>bucket.kind === "PERIOD"), operatorDay = operators.find((bucket)=>bucket.kind === "DAY");
