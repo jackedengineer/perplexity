@@ -15,6 +15,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:motion": "playwright test --config playwright.motion.config.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "eval:offline": "vitest run tests/integration/evaluation-offline-command.test.ts",
     "eval:score": "vitest run --config vitest.eval.config.ts",

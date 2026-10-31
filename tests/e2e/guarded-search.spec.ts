@@ -32,6 +32,12 @@ test("a public question shows guarded progress, committed citations and exact re
     await expect.poll(()=>page.evaluate(()=>window.t11Received.length),{timeout:60000}).toBe(1);
     const bytes=await page.evaluate(()=>window.t11Received[0]);expect(bytes).toContain('"type":"data-answer"');
     await expect(page.locator(".answer-prose")).toContainText("A rainbow appears");expect(bytes).not.toMatch(/PRIVATE_REASONING_MUST_NOT_LEAK|UNREVIEWED_PRIVATE_DRAFT|contentHash|passageId/);
+    const prose=page.locator('.answer-prose');
+    await expect(prose).toHaveAttribute('aria-busy','true');
+    const firstSlice=await prose.textContent()??'';
+    await expect.poll(async()=>(await prose.textContent()??'').length).toBeGreaterThan(firstSlice.length);
+    expect((await prose.textContent()??'').startsWith(firstSlice)).toBe(true);
+    await expect(prose).toHaveAttribute('aria-busy','false',{timeout:6000});
     expect(bytes.indexOf('"type":"text-delta"')).toBeGreaterThan(bytes.indexOf('"stage":"SAVING_ANSWER"'));
     await writeFile(`.artifacts/t11-wire-${info.project.name}.json`,JSON.stringify(await page.evaluate(()=>window.t11Timings[0]),null,2));
     await writeFile(`.artifacts/launch-stream-${info.project.name}.json`,JSON.stringify({timing:response.request().timing(),serverTiming:response.headers()["server-timing"],contentType:response.headers()["content-type"],cacheControl:response.headers()["cache-control"]},null,2));
@@ -40,6 +46,8 @@ test("a public question shows guarded progress, committed citations and exact re
     const feedback=page.getByRole('button',{name:'Helpful answer',exact:true});await expect(feedback).toBeEnabled();await feedback.click();await expect(feedback).toHaveAttribute('aria-pressed','true');
     const rendered=await page.locator(".answer-prose").textContent();
     await page.reload();await expect(page.locator(".answer-prose")).toHaveText(rendered??"");
+    await expect(page.locator('.answer-prose')).toHaveAttribute('aria-busy','false');
+    await expect(page.getByRole('button',{name:'Show full answer',exact:true})).toHaveCount(0);
     await expect(page.getByRole('button',{name:'Helpful answer',exact:true})).toHaveAttribute('aria-pressed','true');
     await page.waitForTimeout(100); // Flush paint observers for the saved-answer lab sample.
     await writeFile(`.artifacts/launch-answer-performance-${info.project.name}.json`,JSON.stringify(await page.evaluate(()=>({
@@ -98,6 +106,32 @@ test("a public question shows guarded progress, committed citations and exact re
   } finally {
     if(requests.length&&info.status!=="passed"){const value=requests[0] as {clientRequestId:string};const [run]=await f.owner.select().from(schema.runs).where(eq(schema.runs.clientRequestId,value.clientRequestId));if(run){console.info({state:run.status,ageMs:Date.now()-run.createdAt.getTime()});console.info((await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id))).map(c=>({stage:c.stage,status:c.status,durationMs:c.finishedAt?c.finishedAt.getTime()-c.startedAt.getTime():null})));}}
     await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
+});
+for(const reduced of [false,true])test(`approved reveal ${reduced?'respects reduced motion':'can be skipped without another request'}`,async({page,context},info)=>{
+ const identity=await identityFixture(context),f=createNeonFixture();let buckets:string[]=[];
+ const requests:string[]=[];page.on('request',request=>{if(request.url().endsWith('/api/chat'))requests.push(request.url());});
+ try{
+  await page.emulateMedia({reducedMotion:reduced?'reduce':'no-preference'});
+  buckets=await provision(f,identity.id);await page.goto('/workspace');
+  await page.getByRole('textbox',{name:'Ask a question'}).fill('Why do rainbows form?');
+  await page.getByRole('button',{name:'Submit question'}).click();
+  const prose=page.locator('.answer-prose');
+  if(reduced){
+   await expect(prose).toContainText('A rainbow appears',{timeout:60000});
+   await expect(prose).toHaveAttribute('aria-busy','false');
+   await expect(page.getByRole('button',{name:'Show full answer',exact:true})).toHaveCount(0);
+  }else{
+   await expect(prose).toHaveAttribute('aria-busy','true',{timeout:60000});
+   await page.getByRole('button',{name:'Show full answer',exact:true}).click();
+   await expect(prose).toHaveAttribute('aria-busy','false');
+   await expect(page.getByRole('article',{name:'Approved answer'})).toBeFocused();
+  }
+  await expect(prose).toContainText('each observer sees their own rainbow');
+  expect(requests).toHaveLength(1);
+  const full=await prose.textContent();await page.reload();await expect(prose).toHaveText(full??'');
+  await expect(prose).toHaveAttribute('aria-busy','false');
+  await page.screenshot({path:`.artifacts/reveal-${reduced?'reduced':'skipped'}-${info.project.name}.png`});
+ }finally{await identity.cleanup();if(buckets.length)await f.owner.delete(schema.operatorUsageBuckets).where(inArray(schema.operatorUsageBuckets.id,buckets));await f.close();}
 });
 for(const scenario of ["input-block","output-block","invalid-citation","search-failure","search-deadline","no-evidence"] as const){
   test(`public ${scenario} keeps private content out of the stream and history`,async({page,context},info)=>{

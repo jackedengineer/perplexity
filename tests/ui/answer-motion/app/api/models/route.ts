@@ -1,0 +1,1 @@
+export function GET(){const window={limit:40,used:0,reserved:0,remaining:40,resetsAt:'2026-11-01T00:00:00Z'};return Response.json({models:[{key:'fast-default',name:'GPT-4.1 mini',credits:5,band:'STANDARD'}],usage:{tier:'FREE',period:window,day:window,paymentsEnabled:false}});}

@@ -6,6 +6,19 @@ record is also retained in [the October 23 checklist](release-checklist-20261023
 
 ## Current production checkpoint
 
+### PR #17 answer presentation follow-up
+
+- [x] Implement word-by-word reveal of approved answers, subtle composer and
+  preparation feedback, reduced-motion support and an immediate skip control.
+- [x] Verify all 12 independent desktop/mobile component browser cases, seven new
+  unit cases, all 670 offline tests, eight existing public browser cases,
+  lint/types and production build. [Scope and evidence](answer-reveal.md).
+- [x] Complete all 12 selected database-backed desktop/mobile browser cases in
+  one run, verify TLS/permissions and correct the verifier's obsolete cleanup
+  assumptions. All 671 offline tests pass; database permissions were not changed.
+- [ ] Verify the final candidate's CI/reviews and production rollout. This
+  follow-up makes no paid AI calls and retains the $2 cap.
+
 Detailed scope, sample sizes, limitations and private evidence references are in
 [the October 31 verification](production-checks-20261031.md).
 

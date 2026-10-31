@@ -16,6 +16,7 @@ export function useResearch(conversationId: string,revision: number,initialRunId
   const busy=useRef(false),recovery=useRef<AbortController|null>(null);
   const [question,setQuestion]=useState(""),[pending,setPending]=useState(false),[stage,setStage]=useState<PublicStage|null>(null),[error,setError]=useState("");
   const [committed,setCommitted]=useState<CommittedAnswer|null>(null),[recovering,setRecovering]=useState(false);
+  const [revealMessageId,setRevealMessageId]=useState<string>();
   const recover=useCallback(async()=>{
     if(!controller.getRunId()||recovery.current)return;
     const abort=new AbortController();recovery.current=abort;setRecovering(true);let pause=1000,resolved=false;
@@ -27,7 +28,7 @@ export function useResearch(conversationId: string,revision: number,initialRunId
         if(!response.ok)break;
         const status=runStateView.parse(await response.json());
         if(status.conversationId!==conversationId||!controller.recordRevision(status.runId,status.revision))break;
-        if(["COMPLETED","NEEDS_CLARIFICATION"].includes(status.state)&&status.answer){resolved=true;setCommitted(status.answer);setError("");setStage(null);router.refresh();return;}
+        if(["COMPLETED","NEEDS_CLARIFICATION"].includes(status.state)&&status.answer){resolved=true;setRevealMessageId(undefined);setCommitted(status.answer);setError("");setStage(null);router.refresh();return;}
         if(status.state==="UNAVAILABLE"||["COMPLETED","NEEDS_CLARIFICATION"].includes(status.state)){resolved=true;
           setError(current=>savedFailureMessage(current,status.terminalReason));setStage(null);break;
         }
@@ -41,7 +42,7 @@ export function useResearch(conversationId: string,revision: number,initialRunId
     onData(part){
       if(part.type==='data-run')controller.recordRevision(part.data.runId,part.data.revision);
       if(part.type==="data-stage"){const parsed=publicStageEventSchema.safeParse(part.data);if(parsed.success&&parsed.data.runId===controller.getRunId())setStage(parsed.data.stage);}
-      if(part.type==="data-answer"){const saved=committedAnswerView.parse(part.data);if(saved.conversationId!==conversationId||saved.runId!==controller.getRunId())throw new Error("Saved answer mismatch");setCommitted(saved);setStage(null);setError("");}
+      if(part.type==="data-answer"){const saved=committedAnswerView.parse(part.data);if(saved.conversationId!==conversationId||saved.runId!==controller.getRunId())throw new Error("Saved answer mismatch");setRevealMessageId(saved.messageId);setCommitted(saved);setStage(null);setError("");}
     },
     onError(failure){if(stopRequested.current)return;setError(safeResearchMessage(failure.message));setPending(false);busy.current=false;if(controller.getRunId())void recover();},
     onFinish({isAbort,isError}){refreshUsage();setPending(false);busy.current=false;if(!isAbort&&!isError)router.refresh();},
@@ -68,11 +69,11 @@ export function useResearch(conversationId: string,revision: number,initialRunId
     try{
       const status=await controller.cancel();
       if(status&&status.conversationId!==conversationId)throw new Error("Saved run mismatch");
-      if(status&&["COMPLETED","NEEDS_CLARIFICATION"].includes(status.state)&&status.answer){setCommitted(status.answer);setError("");router.refresh();}
+      if(status&&["COMPLETED","NEEDS_CLARIFICATION"].includes(status.state)&&status.answer){setRevealMessageId(undefined);setCommitted(status.answer);setError("");router.refresh();}
       else setError(!status||status.terminalReason==="CANCELLED"?"Research stopped. You can start a new search.":status.terminalReason==="TIMED_OUT"?"This research request timed out. You can start a new search.":"Stop requested. Check the same request for its saved status.");
     }catch{setError("Cancellation could not be confirmed. Check the same request for its saved status.");}
     // Abort only after durable cancellation; refresh the settled reservation too.
     finally{void stopChat();refreshUsage();stopping.current=false;setCancelling(false);busy.current=false;setPending(false);setStage(null);}
   }
-  return {submit,retry,recover,stop:!cancelling&&(pending||recovering)?()=>void stop():undefined,question,pending:pending||recovering||cancelling,stage,label:cancelling?"Stopping research":recovering?"Checking saved result":stage?PUBLIC_STAGE_LABELS[stage]:"Checking request",error,committed,revision:committed?.revision??controller.getRevision()??revision};
+  return {submit,retry,recover,stop:!cancelling&&(pending||recovering)?()=>void stop():undefined,question,pending:pending||recovering||cancelling,stage,label:cancelling?"Stopping research":recovering?"Checking saved result":stage?PUBLIC_STAGE_LABELS[stage]:"Checking request",error,committed,revealMessageId,revision:committed?.revision??controller.getRevision()??revision};
 }

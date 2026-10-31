@@ -3,6 +3,7 @@ import { lazy,Suspense,useEffect,useId,useRef,useState,type ReactNode } from "re
 import { createPortal } from "react-dom";
 import type { AnswerNode,PublicAnswer } from "@/server/answers/view";
 import { Icon } from "./icons";
+import type {AnswerReveal} from './use-answer-reveal';
 const AnswerFeedback=lazy(()=>import("./answer-feedback"));
 function Citation({ source }: { source: PublicAnswer["sources"][number] }) {
   const id=useId(),[tip,setTip]=useState<{left:number;top:number;width:number;maxHeight:number;above:boolean}|null>(null);
@@ -22,7 +23,7 @@ function Citation({ source }: { source: PublicAnswer["sources"][number] }) {
     <Icon name="link" size={10}/><span>{source.domain.replace(/\.(gov|com|org|edu)$/u,"")}</span>
   </a>{tip&&createPortal(<span className="citation-tooltip" role="tooltip" id={id} style={{left:tip.left,top:tip.top,width:tip.width,maxHeight:tip.maxHeight,transform:tip.above?"translateY(-100%)":undefined}}>{source.title}<small>{source.domain} · Source {source.number}</small></span>,document.body)}</>;
 }
-export function ApprovedAnswer({ messageId,answer,text,onSources }: {messageId:string; answer: PublicAnswer;text: string;onSources: ()=>void }) {
+export function ApprovedAnswer({ messageId,answer,text,reveal,onSources }: {messageId:string; answer: PublicAnswer;text: string;reveal?:AnswerReveal;onSources: ()=>void }) {
   const [copied,setCopied] = useState(false),[copyFailed,setCopyFailed] = useState(false);
   const copyTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   useEffect(()=>()=>{if(copyTimer.current)clearTimeout(copyTimer.current);},[]);
@@ -53,8 +54,9 @@ export function ApprovedAnswer({ messageId,answer,text,onSources }: {messageId:s
   }); }
   return <div className="approved-answer">
     <div className="answer-researched">{answer.kind === "ANSWER" ? "Researched" : answer.kind === "NO_EVIDENCE" ? "Search complete" : "One more detail"}</div>
-    <div className="answer-prose">{render(answer.document)}</div>
-    <div className="answer-actions">
+    <div className="answer-prose" aria-busy={reveal?.active??false} aria-live="off">{render(reveal?.document??answer.document)}</div>
+    {reveal&&<span className="sr-only" role="status">{reveal.active?'Showing approved answer':'Answer ready'}</span>}
+    {reveal?.active?<button className="research-button answer-show-full" type="button" onClick={event=>{event.currentTarget.closest('article')?.focus({preventScroll:true});reveal.finish();}}>Show full answer<Icon name="down" size={13}/></button>:<div className="answer-actions">
       <button className="research-icon-button answer-copy" onClick={()=>void copy()} aria-label={copied ? "Answer copied" : "Copy answer"}>
         <span className="copy-symbol" data-active={!copied} aria-hidden="true"><Icon name="copy" size={17}/></span>
         <span className="copy-symbol" data-active={copied} aria-hidden="true"><Icon name="check" size={17}/></span>
@@ -62,7 +64,7 @@ export function ApprovedAnswer({ messageId,answer,text,onSources }: {messageId:s
       {answer.sources.length > 0 && <button className="answer-source-count" onClick={onSources}><Icon name="link" size={15} />{answer.sources.length} {answer.sources.length === 1 ? "source" : "sources"}</button>}
       <Suspense fallback={<div className="feedback-placeholder" aria-hidden="true"/>}><AnswerFeedback messageId={messageId}/></Suspense>
       <span className="copy-feedback" role="status">{copyFailed ? "Copy is unavailable. Select the text to copy it." : copied ? "Copied" : ""}</span>
-    </div>
+    </div>}
   </div>;
 }
 export function SourcesPanel({ answer,open,onToggle }: { answer: PublicAnswer | null;open: boolean;onToggle: ()=>void }) {
