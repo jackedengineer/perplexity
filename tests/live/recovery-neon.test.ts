@@ -42,7 +42,13 @@ it('cancellation wins against a paused answer, then concurrent reconciliation de
  await Promise.allSettled(Array.from({length:4},()=>createUsageReconciliation(f.runtime).reconcile(p.subject,p.runId)));
  await createUsageReconciliation(f.runtime).reconcile(p.subject,p.runId);
  expect(await f.owner.select().from(schema.runReconciliations).where(eq(schema.runReconciliations.runId,p.runId))).toHaveLength(1);
- expect((await f.owner.select().from(schema.usageBuckets).where(eq(schema.usageBuckets.userId,p.profile.id))).every(b=>b.settledProviderMicroUsd===8400n&&b.reservedProviderMicroUsd===0n&&b.settledCredits===0)).toBe(true);
+ const calls=await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,p.runId));
+ expect(calls.filter(c=>c.stage==='PLANNER')).toMatchObject([{status:'SUCCEEDED',costMicroUsd:100n}]);
+ // Accounting v2 includes the planner: five 100-micro-USD calls plus the
+ // verified 8,000 search receipt, including the answer returned after Stop.
+ const actualBuckets=await f.owner.select().from(schema.usageBuckets).where(eq(schema.usageBuckets.userId,p.profile.id));
+ expect(actualBuckets).toHaveLength(2);
+ for(const bucket of actualBuckets)expect(bucket).toMatchObject({settledProviderMicroUsd:8500n,reservedProviderMicroUsd:0n,settledCredits:0});
  expect((await f.owner.select().from(schema.messages).where(eq(schema.messages.conversationId,p.conversation.id))).map(m=>m.role)).toEqual(['USER']);
 },90000);
 it('runtime cannot manufacture provider evidence or mutate adjustment history',async()=>{
