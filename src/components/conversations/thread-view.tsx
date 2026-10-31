@@ -7,11 +7,13 @@ import { Icon,ResearchMark } from "./icons";
 import { ConversationActions } from "./conversation-actions";
 import { ConversationHistory } from "./conversation-history";
 import { QuestionComposer } from "./question-composer";
-export type ResearchState={question:string;pending:boolean;error:string;label:string;committed:CommittedAnswer|null;retry:()=>void;stop?:()=>void};
+import {useAnswerReveal} from './use-answer-reveal';
+export type ResearchState={question:string;pending:boolean;error:string;label:string;committed:CommittedAnswer|null;revealMessageId?:string;retry:()=>void;stop?:()=>void};
 export const idleResearch: ResearchState={question:"",pending:false,error:"",label:"Checking request",committed:null,retry:()=>{}};
 export function ThreadView({conversation,initial,research=idleResearch,submit}: {conversation:Conversation;initial:HistoryPage;research?:ResearchState;submit:(text:string)=>void}) {
   const [text,setText]=useState(""),[sourcesOpen,setSourcesOpen]=useState(false);
   const saved=research.committed;
+  const reveal=useAnswerReveal(saved&&research.revealMessageId===saved.messageId?saved:null);
   const [baseSequence]=useState(()=>Math.max(0,...initial.items.map(message=>message.sequence)));
   let history=initial;
   if(saved&&!initial.items.some(message=>message.id===saved.messageId)){
@@ -28,9 +30,9 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
     </header>
     <section className="thread-content" aria-label="Conversation history" tabIndex={0}>
       <h1>{conversation.title}</h1>
-      {history.items.length>0&&<ConversationHistory key={`${saved?.messageId??"saved"}:${initial.items.length}`} conversationId={conversation.id} initial={history} sourcesOpen={sourcesOpen} onSourcesOpenChange={setSourcesOpen}/>}
+      {history.items.length>0&&<ConversationHistory key={`${saved?.messageId??"saved"}:${initial.items.length}`} conversationId={conversation.id} initial={history} reveal={reveal} sourcesOpen={sourcesOpen} onSourcesOpenChange={setSourcesOpen}/>}
       {research.question&&!history.items.some(message=>message.role==="USER"&&message.sequence>baseSequence)&&!saved&&<article className="history-message question-message pending-question" aria-label="Your question"><p>{research.question}</p></article>}
-      {research.pending&&<div className="research-progress" role="status" aria-live="polite"><span className="progress-mark" aria-hidden="true"><ResearchMark/></span><span>{research.label}</span><div className="answer-skeleton" aria-hidden="true"><span/><span/><span/></div></div>}
+      {research.pending&&!saved&&<div className="research-progress" role="status" aria-live="polite"><span className="progress-mark" aria-hidden="true"><ResearchMark/></span><span className="progress-label" key={research.label}>{research.label}</span><div className="answer-skeleton" aria-hidden="true"><span/><span/><span/></div></div>}
       {research.error&&!saved&&<div className="research-failure"><p role="alert">{research.error}</p><div className="failure-actions">
         <button className="research-button" disabled={research.pending} onClick={()=>void research.retry()}>Check same request</button>
         <Link className="research-button" href="/workspace">New search</Link>
