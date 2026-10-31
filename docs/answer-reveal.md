@@ -34,10 +34,9 @@ Browsers without native word segmentation show the approved answer immediately.
 - In-app browser inspection confirms preparation, partial text, final formatting
   and sources. Screenshots remain ignored under `.artifacts/motion-*.png`.
 - Lint, generated route types, strict TypeScript and the production build pass.
-- Development Neon connections time out, including a bounded standalone `SELECT
-  1` probe. DB-backed guarded-search cases could not complete; this is recorded
-  separately from the passing offline component checks. Failed fixture cleanup
-  must be rechecked when that development database becomes reachable.
+- Initially, development Neon connections timed out, including a bounded
+  standalone `SELECT 1` probe. The subsequent database-backed follow-up below
+  supersedes that pending acceptance status.
 - The initial UI run was interrupted by a test-app config reload (11 passed,
   one failed navigation). The complete subsequent run passed all 12 cases.
 - All eight existing production-build public browser cases pass. The first full
@@ -55,3 +54,37 @@ evidence are excluded from lint/type discovery; test source stays checked. No
 provider requests, production migrations, budget changes or deployment were made.
 The combined OpenRouter cap remains **$2**. Exact-head CI/review and hosted
 acceptance remain separate release gates.
+
+## Database-backed follow-up
+
+- Both development connection URLs pass verified TLS, catalog and restricted-role
+  checks. Credentials, endpoint settings, five-second connection timeout and
+  45-second run deadline are unchanged. Intermittent connection/TLS failures
+  recurred during overlapping work; IPv4-only diagnostics did not resolve them.
+  Neon showed the endpoint active; a successful session observed 14 connections
+  and zero lock waiters. A persistent root cause was not established.
+- Correct the maintenance verifier's obsolete pre-lifecycle assumptions: the
+  reviewed deletion/expiry migrations deliberately grant cleanup DELETE and add
+  a fifth evidence policy. Require those cleanup grants and named DELETE policies
+  while continuing to reject UPDATE, budget provisioning and privilege elevation.
+  Missing permission fields fail closed. No database grants or policies changed.
+  Errors now identify the failing CONNECT/CATALOG/PERMISSIONS/TLS_SCHEMA phase.
+- The migrated fresh-role regression checks the actual permission query and
+  rejects unexpected elevation, missing cleanup and missing results. All **671
+  offline tests**, lint and types pass; the pushed verifier correction also
+  passed Quality CI. Later commits require their own CI and reviews.
+- Complete isolated browser rerun: **12/12 passed in 10.1 minutes**, desktop and
+  mobile. Real development Neon sessions, transactions and the production build
+  verify approved word reveal, citations, sources, exact reload, skipping/focus,
+  reduced motion, output blocking, invalid-citation rejection, ownership denial,
+  durable cancellation, settlement and replay without another provider attempt.
+  Providers are test doubles; this does not establish live-model availability,
+  quality or hosted latency. No paid inference was performed.
+- Preserve the earlier interrupted run (one passed, eight failed, one interrupted)
+  and the subsequent successful isolated skip check. The complete successful run
+  is `.artifacts/pr17-neon-browser-final.log`; earlier failures are not passes.
+  Ten captured, unreferenced test-budget buckets from interrupted runs were
+  removed by exact ID in development; production budgets and holds were untouched.
+
+Review/merge is gated on the final commit's CI, both completed reviews and resolved
+threads. Production launch acceptance remains governed by the release checklist.
