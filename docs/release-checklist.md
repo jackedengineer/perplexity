@@ -6,6 +6,17 @@ record is also retained in [the October 23 checklist](release-checklist-20261023
 
 ## Current production checkpoint
 
+### Answer presentation follow-up (not deployed)
+
+- [x] Implement word-by-word reveal of approved answers, subtle composer and
+  preparation feedback, reduced-motion support and an immediate skip control.
+- [x] Verify all 12 independent desktop/mobile component browser cases, seven new
+  unit cases, all 670 offline tests, eight existing public browser cases,
+  lint/types and production build. [Scope and evidence](answer-reveal.md).
+- [ ] Rerun DB-backed guarded-search checks after development Neon connectivity
+  recovers; verify the focused commit's CI/reviews before deployment. This UI
+  follow-up makes no AI calls and retains the $2 cap.
+
 Detailed scope, sample sizes, limitations and private evidence references are in
 [the October 31 verification](production-checks-20261031.md).
 
