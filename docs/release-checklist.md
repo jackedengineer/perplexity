@@ -1,8 +1,45 @@
-# Current release checks — 29 October 2026
+# Current release checks — 31 October 2026
 
 Decision: **HOLD full release acceptance.** The public site and guest entry are
 already deployed. This section supersedes historical status below. The original
 record is also retained in [the October 23 checklist](release-checklist-20261023.md).
+
+## Current production checkpoint
+
+Detailed scope, sample sizes, limitations and private evidence references are in
+[the October 31 verification](production-checks-20261031.md).
+
+- [x] PR #15 merged after exact-head code/security reviews, resolved threads and
+  successful Quality CI. Main `e3be579` is Ready on the canonical Vercel domain.
+- [x] Apply and verify production migration 0024 on October 30: 25 migration
+  receipts, corrected renewal lock ordering and unchanged restricted grants.
+- [x] Observe the October 31 scheduled recovery completion at 08:22 IST, before
+  manual testing. Vercel's daily job is enabled. A separate authenticated manual
+  check returns HTTP 200 and does not update the scheduled marker or alter holds.
+- [x] Execute Vercel application rollback to `e6a5e72`, verify a private saved
+  answer, then promote `e3be579` back. Canonical routing and cron are restored;
+  database migrations, financial counters and 19 runs/83 provider calls persist.
+- [x] Complete 50 hosted HTTP probes and six redirect/entry checks. Record two
+  unthrottled cached DevTools samples (homepage/workspace LCP 604/952 ms, CLS 0)
+  and six completed server runs (median 11.5 seconds, maximum 12.7 seconds).
+  These small samples do not certify mobile, field INP, streaming or a load SLO.
+- [x] Six real development Neon recovery/concurrency cases pass after correcting
+  the v2 test's omitted planner cost; 23 focused offline cases also pass.
+- [x] Obtain a clean full Quality result for this follow-up: [run 41174423242](https://github.com/jackedengineer/perplexity/actions/runs/41174423242)
+  on `92640af` passed lint/types, all 663 tests, the high/critical audit gate,
+  production build and eight browser tests. Both local initialization-timeout
+  failures remain recorded; CI does not turn those failed commands into passes.
+  Subsequent commits still require their own successful Quality result.
+- [x] Reconfirm the non-resetting $1.80 key plus conservative $0.20 retired-key
+  allowance: **$2 maximum**, unchanged. This checkpoint makes no AI calls, raises
+  no budgets and releases no unknown-cost holds.
+- [ ] Complete current quality/human review, hosted operator access, kill-switch,
+  current-schema restore/deletion replay, representative performance/field checks
+  and the missing homepage favicon. Keep paid-tier activation deferred.
+
+The October 30 hosted smoke separately verified a fresh three-source answer,
+progress, reload persistence and zero-credit cancellation after the approved
+Tavily 25 -> 50 credit allowance. Those observations do not close quality gates.
 
 ## PR #15 review corrections
 
@@ -19,8 +56,8 @@ record is also retained in [the October 23 checklist](release-checklist-20261023
 - [x] Six focused offline checks, the real development concurrency regression,
   lint and types pass. No AI requests, budget changes or production data changes
   were needed for these corrections. Migration 0024 is applied in development.
-- [ ] Require fresh code/security reviews and CI on the corrected PR head.
-- [ ] Apply migration 0024 to production through the reviewed owner workflow.
+- [x] Require fresh code/security reviews and CI on the corrected PR head.
+- [x] Apply migration 0024 to production through the reviewed owner workflow.
 
 ## Safety outage restoration — 29 October
 
@@ -124,8 +161,11 @@ Ignored evidence: `.artifacts/safety-route/7c6248d0-19b9-4c8e-afab-3bc151221e5c/
   no pending work. Browser dashboard shows manual completion while retaining the
   warning for unverified scheduled delivery.
 - [ ] Install the production operator allowlist and deploy reviewed code.
-- [ ] Observe a real scheduled invocation after deployment: 02:00 UTC / 07:30 IST.
-- [ ] Repeat current kill-switch, restore/rollback and hosted latency checks.
+- [x] Observe scheduled completion after deployment: October 31 at 02:52 UTC /
+  08:22 IST, within the Hobby schedule's one-hour window. See current evidence above.
+- [x] Repeat application rollback/restoration and bounded hosted latency smoke.
+- [ ] Repeat current kill-switch and latest-schema restore/deletion-replay checks;
+  complete representative performance measurements beyond the smoke samples.
 
 The owner selected a private operator dashboard. It requires visiting/refreshing;
 it does not send background notifications. Earlier drills keep their limited scope.
@@ -158,7 +198,8 @@ it does not send background notifications. Earlier drills keep their limited sco
   The local ice answer also reports a 10–15% density difference; this quantitative
   claim needs correction/review against [USGS](https://www.usgs.gov/water-science-school/science/water-density).
   Citation validity and a successful research request do not establish factual support.
-- [ ] Require current code/security reviews and CI before merge.
+- [x] Require current code/security reviews and CI before PR #15 merge. Later
+  changes require their own checks; this does not approve a subsequent branch.
 
 No paid-tier activation, production fallback expansion, inference retries or
 privacy downgrade was added. The accepted historical benign refusal stays recorded.
