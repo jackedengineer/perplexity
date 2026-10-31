@@ -120,3 +120,24 @@
 .feedback-retry { text-decoration: underline; color: inherit; }
 .feedback-placeholder { width: 76px; min-height: 36px; }
 @media (prefers-reduced-motion: no-preference) { .feedback-buttons button { transition: background-color 120ms, color 120ms; } }
+
+/* State changes animate once; keystrokes and old conversation history do not. */
+.question-composer { transition: border-color 140ms ease-out, box-shadow 140ms ease-out; }
+.question-composer[data-has-text=true]:not([data-pending=true]) { border-color: #587376; }
+.question-composer .send-button { position: relative; transition: background-color 140ms ease-out, opacity 140ms ease-out, transform 120ms ease-out; }
+.question-composer[data-has-text=true] .send-button:not(:disabled):not(.stop-button) { background: var(--r-accent); }
+.question-composer .send-button:not(:disabled):active { transform: scale(.96); }
+.submit-symbol { position: absolute; display: flex; opacity: 0; scale: .25; filter: blur(4px); pointer-events: none; transition: opacity 150ms cubic-bezier(.2,0,0,1), scale 150ms cubic-bezier(.2,0,0,1), filter 150ms cubic-bezier(.2,0,0,1); }
+.submit-symbol[data-active=true] { opacity: 1; scale: 1; filter: blur(0); }
+.answer-show-full { gap: 6px; margin-top: 8px; padding: 0 8px; min-height: 40px; border: 0; color: var(--r-muted); font-size: 12px; }
+.answer-skeleton > span { position: relative; overflow: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+ .pending-question { animation: question-arrive 200ms ease-out; }
+ .progress-label { animation: stage-arrive 160ms ease-out; }
+ .answer-skeleton > span::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgb(139 199 202 / .08), transparent); animation: source-shimmer 1800ms ease-in-out infinite; }
+ .answer-skeleton > span:nth-child(2)::after { animation-delay: 100ms; }
+ .answer-skeleton > span:nth-child(3)::after { animation-delay: 200ms; }
+}
+@keyframes question-arrive { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes stage-arrive { from { opacity: .4; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes source-shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }

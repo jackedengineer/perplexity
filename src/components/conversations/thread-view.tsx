@@ -30,7 +30,7 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
     </header>
     <section className="thread-content" aria-label="Conversation history" tabIndex={0}>
       <h1>{conversation.title}</h1>
-      {history.items.length>0&&<ConversationHistory key={`${saved?.messageId??"saved"}:${initial.items.length}`} conversationId={conversation.id} initial={history} reveal={reveal} sourcesOpen={sourcesOpen} onSourcesOpenChange={setSourcesOpen}/>}
+      {history.items.length>0&&<ConversationHistory key={saved?.messageId??`saved:${initial.items.length}`} conversationId={conversation.id} initial={history} reveal={reveal} sourcesOpen={sourcesOpen} onSourcesOpenChange={setSourcesOpen}/>}
       {research.question&&!history.items.some(message=>message.role==="USER"&&message.sequence>baseSequence)&&!saved&&<article className="history-message question-message pending-question" aria-label="Your question"><p>{research.question}</p></article>}
       {research.pending&&!saved&&<div className="research-progress" role="status" aria-live="polite"><span className="progress-mark" aria-hidden="true"><ResearchMark/></span><span className="progress-label" key={research.label}>{research.label}</span><div className="answer-skeleton" aria-hidden="true"><span/><span/><span/></div></div>}
       {research.error&&!saved&&<div className="research-failure"><p role="alert">{research.error}</p><div className="failure-actions">

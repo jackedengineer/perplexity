@@ -10,7 +10,7 @@ export function QuestionComposer({text,onText,onSubmit,pending,onStop,placeholde
 }) {
   const {data}=useModelAccess();
   const available=Boolean(data?.models.length);
-  return <><form className="research-composer question-composer" onSubmit={event=>{event.preventDefault();if(!pending&&available&&text.trim())onSubmit();}} aria-busy={pending}>
+  return <><form className="research-composer question-composer" data-has-text={Boolean(text.trim())} data-pending={pending} onSubmit={event=>{event.preventDefault();if(!pending&&available&&text.trim())onSubmit();}} aria-busy={pending}>
     <textarea aria-label="Ask a question" placeholder={placeholder} rows={2} maxLength={4000} value={text} disabled={pending} onChange={event=>onText(event.target.value)}
       onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();if(!pending&&available&&text.trim())onSubmit();}}} />
     <div className="composer-toolbar">
@@ -19,7 +19,10 @@ export function QuestionComposer({text,onText,onSubmit,pending,onStop,placeholde
       <span className="toolbar-spacer"/><ModelSelector disabled={pending}/>
       <button className="research-icon-button voice-control" type="button" disabled aria-label="Voice input is not available yet"><Icon name="microphone" size={16}/></button>
       {pending&&onStop ? <button className="send-button stop-button" type="button" onClick={onStop} aria-label="Stop research"><span/></button>
-        : <button className="send-button" type="submit" disabled={pending||!available||!text.trim()} aria-label="Submit question">{pending ? <span className="research-spinner"/>:<Icon name="arrow" size={18}/>}</button>}
+        : <button className="send-button" type="submit" disabled={pending||!available||!text.trim()} aria-label="Submit question">
+          <span className="submit-symbol" data-active={!pending} aria-hidden="true"><Icon name="arrow" size={18}/></span>
+          <span className="submit-symbol" data-active={pending} aria-hidden="true"><span className="research-spinner"/></span>
+        </button>}
     </div>
   </form><UsageSummary/></>;
 }
