@@ -123,7 +123,11 @@ one-worker run with unchanged deadlines failed four different initialization
 hooks (630 passed, 33 not executed). The failed file sets are disjoint, so all
 663 test bodies passed across the two runs, but **neither is a clean full run**.
 Keep a fresh clean full Quality CI result as a review gate; do not raise hook
-deadlines, skip cases or report `pnpm check` as passing. Both failed logs remain.
+deadlines, skip cases or report the local `pnpm check` as passing. Both failed
+logs remain. [Quality run 41174423242](https://github.com/jackedengineer/perplexity/actions/runs/41174423242)
+subsequently passed on `92640af`: lint/types, 663/663 tests across 83 files,
+the high/critical production audit gate, build and eight browser tests. Later
+commits still require their own CI and exact-head reviews before merging.
 
 Evidence: `production-checks-20261031-before.json`, `production-recovery-20261031.json`,
 `production-rollback-final-20261031.json`, `production-http-latency-20261031.json`,

@@ -25,10 +25,11 @@ Detailed scope, sample sizes, limitations and private evidence references are in
   These small samples do not certify mobile, field INP, streaming or a load SLO.
 - [x] Six real development Neon recovery/concurrency cases pass after correcting
   the v2 test's omitted planner cost; 23 focused offline cases also pass.
-- [ ] Obtain a clean full Quality result for this follow-up. Lint/types pass;
-  both local full runs hit PGlite initialization timeouts with unchanged deadlines.
-  All 663 bodies pass across their disjoint successful batches, which does not
-  turn either failed full command into a pass. Retain both failed reports.
+- [x] Obtain a clean full Quality result for this follow-up: [run 41174423242](https://github.com/jackedengineer/perplexity/actions/runs/41174423242)
+  on `92640af` passed lint/types, all 663 tests, the high/critical audit gate,
+  production build and eight browser tests. Both local initialization-timeout
+  failures remain recorded; CI does not turn those failed commands into passes.
+  Subsequent commits still require their own successful Quality result.
 - [x] Reconfirm the non-resetting $1.80 key plus conservative $0.20 retired-key
   allowance: **$2 maximum**, unchanged. This checkpoint makes no AI calls, raises
   no budgets and releases no unknown-cost holds.
