@@ -1,8 +1,17 @@
-import {expect,it} from 'vitest';
+import {expect,it,vi} from 'vitest';
 import type {AnswerNode} from '@/server/answers/view';
 import {prepareAnswerReveal,revealUnitsAt} from '@/components/conversations/answer-reveal';
 
 const text=(value:string):AnswerNode=>({type:'text',text:value});
+it('keeps approved content readable if the browser lacks word segmentation',()=>{
+ const document:AnswerNode[]=[{type:'paragraph',children:[text('Still readable. 👩🏽‍💻')]}];
+ vi.stubGlobal('Intl',{Segmenter:undefined});
+ try{
+  const reveal=prepareAnswerReveal(document);
+  expect(reveal.total).toBe(0);
+  expect(reveal.slice(0)).toBe(document);
+ }finally{vi.unstubAllGlobals();}
+});
 it('reveals complete words without losing approved whitespace or inline structure',()=>{
  const document:AnswerNode[]=[{type:'paragraph',children:[text('  Light bends '),{type:'strong',children:[text('inside droplets')]},text(' again.\n')]}];
  const reveal=prepareAnswerReveal(document);

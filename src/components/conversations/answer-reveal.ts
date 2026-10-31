@@ -3,6 +3,8 @@ import type {AnswerNode} from '@/server/answers/view';
 // Only slices the canonical approved tree. Markdown and citation URLs are never
 // reparsed from incomplete text. Boundaries are computed once per answer.
 export function prepareAnswerReveal(document:AnswerNode[]) {
+ // Preserve readable approved content in browsers without word segmentation.
+ if(typeof Intl.Segmenter!=='function')return {total:0,slice:()=>document};
  type Plan={node:AnswerNode;total:number;ends:number[];children:Plan[]};
  const segmenter=new Intl.Segmenter(undefined,{granularity:'word'});
  function wordEnds(text:string){
