@@ -16,8 +16,9 @@ export function createNeonFixture() {
       runtimeUrl.hostname.replace("-pooler", "") !== ownerUrl.hostname || runtimeUrl.pathname !== ownerUrl.pathname) {
     throw new Error("Explicit dedicated development Neon owner/runtime configuration required");
   }
-  const ownerPool = new Pool({ connectionString: ownerUrl.toString(), max: 2, connectionTimeoutMillis: 5000, statement_timeout: 10_000 });
-  const runtimePool = new Pool({ connectionString: runtimeUrl.toString(), max: 4, connectionTimeoutMillis: 5000, statement_timeout: 10_000 });
+  const ownerPool = new Pool({ connectionString: ownerUrl.toString(), max: 2, connectionTimeoutMillis: 5000, statement_timeout: 10_000, query_timeout: 10_000, keepAlive: true });
+  const runtimePool = new Pool({ connectionString: runtimeUrl.toString(), max: 4, connectionTimeoutMillis: 5000, statement_timeout: 10_000, query_timeout: 10_000, keepAlive: true });
+  for(const pool of [ownerPool,runtimePool])pool.on('error',()=>console.warn('Development database pool connection unavailable'));
   const owner = drizzle(ownerPool, { schema }), runtime = drizzle(runtimePool, { schema });
   const subjects: string[] = [], namespace = `test-${randomUUID()}`;
   const keys = { activeKeyId: "test-v1", keys: { "test-v1": randomBytes(32).toString("hex") } };

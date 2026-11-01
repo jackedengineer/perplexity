@@ -10,7 +10,9 @@ export function sandboxDatabaseUrl(env:Record<string,string|undefined>=process.e
 }
 let pool:Pool|undefined;
 export function workerDatabase(){
- pool??=new Pool({connectionString:sandboxDatabaseUrl(),max:2,connectionTimeoutMillis:5000,statement_timeout:10000,idleTimeoutMillis:10000,application_name:'perplex-jobs-dev'});
+ if(!pool){pool=new Pool({connectionString:sandboxDatabaseUrl(),max:2,connectionTimeoutMillis:5000,query_timeout:10000,statement_timeout:10000,idleTimeoutMillis:10000,keepAlive:true,keepAliveInitialDelayMillis:10000,application_name:'perplex-jobs-dev'});
+  pool.on('error',()=>console.warn(JSON.stringify({event:'jobs.database_pool',outcome:'UNAVAILABLE'})));
+ }
  return drizzle(pool,{schema});
 }
 export async function closeWorkerDatabase(){await pool?.end();pool=undefined;}
