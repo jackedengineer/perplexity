@@ -1,5 +1,10 @@
 # Implementation plan
 
+Current work (1 November 2026): [durable paid-job foundation](durable-jobs-and-billing.md),
+with job/step accounting, replay, cancellation/recovery and Razorpay test-mode access.
+The following earlier status is historical; the release checklist and current work
+record distinguish implemented foundations from enabled production features.
+
 Status: T01–T03, T05–T11 and the requested T18–T20 operational slices are implemented and verified locally. T18–T20 reuse T11 boundaries ahead of T12–T17; those product features remain open. T21 adds a versioned synthetic corpus, offline critical/citation checks, local manual-result scoring and aggregate CI reporting. Its human/live quality baseline, harmful-completion measurement and paid cost/latency remain pending. T04 retains its deployed-preview check. The next product slice is T12 intent-preserving planning, then T13 contextual follow-ups; the next operational implementation is T22 deletion and retention. Deployment and operational release gates remain open; [todo.md](todo.md) is the canonical checklist.
 
 Read [the system design](../docs/system-design.md), [authentication](../docs/authentication.md), [billing and entitlements](../docs/billing-and-entitlements.md), [the safety policy](../docs/safety-policy.md) and [the capability map](../CAPABILITY-MAP.md) before implementing. [todo.md](todo.md) is the canonical build checklist.
