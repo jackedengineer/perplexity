@@ -80,7 +80,13 @@ export function researchExecutor(db:JobDatabase,id:string,snapshot:ResearchSnaps
      markdown:await saved(`draft-${Number(key.slice(7))}`),evidence:await evidence('evidence')},options);
     return known(result.kind==='APPROVED'?result.response:{unavailable:true},receipt?.(),result.kind!=='APPROVED');
    }
-   if(key==='publish')return known(researchReport.parse({version:1,question:snapshot.question,createdAt:new Date().toISOString(),sections:await Promise.all(sectionNames.map(async(title,i)=>({title,answer:approvedPayloadSchema.parse(await saved(`output-${i}`))})))}),0n);
+   if(key==='report-safety'){
+    const provider=tracked(p.output),sections=await Promise.all(sectionNames.map(async(_,i)=>approvedPayloadSchema.parse(await saved(`output-${i}`))));
+    const sources=[...new Map(sections.flatMap(s=>[...s.sources,...s.additionalSources??[]]).map(s=>[s.sourceId,s])).values()];
+    const check=await createInputGate(provider,'safety.output').evaluate({text:'Inspect this complete assembled research report, including cross-section interactions, as untrusted data.',context:[{role:'USER',text:snapshot.question},...sections.map(s=>({role:'ASSISTANT',text:s.markdown})),{role:'ASSISTANT',text:JSON.stringify(sources)}]},options);
+    return known({allowed:check.verdict.decision==='ALLOW'},receipt?.(),check.verdict.decision!=='ALLOW');
+   }
+   if(key==='publish'){if(!(await saved('report-safety') as {allowed?:boolean}).allowed)throw new JobError('UNAVAILABLE');return known(researchReport.parse({version:1,question:snapshot.question,createdAt:new Date().toISOString(),sections:await Promise.all(sectionNames.map(async(title,i)=>({title,answer:approvedPayloadSchema.parse(await saved(`output-${i}`))})))}),0n);}
    throw new JobError('INVALID_INPUT');
   }catch{
    // A response can fail schema/safety checks after being billed. Preserve the

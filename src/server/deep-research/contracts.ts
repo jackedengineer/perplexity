@@ -19,5 +19,5 @@ const searchSteps=(start:number)=>Array.from({length:3},(_,i)=>[step(`query-${st
 export const deepResearch={version:'deep-research-v1',deadlineMs:900_000,leaseMs:30_000,steps:[
  step('input','MODEL',2250n),step('plan','MODEL',12000n),...searchSteps(1),step('initial-evidence','MODEL',2250n),
  step('refine','MODEL',12000n),...searchSteps(4),step('extract','SEARCH',15000n),step('evidence','MODEL',2250n),
- ...sectionNames.flatMap((_,i)=>[step(`draft-${i}`,'MODEL',14000n),step(`output-${i}`,'MODEL',2250n)]),step('publish','SYSTEM',0n),
+ ...sectionNames.flatMap((_,i)=>[step(`draft-${i}`,'MODEL',14000n),step(`output-${i}`,'MODEL',2250n)]),step('report-safety','MODEL',2250n),step('publish','SYSTEM',0n),
 ]} as const;

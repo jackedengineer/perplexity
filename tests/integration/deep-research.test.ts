@@ -60,7 +60,7 @@ it('completes six searches and releases only the atomically approved three-secti
  expect(await consumeResearch(f.db,id,{providers:p})).toBe('COMPLETED');expect(calls).toBe(6);
  const job=await readJob(f.db,f.subject,id);expect(job.report?.sections).toHaveLength(3);expect(job.report?.sections[0].answer.sources[0].url).toBe('https://www.postgresql.org/docs/');
  expect(await consumeResearch(f.db,id,{providers:p})).toBe('DUPLICATE');expect(calls).toBe(6);
- expect(job.spentMicroUsd).toBe('106700');expect(job.heldMicroUsd).toBe('0');
+ expect(job.spentMicroUsd).toBe('106800');expect(job.heldMicroUsd).toBe('0');
 });
 it('blocks unsafe queries before search and never returns a private draft',async()=>{
  const id=await admitJob(f.db,f.subject,input(),f.key,models),p=providers();let calls=0;
@@ -79,4 +79,11 @@ it('retains unknown provider exposure and never retries the paid operation',asyn
 it('rejects output without valid citations and exposes no partial report',async()=>{
  const id=await admitJob(f.db,f.subject,input(),f.key,models),p=providers();p.answer.generate=async()=>({text:'Unsupported answer [S9]',usage:{costMicroUsd:100n,inputTokens:1,outputTokens:1,actualModel:'fixture'}});
  expect(await consumeResearch(f.db,id,{providers:p})).toBe('FAILED');expect((await readJob(f.db,f.subject,id)).report).toBeUndefined();
+});
+
+it('checks cross-section interactions before publishing the assembled report',async()=>{
+ const id=await admitJob(f.db,f.subject,input(),f.key,models),p=providers();const allow=p.output.classify;
+ p.output={...p.output,classify:async(value,signal)=>value.text.includes('complete assembled')?{decision:'BLOCK',categoryCodes:['FRAUD'],policyVersion:'v1'}:allow(value,signal)};
+ expect(await consumeResearch(f.db,id,{providers:p})).toBe('FAILED');expect((await readJob(f.db,f.subject,id)).report).toBeUndefined();
+ expect((await f.db.select().from(jobCheckpoints).where(eq(jobCheckpoints.jobId,id))).some(c=>c.step==='publish')).toBe(false);
 });
