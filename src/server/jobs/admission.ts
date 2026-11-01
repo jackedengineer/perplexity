@@ -1,11 +1,17 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {and,eq,gt,inArray,lte,or,sql} from 'drizzle-orm';
-import {appUsers,durableJobs as jobs,jobPeriods as periods,jobReservations as reservations,jobSteps as steps,jobOutbox as outbox,jobEvents as events,operatorUsageBuckets as budgets} from '@/db/schema';
-import {JobError,executionCheck,jobSubmission,type JobView,type JobEvent,type JobState} from './contracts';
+import {appUsers,durableJobs as jobs,jobPeriods as periods,jobReservations as reservations,jobSteps as steps,jobOutbox as outbox,jobEvents as events,operatorUsageBuckets as budgets,jobResearchInputs} from '@/db/schema';
+import {JobError,manifestFor,jobSubmission,type JobView,type JobEvent,type JobState} from './contracts';
+import {inspectInput} from '@/server/safety/deterministic';
+import {researchModels,researchReport} from '@/server/deep-research/contracts';
+import {readCheckpoint} from '@/server/deep-research/checkpoints';
 import {appendEvent,databaseNow,ownerFor,type JobDatabase} from './store';
-export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetKey:string){
+export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetKey:string,models?:import('zod').infer<typeof researchModels>){
  const parsed=jobSubmission.safeParse(raw);if(!parsed.success||!budgetKey)throw new JobError('INVALID_INPUT');
- const input=parsed.data,fingerprint=createHash('sha256').update(JSON.stringify({version:input.version,workflow:input.workflow})).digest('hex');
+ const input=parsed.data,manifest=manifestFor(input.workflow);
+ if(input.workflow==='deep-research-v1'&&!models)throw new JobError('DISABLED');
+ if(input.workflow==='deep-research-v1'&&inspectInput({text:input.question,context:[]}))throw new JobError('INVALID_INPUT');
+ const fingerprint=createHash('sha256').update(JSON.stringify(input.workflow==='deep-research-v1'?{version:input.version,workflow:input.workflow,question:input.question,locale:input.locale}:{version:input.version,workflow:input.workflow})).digest('hex');
  return db.transaction(async tx=>{
   await tx.execute(sql`SET LOCAL lock_timeout='2s'`);
   const owner=await ownerFor(tx,subject);
@@ -22,14 +28,15 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
   // Same ascending UUID operator lock order as FAST and the reviewed renewal function.
   const windows=await tx.select().from(budgets).where(and(eq(budgets.budgetKey,budgetKey),lte(budgets.startsAt,now),gt(budgets.endsAt,now))).orderBy(budgets.id).limit(3).for('update');
   const day=windows.find(w=>w.kind==='DAY'),month=windows.find(w=>w.kind==='PERIOD');
-  const reserve=executionCheck.steps.reduce((n,s)=>n+s.capMicroUsd,0n);
+  const reserve=manifest.steps.reduce((n,s)=>n+s.capMicroUsd,0n);
   if(windows.length!==2||!day||!month)throw new JobError('UNAVAILABLE');
   if(windows.some(w=>w.providerLimitMicroUsd-w.reservedProviderMicroUsd-w.settledProviderMicroUsd<reserve))throw new JobError('QUOTA');
   await tx.update(periods).set({reservedJobs:sql`${periods.reservedJobs}+1`}).where(eq(periods.id,period.id));
   await tx.update(budgets).set({reservedProviderMicroUsd:sql`${budgets.reservedProviderMicroUsd}+${reserve}`}).where(inArray(budgets.id,windows.map(w=>w.id)));
-  const [job]=await tx.insert(jobs).values({userId:owner,requestId:input.requestId,fingerprint,workflow:input.workflow,periodId:period.id,createdAt:now,deadlineAt:new Date(Math.min(now.getTime()+executionCheck.deadlineMs,period.endsAt.getTime(),...windows.map(w=>w.endsAt.getTime())))}).returning();
+  const [job]=await tx.insert(jobs).values({userId:owner,requestId:input.requestId,fingerprint,workflow:input.workflow,periodId:period.id,createdAt:now,deadlineAt:new Date(Math.min(now.getTime()+manifest.deadlineMs,period.endsAt.getTime(),...windows.map(w=>w.endsAt.getTime())))}).returning();
   await tx.insert(reservations).values({jobId:job.id,budgetKey,operatorPeriodId:month.id,operatorDayId:day.id,reservedMicroUsd:reserve});
-  await tx.insert(steps).values(executionCheck.steps.map(s=>({jobId:job.id,...s})));
+  await tx.insert(steps).values(manifest.steps.map(s=>({jobId:job.id,...s})));
+  if(input.workflow==='deep-research-v1')await tx.insert(jobResearchInputs).values({jobId:job.id,snapshot:{question:input.question,locale:input.locale,models:researchModels.parse(models),policy:'v1',version:'deep-research-v1'}});
   await tx.insert(outbox).values({jobId:job.id});await appendEvent(tx,job.id,'QUEUED');
   return job.id;
  });
@@ -38,10 +45,11 @@ export async function readJob(db:JobDatabase,subject:string,id:string):Promise<J
  const [row]=await db.select({job:jobs,reservation:reservations}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))
   .innerJoin(reservations,eq(reservations.jobId,jobs.id)).where(and(eq(jobs.id,id),eq(appUsers.authSubject,subject))).limit(1);
  if(!row)throw new JobError('NOT_FOUND');const {job,reservation}=row;
- return {id:job.id,workflow:job.workflow,state:job.state as JobState,createdAt:job.createdAt.toISOString(),deadlineAt:job.deadlineAt.toISOString(),cursor:job.nextEvent-1,heldMicroUsd:reservation.heldMicroUsd.toString(),spentMicroUsd:reservation.spentMicroUsd.toString()};
+ const report=job.workflow==='deep-research-v1'&&job.state==='COMPLETED'?researchReport.parse(await readCheckpoint(db,id,'publish')):undefined;
+ return {...(report?{report}:{}),id:job.id,workflow:job.workflow,state:job.state as JobState,createdAt:job.createdAt.toISOString(),deadlineAt:job.deadlineAt.toISOString(),cursor:job.nextEvent-1,heldMicroUsd:reservation.heldMicroUsd.toString(),spentMicroUsd:reservation.spentMicroUsd.toString()};
 }
 export async function listJobs(db:JobDatabase,subject:string){
- return db.select({id:jobs.id,state:jobs.state,createdAt:jobs.createdAt}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))
+ return db.select({id:jobs.id,state:jobs.state,createdAt:jobs.createdAt,workflow:jobs.workflow}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))
   .where(eq(appUsers.authSubject,subject)).orderBy(sql`${jobs.createdAt} DESC`,jobs.id).limit(20);
 }
 export async function readEvents(db:JobDatabase,subject:string,id:string,after:number):Promise<JobEvent[]>{

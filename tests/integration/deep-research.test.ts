@@ -1,0 +1,44 @@
+import {afterAll,beforeAll,expect,it} from 'vitest';
+import {eq,sql} from 'drizzle-orm';
+import {jobsFixture} from './jobs-fixture';
+import {admitJob,readJob} from '@/server/jobs/admission';
+import {claimJob,startStep,completeStep,recoverJobs,failJob} from '@/server/jobs/worker';
+import {readCheckpoint} from '@/server/deep-research/checkpoints';
+import {durableJobs,jobSteps,jobReservations,operatorUsageBuckets,jobResearchInputs,jobCheckpoints} from '@/db/schema';
+const models={safety:{modelId:'openai/gpt-4.1-nano',provider:'azure'},planner:{modelId:'openai/gpt-4.1-nano',provider:'azure'},answer:{modelId:'openai/gpt-4.1-mini',provider:'azure'}};
+let f:Awaited<ReturnType<typeof jobsFixture>>;
+beforeAll(async()=>{f=await jobsFixture();await f.db.update(operatorUsageBuckets).set({providerLimitMicroUsd:1000000n});},30000);
+afterAll(()=>f?.pg.close());
+const input=()=>({version:1,workflow:'deep-research-v1',requestId:crypto.randomUUID(),question:'Compare SQLite and PostgreSQL for offline applications.',locale:'en'});
+it('requires explicit server configuration and rejects secrets before storage',async()=>{
+ await expect(admitJob(f.db,f.subject,input(),f.key)).rejects.toThrow('DISABLED');
+ const raw={...input(),question:'My key is sk-proj-'+ 'a'.repeat(50)};
+ await expect(admitJob(f.db,f.subject,raw,f.key,models)).rejects.toThrow();
+ expect(await f.db.select().from(jobResearchInputs)).toHaveLength(0);
+});
+it('snapshots private original, idempotency and all call reservations atomically',async()=>{
+ const raw=input(),id=await admitJob(f.db,f.subject,raw,f.key,models);
+ expect(await admitJob(f.db,f.subject,raw,f.key,models)).toBe(id);
+ await expect(admitJob(f.db,f.subject,{...raw,question:'Another topic'},f.key,models)).rejects.toThrow('CONFLICT');
+ expect((await readJob(f.db,f.subject,id))).not.toHaveProperty('question');
+ expect((await f.db.select().from(jobResearchInputs))[0].snapshot.question).toBe(raw.question);
+ expect((await f.db.select().from(jobReservations))[0].reservedMicroUsd).toBeGreaterThan(100000n);
+ const lease=(await claimJob(f.db,id))!;await startStep(f.db,lease,'input');
+ await completeStep(f.db,lease,'input',100n,{allowed:true});
+ expect(await readCheckpoint(f.db,id,'input')).toEqual({allowed:true});
+ await f.db.update(durableJobs).set({leaseUntil:new Date(Date.now()-1000)}).where(eq(durableJobs.id,id));
+ await recoverJobs(f.db);const next=(await claimJob(f.db,id))!;
+ expect(await startStep(f.db,next,'input')).toBe('DONE');
+ expect(await readCheckpoint(f.db,id,'input')).toEqual({allowed:true});
+ await expect(completeStep(f.db,lease,'input',100n,{changed:true})).rejects.toThrow('STALE');
+ await startStep(f.db,next,'plan');await failJob(f.db,next);
+ const view=await readJob(f.db,f.subject,id);expect(view.state).toBe('FAILED');expect(view.spentMicroUsd).toBe('100');expect(view.heldMicroUsd).toBe('12000');
+ expect((await f.db.select().from(jobSteps).where(eq(jobSteps.key,'plan')))[0].state).toBe('UNKNOWN');
+ expect((await f.db.select().from(operatorUsageBuckets)).every(b=>b.reservedProviderMicroUsd===12000n&&b.settledProviderMicroUsd===100n)).toBe(true);
+});
+it('detects checkpoint tampering instead of replaying corrupt evidence',async()=>{
+ const [saved]=await f.db.select().from(jobCheckpoints);await f.db.update(jobCheckpoints).set({value:{tampered:true}}).where(eq(jobCheckpoints.jobId,saved.jobId));
+ await expect(readCheckpoint(f.db,saved.jobId,saved.step)).rejects.toThrow('UNAVAILABLE');
+ expect((await f.pg.query<{n:number}>('SELECT count(*)::int n FROM job_checkpoints')).rows[0].n).toBe(1);
+ await f.db.execute(sql`SELECT 1`);
+});

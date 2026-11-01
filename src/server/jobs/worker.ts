@@ -1,6 +1,7 @@
 import {and,eq,gt,inArray,lte,or,sql} from 'drizzle-orm';
-import {durableJobs as jobs,jobPeriods as periods,jobSteps as steps,jobReservations as reservations,jobOutbox as outbox,operatorUsageBuckets as budgets,appUsers} from '@/db/schema';
-import {JobError,activeJob,executionCheck,type JobState} from './contracts';
+import {durableJobs as jobs,jobPeriods as periods,jobSteps as steps,jobReservations as reservations,jobOutbox as outbox,operatorUsageBuckets as budgets,appUsers,jobCheckpoints} from '@/db/schema';
+import {JobError,activeJob,manifestFor,type JobState} from './contracts';
+import {checkpointHash} from '@/server/deep-research/checkpoints';
 import {appendEvent,databaseNow,lockJob,type JobDatabase,type JobTransaction} from './store';
 export type JobLease={jobId:string;generation:number};
 type Job=typeof jobs.$inferSelect;
@@ -48,38 +49,40 @@ export async function claimJob(db:JobDatabase,id:string,budgetKey?:string):Promi
   const [period]=await tx.select().from(periods).where(eq(periods.id,job.periodId)).for('share');
   if(job.deadlineAt<=now||!period||period.state!=='ACTIVE'||period.endsAt<=now){await settle(tx,job,job.deadlineAt<=now?'EXPIRED':'CANCELLED');return null;}
   const generation=job.generation+1;
-  await tx.update(jobs).set({state:'RUNNING',generation,leaseUntil:new Date(now.getTime()+executionCheck.leaseMs),updatedAt:now}).where(eq(jobs.id,id));
+  await tx.update(jobs).set({state:'RUNNING',generation,leaseUntil:new Date(now.getTime()+manifestFor(job.workflow).leaseMs),updatedAt:now}).where(eq(jobs.id,id));
   await appendEvent(tx,id,'RUNNING');return {jobId:id,generation};
  });
 }
 export async function heartbeat(db:JobDatabase,lease:JobLease){
  return db.transaction(async tx=>{
-  const {now}=await validateLease(tx,lease);
-  await tx.update(jobs).set({leaseUntil:new Date(now.getTime()+executionCheck.leaseMs),updatedAt:now}).where(eq(jobs.id,lease.jobId));
+  const {now,job}=await validateLease(tx,lease);
+  await tx.update(jobs).set({leaseUntil:new Date(now.getTime()+manifestFor(job.workflow).leaseMs),updatedAt:now}).where(eq(jobs.id,lease.jobId));
  });
 }
 export async function startStep(db:JobDatabase,lease:JobLease,key:string){
  return db.transaction(async tx=>{
-  const {now}=await validateLease(tx,lease);
+  const {now,job}=await validateLease(tx,lease);
   const [step]=await tx.select().from(steps).where(and(eq(steps.jobId,lease.jobId),eq(steps.key,key)));
-  const manifest=executionCheck.steps.find(s=>s.key===key);
+  const manifest=manifestFor(job.workflow).steps.find(s=>s.key===key);
   if(!step||!manifest||step.capMicroUsd!==manifest.capMicroUsd||step.kind!==manifest.kind)throw new JobError('INVALID_INPUT');
   if(step.state==='SUCCEEDED')return 'DONE' as const;
   if(step.state!=='PENDING')throw new JobError('STALE');
   // Fixed order: later executors cannot skip their prerequisite checkpoints.
-  const prior=executionCheck.steps.slice(0,executionCheck.steps.findIndex(s=>s.key===key)).map(s=>s.key);
+  const all=manifestFor(job.workflow).steps;
+  const prior=all.slice(0,all.findIndex(s=>s.key===key)).map(s=>s.key);
   if(prior.length&&(await tx.select().from(steps).where(and(eq(steps.jobId,lease.jobId),inArray(steps.key,prior),sql`${steps.state}<>'SUCCEEDED'`))).length)throw new JobError('CONFLICT');
   await tx.update(steps).set({state:'STARTED',generation:lease.generation,startedAt:now}).where(and(eq(steps.jobId,lease.jobId),eq(steps.key,key)));
   await appendEvent(tx,lease.jobId,'STEP_STARTED',key);return 'START' as const;
  });
 }
-export async function completeStep(db:JobDatabase,lease:JobLease,key:string,cost:bigint){
+export async function completeStep(db:JobDatabase,lease:JobLease,key:string,cost:bigint,value?:unknown){
  return db.transaction(async tx=>{
   const {now}=await validateLease(tx,lease);
   const [step]=await tx.select().from(steps).where(and(eq(steps.jobId,lease.jobId),eq(steps.key,key)));
   if(!step||step.generation!==lease.generation||cost<0n||cost>step.capMicroUsd)throw new JobError('STALE');
   if(step.state==='SUCCEEDED'){if(step.costMicroUsd!==cost)throw new JobError('CONFLICT');return;}
   if(step.state!=='STARTED')throw new JobError('STALE');
+  if(value!==undefined)await tx.insert(jobCheckpoints).values({jobId:lease.jobId,step:key,value,hash:checkpointHash(value)});
   await tx.update(steps).set({state:'SUCCEEDED',costMicroUsd:cost,finishedAt:now}).where(and(eq(steps.jobId,lease.jobId),eq(steps.key,key)));
   await appendEvent(tx,lease.jobId,'STEP_COMPLETED',key);
  });
@@ -89,7 +92,8 @@ export async function completeJob(db:JobDatabase,lease:JobLease){
   const job=await lockJob(tx,lease.jobId);if(job.state==='COMPLETED')return;
   await validateLease(tx,lease);
   const all=await tx.select().from(steps).where(eq(steps.jobId,job.id));
-  if(all.length!==executionCheck.steps.length||all.some(s=>s.state!=='SUCCEEDED'||!executionCheck.steps.some(m=>m.key===s.key&&m.kind===s.kind&&m.capMicroUsd===s.capMicroUsd)))throw new JobError('CONFLICT');
+  const manifest=manifestFor(job.workflow);
+  if(all.length!==manifest.steps.length||all.some(s=>s.state!=='SUCCEEDED'||!manifest.steps.some(m=>m.key===s.key&&m.kind===s.kind&&m.capMicroUsd===s.capMicroUsd)))throw new JobError('CONFLICT');
   await settle(tx,job,'COMPLETED');
  });
 }
@@ -128,3 +132,5 @@ export async function recoverJobs(db:JobDatabase,limit=20,budgetKey?:string){
  });
  return recovered;
 }
+
+export async function failJob(db:JobDatabase,lease:JobLease){return db.transaction(async tx=>{const {job}=await validateLease(tx,lease);await settle(tx,job,'FAILED');});}
