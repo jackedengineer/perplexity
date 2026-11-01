@@ -1,8 +1,58 @@
-# Current release checks — 31 October 2026
+# Current release checks — 1 November 2026
 
 Decision: **HOLD full release acceptance.** The public site and guest entry are
 already deployed. This section supersedes historical status below. The original
 record is also retained in [the October 23 checklist](release-checklist-20261023.md).
+
+## Durable job and paid-access foundation — development only
+
+This change does not open Deep Research, browser tasks or live purchases. Both
+new feature flags remain off by default and reject Vercel production. Existing
+FAST research, guest behavior, the $2 OpenRouter cap and production financial
+holds remain unchanged. [Architecture, setup and limits](durable-jobs.md).
+
+- [x] Atomic owned admission/reservation/outbox, immutable step identities,
+  generation fencing, checkpoint replay, cancellation, expiry and conservative
+  known/unknown-cost settlement. Compound FKs bind owner and budget snapshots.
+- [x] Real restricted-role development Neon: all three concurrent-admission,
+  actual worker-process crash/restart and cancellation cases pass on the final
+  engine in **58.89 seconds**. Synthetic rows/namespaces are cleaned. Earlier
+  successful run: 70.55 seconds; neither run uses paid AI calls.
+- [x] Trigger Development registers both tasks and consumes real outbox deliveries.
+  Browser reload before/during execution, completion and persisted Stop pass.
+  Only the explicit execution-check workflow is registered, not a research agent.
+- [x] Razorpay TEST: selected ₹999/month Pro plan, actual test-card capture,
+  server-fetched invoice/payment verification, ten-check test entitlement and
+  renewal cancellation retaining paid-through coverage. The shared test API key
+  was copied from the user's other local project without regenerating it.
+- [x] Four final desktop/mobile development browser cases pass in **2.7 minutes**:
+  paid/owner isolation, reconnect/reload/Back replay, cancellation/completion,
+  full-page accessibility, reduced motion, no hydration errors, and raw webhook
+  HMAC/forgery/duplicate/conflicting-ID checks. Local signed HTTP delivery does
+  not establish provider-origin hosted webhook delivery.
+- [x] Existing production-build browser checks pass: **10 public/disabled-boundary
+  cases (8.5 s)** and **12 answer-motion cases (1.1 min)**. Word reveal/citations
+  and default-off paid boundaries retain their previous behavior.
+- [x] Full serial offline run: **705/705**; the latest focused configuration,
+  accounting and billing run: **19/19**, including the additional invoice-order
+  regression. Lint/types and production build pass. The first concurrent local
+  run encountered PGlite startup timeouts and was stopped; it is not a pass.
+  Original assertions, hook deadlines and CI concurrency gates remain unchanged.
+- [x] Dependency audit has **no high/critical** findings (four moderate development
+  advisories remain). Patched CLI transitives are pinned; its TypeScript 5 peer
+  is isolated from the application's TypeScript 6 without suppressing checks.
+- [x] Local metadata API timings: desktop 20 samples, p50 902 ms / p95 1591 ms /
+  max 2196 ms; mobile 22 samples, p50 927 ms / p95 1910 ms / max 2087 ms. These are
+  unthrottled development-Neon request durations, not hosted research latency,
+  field INP or a production SLO. The execution check deliberately waits at each
+  checkpoint and makes no provider inference/search request.
+- [ ] Obtain successful CI and independent review on the final PR head.
+- [ ] Before enabling actual paid features: implement/evaluate the Deep Research
+  evidence loop and browser-task approvals/executors; provision reviewed live
+  manifests and separate search/browser/compute limits; verify hosted scheduler
+  recovery and HTTPS Razorpay webhook retries/lifecycle; review billing retention,
+  terms/taxes/refunds and production restore/migrations. No live sale is enabled
+  by a successful sandbox checkout or this foundation PR.
 
 ## Current production checkpoint
 

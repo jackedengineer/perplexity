@@ -35,27 +35,27 @@ search or browser calls and no claim that research/agent work is implemented.
 - New features default off. Expose the execution check and sandbox checkout only
   in a dedicated development/test configuration. Never sell incomplete research.
 - Keep the existing $2 OpenRouter cap. This foundation needs no paid AI requests.
-  Trigger/Razorpay credentials are absent; browser sign-in is pending. Credentials
+  Trigger development and Razorpay TEST credentials are configured locally. Credentials
   belong only in ignored local files and server settings, never chat or commits.
 
 ## Ordered increments
 
-1. [ ] Define versioned contracts and additive schema; generated migration and
+1. [x] Define versioned contracts and additive schema; generated migration and
    restricted grants. Prove strict inputs, uniqueness, ownership and billing/job
    period constraints against migrated PGlite before committing.
-2. [ ] Implement atomic job admission, shared operator reservations, ordered events
+2. [x] Implement atomic job admission, shared operator reservations, ordered events
    and dispatch claims. Prove idempotent admission, budget denial and crash-safe
    outbox re-delivery; never put provider calls inside a DB transaction.
-3. [ ] Implement fenced step claims/outcomes, checkpoints, terminal settlement,
+3. [x] Implement fenced step claims/outcomes, checkpoints, terminal settlement,
    cancellation and bounded stale recovery. Prove stale/duplicate workers cannot
    commit or release UNKNOWN holds, and cancellation wins against late completion.
-4. [ ] Connect Trigger.dev and the development worker to the same consumer;
+4. [x] Connect Trigger.dev and the development worker to the same consumer;
    authenticated dispatch, conservative retry limits, expiry and maintenance.
    Verify process restart and duplicate delivery with real development Postgres.
-5. [ ] Implement owner HTTP admission/status/event replay/cancellation and a
+5. [x] Implement owner HTTP admission/status/event replay/cancellation and a
    disabled-by-default execution-check UI with loading, retry and error states.
    Verify refresh/reconnect, owner isolation, stop and recovery in desktop/mobile.
-6. [ ] Add Razorpay test checkout, verified-cycle entitlement, durable webhook
+6. [x] Add Razorpay test checkout, verified-cycle entitlement, durable webhook
    inbox/reconciliation and billing status/cancellation UI. Test forgery, duplicates,
    out-of-order/reversed events, wrong environment/plan/currency, paid-through and
    unknown creation. Connect actual test credentials when browser setup is ready.
@@ -75,3 +75,20 @@ search or browser calls and no claim that research/agent work is implemented.
 Acceptance is scoped to the foundation, not full T26 research quality or arbitrary
 browser-task execution. Provider sandbox, hosted scheduling and live billing checks
 must be recorded honestly if credentials or merchant activation remain unavailable.
+
+## Verified handoff
+
+- Real TEST ₹999 capture, invoice-verified ten-check access and renewal cancellation
+  passed in the in-app browser. The shared Razorpay key was not regenerated.
+- Four final desktop/mobile job/webhook cases pass, including owned Stop, Back,
+  reload, reduced motion, full-page accessibility and no hydration errors.
+- Three final real PostgreSQL/process cases pass in 58.89 s; all captured
+  synthetic fixtures and their zero-dollar namespace were cleaned.
+- Local 705-test full run, latest 19 targeted cases, lint/types/build, 10 default
+  browser cases, 12 answer-motion cases and high/critical audit gates pass.
+- Hosted scheduler/webhook delivery, billable executors, live feature activation
+  and final GitHub CI/review remain explicit release gates.
+- [x] Focused implementation commits pushed to the requested GitHub repository.
+- [ ] Open the verified foundation PR and attach its CI/review handoff.
+
+Detailed evidence and limitations: [release checklist](../docs/release-checklist.md).
