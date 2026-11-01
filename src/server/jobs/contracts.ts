@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {researchInput,deepResearch,type ResearchReport} from '@/server/deep-research/contracts';
+import {researchInput,deepResearch} from '@/server/deep-research/contracts';
 export const jobSubmission=z.discriminatedUnion('workflow',[z.strictObject({version:z.literal(1),workflow:z.literal('execution-check-v1'),requestId:z.uuid()}),researchInput.extend({version:z.literal(1),workflow:z.literal('deep-research-v1'),requestId:z.uuid()})]);
 export const jobCursor=z.coerce.number().int().min(0).max(1_000_000);
 export const jobId=z.uuid();
@@ -12,7 +12,7 @@ export const executionCheck={version:'execution-check-v1',deadlineMs:120_000,lea
 export function manifestFor(workflow:string){if(workflow===executionCheck.version)return executionCheck;if(workflow===deepResearch.version)return deepResearch;throw new JobError('INVALID_INPUT');}
 export const progressCodes=['QUEUED','RUNNING','STEP_STARTED','STEP_COMPLETED','RECOVERED','CANCELLED','COMPLETED','FAILED','EXPIRED','COST_UNKNOWN'] as const;
 export type ProgressCode=typeof progressCodes[number];
-export type JobView={id:string;workflow:string;state:JobState;createdAt:string;deadlineAt:string;cursor:number;heldMicroUsd:string;spentMicroUsd:string;report?:ResearchReport};
+export type JobView={id:string;workflow:string;state:JobState;createdAt:string;deadlineAt:string;cursor:number;heldMicroUsd:string;spentMicroUsd:string;report?:import('@/server/deep-research/view').PublicResearchReport};
 export type JobEvent={sequence:number;code:ProgressCode;step:string|null;createdAt:string};
 export class JobError extends Error {
  constructor(public code:'DISABLED'|'NOT_FOUND'|'PAYMENT_REQUIRED'|'CONFLICT'|'QUOTA'|'STALE'|'INVALID_INPUT'|'UNAVAILABLE'){super(code);}

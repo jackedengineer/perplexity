@@ -2,6 +2,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {and,eq,gt,inArray,lte,or,sql} from 'drizzle-orm';
 import {appUsers,durableJobs as jobs,jobPeriods as periods,jobReservations as reservations,jobSteps as steps,jobOutbox as outbox,jobEvents as events,operatorUsageBuckets as budgets,jobResearchInputs} from '@/db/schema';
 import {JobError,manifestFor,jobSubmission,type JobView,type JobEvent,type JobState} from './contracts';
+import {presentAnswer} from '@/server/answers/presentation';
 import {inspectInput} from '@/server/safety/deterministic';
 import {researchModels,researchReport} from '@/server/deep-research/contracts';
 import {readCheckpoint} from '@/server/deep-research/checkpoints';
@@ -45,7 +46,8 @@ export async function readJob(db:JobDatabase,subject:string,id:string):Promise<J
  const [row]=await db.select({job:jobs,reservation:reservations}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))
   .innerJoin(reservations,eq(reservations.jobId,jobs.id)).where(and(eq(jobs.id,id),eq(appUsers.authSubject,subject))).limit(1);
  if(!row)throw new JobError('NOT_FOUND');const {job,reservation}=row;
- const report=job.workflow==='deep-research-v1'&&job.state==='COMPLETED'?researchReport.parse(await readCheckpoint(db,id,'publish')):undefined;
+ const privateReport=job.workflow==='deep-research-v1'&&job.state==='COMPLETED'?researchReport.parse(await readCheckpoint(db,id,'publish')):undefined;
+ const report=privateReport?{question:privateReport.question,createdAt:privateReport.createdAt,sections:privateReport.sections.map(s=>({title:s.title,markdown:s.answer.markdown,answer:presentAnswer(s.answer)}))}:undefined;
  return {...(report?{report}:{}),id:job.id,workflow:job.workflow,state:job.state as JobState,createdAt:job.createdAt.toISOString(),deadlineAt:job.deadlineAt.toISOString(),cursor:job.nextEvent-1,heldMicroUsd:reservation.heldMicroUsd.toString(),spentMicroUsd:reservation.spentMicroUsd.toString()};
 }
 export async function listJobs(db:JobDatabase,subject:string){
