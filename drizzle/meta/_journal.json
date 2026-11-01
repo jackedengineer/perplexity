@@ -183,6 +183,13 @@
       "when": 1793537711406,
       "tag": "0025_low_doomsday",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793538206250,
+      "tag": "0026_talented_nemesis",
+      "breakpoints": true
     }
   ]
 }

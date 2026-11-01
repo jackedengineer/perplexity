@@ -32,3 +32,6 @@ GRANT UPDATE (state, reserved_jobs, spent_jobs) ON job_periods TO perplex_web;
 GRANT UPDATE (state, generation, cost_micro_usd, started_at, finished_at) ON job_steps TO perplex_web;
 GRANT UPDATE (spent_micro_usd, held_micro_usd, settled_at) ON job_reservations TO perplex_web;
 GRANT UPDATE (revision, state, attempts, lease_token, lease_until, available_at) ON job_outbox TO perplex_web;
+GRANT SELECT, INSERT ON billing_checkouts, billing_inbox, billing_reversals TO perplex_web;
+GRANT UPDATE (subscription_id, state, provider_state, cancel_at_cycle_end, updated_at) ON billing_checkouts TO perplex_web;
+GRANT UPDATE (state, attempts, lease_token, lease_until, available_at) ON billing_inbox TO perplex_web;
