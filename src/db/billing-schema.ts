@@ -7,7 +7,7 @@ export const billingCheckouts=pgTable('billing_checkouts',{
  planId:varchar('plan_id',{length:80}).notNull(),priceKey:varchar('price_key',{length:32}).notNull(),environment:varchar('environment',{length:8}).notNull(),
  subscriptionId:varchar('subscription_id',{length:80}).unique(),state:varchar('state',{length:16}).notNull(),providerState:varchar('provider_state',{length:32}),cancelAtCycleEnd:boolean('cancel_at_cycle_end').notNull().default(false),
  createdAt:instant('created_at').notNull().defaultNow(),updatedAt:instant('updated_at').notNull().defaultNow(),
-},t=>[uniqueIndex('checkout_owner_intent').on(t.userId,t.requestId),uniqueIndex('checkout_one_open_owner').on(t.userId).where(sql`${t.state} IN ('CREATING','READY','UNKNOWN')`),index('checkout_reconcile').on(t.state,t.updatedAt),
+},t=>[uniqueIndex('checkout_subscription_owner').on(t.subscriptionId,t.userId),uniqueIndex('checkout_owner_intent').on(t.userId,t.requestId),uniqueIndex('checkout_one_open_owner').on(t.userId).where(sql`${t.state} IN ('CREATING','READY','UNKNOWN')`),index('checkout_reconcile').on(t.state,t.updatedAt),
  check('checkout_test_plan_valid',sql`${t.environment}='TEST' AND ${t.priceKey}='pro-monthly-inr-v1' AND ${t.state} IN ('CREATING','READY','UNKNOWN','CANCELLED','COMPLETED')`)]);
 export const billingInbox=pgTable('billing_inbox',{
  eventId:varchar('event_id',{length:100}).primaryKey(),bodyHash:varchar('body_hash',{length:64}).notNull(),kind:varchar('kind',{length:64}).notNull(),

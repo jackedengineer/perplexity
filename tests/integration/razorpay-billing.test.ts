@@ -10,7 +10,7 @@ let checkoutId='';const sub=()=>({id:'sub_billing',plan_id:'plan_billing',status
 const now=Math.floor(Date.now()/1000),invoice=()=>({id:'inv_billing',payment_id:'pay_billing',status:'paid',amount:99900,amount_paid:99900,currency:'INR',billing_start:now-10,billing_end:now+2592000});
 const payment=()=>({id:'pay_billing',invoice_id:'inv_billing',status:'captured',amount:99900,currency:'INR',amount_refunded:refunded?99900:0});
 const api:RazorpayApi={keyId:'rzp_test_billing',plan:async()=>({id:'plan_billing',period:'monthly',interval:1,item:{amount:99900,currency:'INR'}}),create:async id=>{creations++;checkoutId=id;return sub();},subscription:async()=>sub(),subscriptions:async()=>[sub()],invoices:async()=>[invoice()],payment:async()=>payment(),cancel:async()=>({...sub(),status:'cancelled'})};
-beforeAll(async()=>{f=await jobsFixture();await f.db.delete(jobPeriods);},30000);afterAll(()=>f.pg.close());
+beforeAll(async()=>{f=await jobsFixture();await f.db.delete(jobPeriods);await f.db.delete(billingCheckouts);},30000);afterAll(()=>f?.pg.close());
 const start=()=>startCheckout(f.db,f.subject,{requestId:crypto.randomUUID(),priceKey:proPlan.priceKey},'plan_billing',api);
 it('creates once, binds owner/price and refuses to grant on checkout creation alone',async()=>{
  const input={requestId:crypto.randomUUID(),priceKey:proPlan.priceKey};const first=await startCheckout(f.db,f.subject,input,'plan_billing',api);

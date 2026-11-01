@@ -4,7 +4,7 @@ import {admitJob,readJob,readEvents} from '@/server/jobs/admission';
 import {consumeJob,dispatchJobs} from '@/server/jobs/consumer';
 import {cancelJob} from '@/server/jobs/worker';
 let f:Awaited<ReturnType<typeof jobsFixture>>;
-beforeAll(async()=>{f=await jobsFixture();},30000);afterAll(()=>f.pg.close());
+beforeAll(async()=>{f=await jobsFixture();},30000);afterAll(()=>f?.pg.close());
 it('uses one consumer for dispatch and duplicate delivery, with persisted checkpoints',async()=>{
  const id=await admitJob(f.db,f.subject,{version:1,workflow:'execution-check-v1',requestId:crypto.randomUUID()},f.key);
  expect(await dispatchJobs(f.db,async claim=>{await consumeJob(f.db,claim.jobId,{stepMs:0});})).toBe(1);

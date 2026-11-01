@@ -4,7 +4,7 @@ import {jobOutbox,jobPeriods,operatorUsageBuckets,jobEvents} from '@/db/schema';
 import {admitJob,readJob,readEvents,claimDispatch,finishDispatch} from '@/server/jobs/admission';
 import {jobsFixture} from './jobs-fixture';
 let f:Awaited<ReturnType<typeof jobsFixture>>;
-beforeAll(async()=>{f=await jobsFixture();},30000);afterAll(()=>f.pg.close());
+beforeAll(async()=>{f=await jobsFixture();},30000);afterAll(()=>f?.pg.close());
 const submit=()=>({version:1 as const,workflow:'execution-check-v1' as const,requestId:crypto.randomUUID()});
 it('atomically admits a paid owned job, steps, reservation, events and outbox; replay charges once',async()=>{
  const input=submit(),id=await admitJob(f.db,f.subject,input,f.key);

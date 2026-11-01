@@ -7,6 +7,7 @@ beforeAll(async()=>{
  for(const entry of journal.entries)await pg.exec(await readFile(`drizzle/${entry.tag}.sql`,'utf8'));
  await pg.exec(`INSERT INTO "user"(id,name,email) VALUES ('jobs-schema','Test','jobs-schema@example.test')`);
  await pg.query('INSERT INTO app_users(id,auth_subject) VALUES ($1,$2)',[owner,'jobs-schema']);
+ await pg.query(`INSERT INTO billing_checkouts(user_id,request_id,plan_id,price_key,environment,subscription_id,state) VALUES ($1,$2,'plan_schema','pro-monthly-inr-v1','TEST','sub_schema','READY')`,[owner,crypto.randomUUID()]);
  await pg.query(`INSERT INTO job_periods(id,user_id,environment,payment_id,invoice_id,subscription_id,starts_at,ends_at,job_limit) VALUES ($1,$2,'TEST','pay_schema','inv_schema','sub_schema',now(),now()+interval '1 day',3)`,[period,owner]);
  await pg.query(`INSERT INTO durable_jobs(id,user_id,request_id,fingerprint,workflow,period_id,deadline_at) VALUES ($1,$2,$3,$4,'execution-check-v1',$5,now()+interval '2 minutes')`,[job,owner,intent,'a'.repeat(64),period]);
 },30000);
@@ -38,4 +39,9 @@ it('keeps immutable grant and step snapshots out of runtime UPDATE privileges',a
   expect((await pg.query(`SELECT has_column_privilege(current_user,'job_periods','job_limit','UPDATE') AS escalate, has_column_privilege(current_user,'job_steps','cap_micro_usd','UPDATE') AS cap,has_table_privilege(current_user,'job_events','DELETE') AS erase`)).rows).toEqual([{escalate:false,cap:false,erase:false}]);
   expect((await pg.query('SELECT id FROM durable_jobs')).rows).toHaveLength(1);
  }finally{await pg.exec('RESET ROLE');}
+});
+it('rejects a job bound to another owner’s captured period',async()=>{
+ const other=crypto.randomUUID();await pg.query(`INSERT INTO "user"(id,name,email) VALUES ($1,'Other',$2)`,[other,other+'@example.test']);
+ await pg.query('INSERT INTO app_users(id,auth_subject) VALUES ($1,$2)',[other,other]);
+ await expect(pg.query(`INSERT INTO durable_jobs(user_id,request_id,fingerprint,workflow,period_id,deadline_at) VALUES ($1,$2,$3,'execution-check-v1',$4,now()+interval '1 minute')`,[other,crypto.randomUUID(),'a'.repeat(64),period])).rejects.toThrow(/foreign key/);
 });

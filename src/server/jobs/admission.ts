@@ -28,7 +28,7 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
   await tx.update(periods).set({reservedJobs:sql`${periods.reservedJobs}+1`}).where(eq(periods.id,period.id));
   await tx.update(budgets).set({reservedProviderMicroUsd:sql`${budgets.reservedProviderMicroUsd}+${reserve}`}).where(inArray(budgets.id,windows.map(w=>w.id)));
   const [job]=await tx.insert(jobs).values({userId:owner,requestId:input.requestId,fingerprint,workflow:input.workflow,periodId:period.id,createdAt:now,deadlineAt:new Date(Math.min(now.getTime()+executionCheck.deadlineMs,period.endsAt.getTime(),...windows.map(w=>w.endsAt.getTime())))}).returning();
-  await tx.insert(reservations).values({jobId:job.id,operatorPeriodId:month.id,operatorDayId:day.id,reservedMicroUsd:reserve});
+  await tx.insert(reservations).values({jobId:job.id,budgetKey,operatorPeriodId:month.id,operatorDayId:day.id,reservedMicroUsd:reserve});
   await tx.insert(steps).values(executionCheck.steps.map(s=>({jobId:job.id,...s})));
   await tx.insert(outbox).values({jobId:job.id});await appendEvent(tx,job.id,'QUEUED');
   return job.id;
@@ -50,11 +50,11 @@ export async function readEvents(db:JobDatabase,subject:string,id:string,after:n
  return rows.map(e=>({sequence:e.sequence,code:e.code as JobEvent['code'],step:e.step,createdAt:e.createdAt.toISOString()}));
 }
 export type DispatchClaim={jobId:string;revision:number;token:string;key:string};
-export async function claimDispatch(db:JobDatabase):Promise<DispatchClaim|null>{
+export async function claimDispatch(db:JobDatabase,budgetKey?:string):Promise<DispatchClaim|null>{
  return db.transaction(async tx=>{
   const now=await databaseNow(tx);
-  const [row]=await tx.select({outbox}).from(outbox).innerJoin(jobs,eq(jobs.id,outbox.jobId))
-   .where(and(inArray(jobs.state,['QUEUED','RUNNING']),gt(jobs.deadlineAt,now),lte(outbox.availableAt,now),sql`${outbox.attempts}<20`,or(eq(outbox.state,'PENDING'),and(eq(outbox.state,'DISPATCHING'),lte(outbox.leaseUntil,now)))))
+  const [row]=await tx.select({outbox}).from(outbox).innerJoin(jobs,eq(jobs.id,outbox.jobId)).innerJoin(reservations,eq(reservations.jobId,jobs.id))
+   .where(and(budgetKey?eq(reservations.budgetKey,budgetKey):undefined,inArray(jobs.state,['QUEUED','RUNNING']),gt(jobs.deadlineAt,now),lte(outbox.availableAt,now),sql`${outbox.attempts}<20`,or(eq(outbox.state,'PENDING'),and(eq(outbox.state,'DISPATCHING'),lte(outbox.leaseUntil,now)))))
    .orderBy(outbox.availableAt,outbox.jobId).limit(1).for('update',{of:outbox,skipLocked:true});
   if(!row)return null;const token=randomUUID(),o=row.outbox;
   await tx.update(outbox).set({state:'DISPATCHING',attempts:o.attempts+1,leaseToken:token,leaseUntil:new Date(now.getTime()+15000)}).where(eq(outbox.jobId,o.jobId));

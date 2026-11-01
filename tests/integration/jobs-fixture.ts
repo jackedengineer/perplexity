@@ -8,6 +8,7 @@ export async function jobsFixture(){
  const db=drizzle(pg,{schema}),subject='jobs-'+crypto.randomUUID(),owner=crypto.randomUUID(),period=crypto.randomUUID();
  await pg.query('INSERT INTO "user"(id,name,email,email_verified) VALUES ($1,$1,$2,true)',[subject,subject+'@example.test']);
  await db.insert(schema.appUsers).values({id:owner,authSubject:subject});
+ await db.insert(schema.billingCheckouts).values({userId:owner,requestId:crypto.randomUUID(),planId:'plan_fixture',priceKey:'pro-monthly-inr-v1',environment:'TEST',subscriptionId:'sub_'+owner,state:'READY'});
  await db.insert(schema.jobPeriods).values({id:period,userId:owner,environment:'TEST',paymentId:'pay_'+owner,invoiceId:'inv_'+owner,subscriptionId:'sub_'+owner,startsAt:new Date(Date.now()-1000),endsAt:new Date(Date.now()+3600000),jobLimit:10});
  const key='jobs-'+owner;
  for(const kind of ['PERIOD','DAY'] as const)await db.insert(schema.operatorUsageBuckets).values({budgetKey:key,kind,startsAt:new Date(Date.now()-1000),endsAt:new Date(Date.now()+3600000),providerLimitMicroUsd:100000n});
