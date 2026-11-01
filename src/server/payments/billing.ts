@@ -8,6 +8,9 @@ type Checkout=typeof checkouts.$inferSelect;
 const view=(row:Checkout,keyId:string)=>({checkoutId:row.id,subscriptionId:row.subscriptionId,keyId,state:row.state,mode:'TEST' as const,priceKey:row.priceKey});
 export async function startCheckout(db:JobDatabase,subject:string,raw:unknown,planId:string,api:RazorpayApi){
  const input=checkoutInput.parse(raw);
+ // A failed read cannot make a billable create ambiguous. Validate before the
+ // durable creation intent; only the create attempt may enter UNKNOWN.
+ try{await api.plan(planId);}catch{throw new JobError('UNAVAILABLE');}
  const prepared=await db.transaction(async tx=>{
   const owner=await ownerFor(tx,subject);await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'billing:'+owner},0))`);
   const [prior]=await tx.select().from(checkouts).where(and(eq(checkouts.userId,owner),eq(checkouts.requestId,input.requestId)));
@@ -20,7 +23,7 @@ export async function startCheckout(db:JobDatabase,subject:string,raw:unknown,pl
  });
  if(!prepared.create)return view(prepared.row,api.keyId);
  try{
-  await api.plan(planId);const created=await api.create(prepared.row.id,planId);
+  const created=await api.create(prepared.row.id,planId);
   if(created.notes.checkoutId!==prepared.row.id||created.plan_id!==planId)throw new JobError('UNAVAILABLE');
   const [row]=await db.update(checkouts).set({subscriptionId:created.id,state:'READY',providerState:created.status,updatedAt:sql`clock_timestamp()`}).where(and(eq(checkouts.id,prepared.row.id),eq(checkouts.state,'CREATING'))).returning();
   if(!row)throw new JobError('CONFLICT');return view(row,api.keyId);
