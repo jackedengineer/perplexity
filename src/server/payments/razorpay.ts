@@ -9,6 +9,15 @@ export const confirmationInput=z.strictObject({checkoutId:z.uuid(),razorpay_paym
 export const subscriptionSchema=z.object({id:subscriptionId,plan_id:planId,status:z.enum(['created','authenticated','active','pending','halted','cancelled','completed','expired']),quantity:z.literal(1),notes:z.object({checkoutId:z.uuid(),priceKey:z.literal(proPlan.priceKey)})});
 export const invoiceSchema=z.object({id:invoiceId,payment_id:paymentId,status:z.literal('paid'),amount:z.literal(proPlan.amountPaise),amount_paid:z.literal(proPlan.amountPaise),currency:z.literal('INR'),billing_start:z.int().positive(),billing_end:z.int().positive()});
 export const paymentSchema=z.object({id:paymentId,invoice_id:invoiceId,status:z.literal('captured'),amount:z.literal(proPlan.amountPaise),currency:z.literal('INR'),amount_refunded:z.literal(0)});
+// Polling uses the same linked invoice/payment identity as grants. A refund is
+// authoritative only after checking the currency, original amount and references.
+const refundedPaymentSchema=paymentSchema.extend({status:z.enum(['captured','refunded']),amount_refunded:z.int().min(0).max(proPlan.amountPaise)});
+export function verifiedRefund(rawInvoice:unknown,rawPayment:unknown){
+ const invoice=invoiceSchema.parse(rawInvoice),parsed=refundedPaymentSchema.safeParse(rawPayment);
+ if(!parsed.success)return null;const payment=parsed.data;
+ if(payment.id!==invoice.payment_id||payment.invoice_id!==invoice.id)return null;
+ return payment.amount_refunded>0||payment.status==='refunded'?{paymentId:payment.id,invoiceId:invoice.id}:null;
+}
 export function verifySignature(body:Uint8Array,signature:string,secret:string){
  if(!/^[a-f0-9]{64}$/u.test(signature)||secret.length<16)return false;
  return timingSafeEqual(createHmac('sha256',secret).update(body).digest(),Buffer.from(signature,'hex'));

@@ -1,9 +1,9 @@
 import {reconcileDueCheckouts} from '@/server/payments/maintenance';
 import {afterAll,beforeAll,expect,it,vi} from 'vitest';
 import {eq} from 'drizzle-orm';
-import {appUsers,user,billingCheckouts as checkouts,jobPeriods} from '@/db/schema';
+import {appUsers,user,billingCheckouts as checkouts,jobPeriods,billingReversals} from '@/db/schema';
 import {jobsFixture} from './jobs-fixture';
-import {startCheckout} from '@/server/payments/billing';
+import {startCheckout,reconcileCheckout} from '@/server/payments/billing';
 import {proPlan,type RazorpayApi} from '@/server/payments/razorpay';
 let f:Awaited<ReturnType<typeof jobsFixture>>;
 beforeAll(async()=>{f=await jobsFixture();await f.db.delete(jobPeriods);await f.db.delete(checkouts);},30000);
@@ -49,3 +49,28 @@ it('backs off failed oldest checkouts so a missed captured invoice is eventually
  expect(await f.db.select().from(jobPeriods).where(eq(jobPeriods.userId,paid.userId))).toHaveLength(1);
  expect(subscriptions).toHaveBeenCalledTimes(3);
 });
+
+for(const refund of [{status:'refunded',amount_refunded:99900},{status:'captured',amount_refunded:100}]){
+ it(`revokes a missed ${refund.status==='refunded'?'full':'partial'} refund and rejects delayed capture regrant`,async()=>{
+  const {owner}=await account(),suffix=crypto.randomUUID().replaceAll('-','');
+  const [row]=await f.db.insert(checkouts).values({userId:owner.id,requestId:crypto.randomUUID(),planId:'plan_recovery',priceKey:proPlan.priceKey,environment:'TEST',state:'READY',subscriptionId:'sub_'+suffix}).returning();
+  const now=Math.floor(Date.now()/1000),invoice={id:'inv_'+suffix,payment_id:'pay_'+suffix,status:'paid',amount:99900,amount_paid:99900,currency:'INR',billing_start:now-10,billing_end:now+2592000};
+  let payment={id:invoice.payment_id,invoice_id:invoice.id,status:'captured',amount:99900,currency:'INR',amount_refunded:0};
+  const api=apiWith({subscription:async()=>({id:row.subscriptionId!,plan_id:row.planId,status:'active',quantity:1,notes:{checkoutId:row.id,priceKey:proPlan.priceKey}}),invoices:async()=>[invoice],payment:async()=>payment});
+  await reconcileCheckout(f.db,row.id,api);
+  const period=async()=>(await f.db.select().from(jobPeriods).where(eq(jobPeriods.paymentId,invoice.payment_id)))[0];
+  expect((await period()).state).toBe('ACTIVE');
+  const captured={...payment};
+  for(const invalid of [{id:'pay_unrelated'},{invoice_id:'inv_unrelated'},{currency:'USD'},{amount:100}]){
+   payment={...captured,...refund,...invalid};await reconcileCheckout(f.db,row.id,api);
+   expect((await period()).state).toBe('ACTIVE');
+   expect(await f.db.select().from(billingReversals).where(eq(billingReversals.paymentId,invoice.payment_id))).toHaveLength(0);
+  }
+  payment={...captured,...refund};await reconcileCheckout(f.db,row.id,api);
+  expect((await period()).state).toBe('REVOKED');
+  await reconcileCheckout(f.db,row.id,api);
+  payment={...payment,status:'captured',amount_refunded:0};await reconcileCheckout(f.db,row.id,api);
+  expect((await period()).state).toBe('REVOKED');
+  expect(await f.db.select().from(billingReversals).where(eq(billingReversals.paymentId,invoice.payment_id))).toHaveLength(1);
+ });
+}

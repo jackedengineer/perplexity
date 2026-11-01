@@ -3,7 +3,7 @@ import {and,eq,gt,inArray,lte,or,sql} from 'drizzle-orm';
 import {billingCheckouts as checkouts,billingInbox as inbox,billingReversals as reversals,jobPeriods as periods,appUsers} from '@/db/schema';
 import {JobError} from '@/server/jobs/contracts';
 import {databaseNow,ownerFor,type JobDatabase,type JobTransaction} from '@/server/jobs/store';
-import {checkoutInput,confirmationInput,proPlan,normalizeWebhook,verifySignature,verifyCycle,invoiceSchema,type RazorpayApi} from './razorpay';
+import {checkoutInput,confirmationInput,proPlan,normalizeWebhook,verifySignature,verifyCycle,verifiedRefund,invoiceSchema,type RazorpayApi} from './razorpay';
 type Checkout=typeof checkouts.$inferSelect;
 const view=(row:Checkout,keyId:string)=>({checkoutId:row.id,subscriptionId:row.subscriptionId,keyId,state:row.state,mode:'TEST' as const,priceKey:row.priceKey});
 export async function startCheckout(db:JobDatabase,subject:string,raw:unknown,planId:string,api:RazorpayApi){
@@ -39,6 +39,15 @@ async function ownedCheckout(db:JobDatabase,subject:string,id:string){
 async function lockedCheckout(tx:JobTransaction,id:string){
  const [row]=await tx.select().from(checkouts).where(eq(checkouts.id,id)).for('update');if(!row)throw new JobError('NOT_FOUND');return row;
 }
+async function recordReversal(tx:JobTransaction,paymentId:string,reason:string,expected?:{userId:string;subscriptionId:string;invoiceId:string}){
+ await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'payment:'+paymentId},0))`);
+ if(expected){
+  const [saved]=await tx.select().from(periods).where(eq(periods.paymentId,paymentId));
+  if(saved&&(saved.userId!==expected.userId||saved.subscriptionId!==expected.subscriptionId||saved.invoiceId!==expected.invoiceId))throw new JobError('CONFLICT');
+ }
+ await tx.insert(reversals).values({paymentId,reason}).onConflictDoNothing();
+ await tx.update(periods).set({state:'REVOKED'}).where(eq(periods.paymentId,paymentId));
+}
 async function reconcileCycles(db:JobDatabase,row:Checkout,api:RazorpayApi,onlyPayment?:string,deadline=performance.now()+10000){
  if(!row.subscriptionId)throw new JobError('CONFLICT');
  const sub=await api.subscription(row.subscriptionId);
@@ -50,6 +59,14 @@ async function reconcileCycles(db:JobDatabase,row:Checkout,api:RazorpayApi,onlyP
   const parsed=invoiceSchema.safeParse(raw);if(!parsed.success||onlyPayment&&parsed.data.payment_id!==onlyPayment)continue;
   if(verified++>=12)throw new JobError('UNAVAILABLE');
   const payment=await api.payment(parsed.data.payment_id);let cycle:ReturnType<typeof verifyCycle>;
+  const refund=verifiedRefund(parsed.data,payment);
+  if(refund){
+   await db.transaction(async tx=>{
+    const current=await lockedCheckout(tx,row.id);if(current.subscriptionId!==sub.id||current.environment!=='TEST')throw new JobError('CONFLICT');
+    await recordReversal(tx,refund.paymentId,'reconciliation.refund',{userId:row.userId,subscriptionId:sub.id,invoiceId:refund.invoiceId});
+   });
+   continue;
+  }
   try{cycle=verifyCycle(parsed.data,payment);}catch{continue;}
   await db.transaction(async tx=>{
    const current=await lockedCheckout(tx,row.id);if(current.subscriptionId!==sub.id||current.environment!=='TEST')throw new JobError('CONFLICT');
@@ -85,9 +102,7 @@ export async function ingestWebhook(db:JobDatabase,eventId:string,bytes:Uint8Arr
   await tx.insert(inbox).values({eventId,bodyHash,...event}).onConflictDoNothing();
   const [prior]=await tx.select().from(inbox).where(eq(inbox.eventId,eventId));if(prior.bodyHash!==bodyHash)throw new JobError('CONFLICT');
   if(event.paymentId&&(event.kind==='payment.refunded'||event.kind==='refund.processed'||event.kind==='payment.dispute.created')){
-   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'payment:'+event.paymentId},0))`);
-   await tx.insert(reversals).values({paymentId:event.paymentId,reason:event.kind}).onConflictDoNothing();
-   await tx.update(periods).set({state:'REVOKED'}).where(eq(periods.paymentId,event.paymentId));
+   await recordReversal(tx,event.paymentId,event.kind);
   }
  });
 }
