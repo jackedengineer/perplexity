@@ -38,3 +38,9 @@ test("unknown routes show an actionable 404", async ({ page }) => {
   await page.getByRole("link", { name: "Back to home" }).click();
   await expect(page).toHaveURL("/");
 });
+
+test('unfinished paid job and checkout boundaries stay off on the default deployment',async({request})=>{
+ for(const path of ['/api/jobs','/api/billing'])expect((await request.get(path)).status()).toBe(404);
+ expect((await request.post('/api/jobs',{data:{version:1,workflow:'execution-check-v1',requestId:crypto.randomUUID()}})).status()).toBe(404);
+ expect((await request.post('/api/webhooks/razorpay',{data:{event:'subscription.charged'}})).status()).toBe(404);
+});

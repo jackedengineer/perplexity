@@ -25,6 +25,8 @@ export default defineConfig({
       BETTER_AUTH_SECRET: "isolated-e2e-only-secret-not-a-live-credential",
       GOOGLE_CLIENT_ID: "test.apps.googleusercontent.com",
       GOOGLE_CLIENT_SECRET: "test-only",
+      ENABLE_DURABLE_JOB_SANDBOX: "false",
+      ENABLE_RAZORPAY_TEST_CHECKOUT: "false",
     },
   },
 });
