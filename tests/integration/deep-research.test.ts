@@ -1,3 +1,4 @@
+import {models,providers} from './deep-fixture';
 import {afterAll,beforeAll,expect,it} from 'vitest';
 import {eq,sql} from 'drizzle-orm';
 import {jobsFixture} from './jobs-fixture';
@@ -5,7 +6,7 @@ import {admitJob,readJob} from '@/server/jobs/admission';
 import {claimJob,startStep,completeStep,recoverJobs,failJob} from '@/server/jobs/worker';
 import {readCheckpoint} from '@/server/deep-research/checkpoints';
 import {durableJobs,jobSteps,jobReservations,operatorUsageBuckets,jobResearchInputs,jobCheckpoints} from '@/db/schema';
-const models={safety:{modelId:'openai/gpt-4.1-nano',provider:'azure'},planner:{modelId:'openai/gpt-4.1-nano',provider:'azure'},answer:{modelId:'openai/gpt-4.1-mini',provider:'azure'}};
+
 let f:Awaited<ReturnType<typeof jobsFixture>>;
 beforeAll(async()=>{f=await jobsFixture();await f.db.update(operatorUsageBuckets).set({providerLimitMicroUsd:1000000n});},30000);
 afterAll(()=>f?.pg.close());
@@ -20,7 +21,7 @@ it('snapshots private original, idempotency and all call reservations atomically
  const raw=input(),id=await admitJob(f.db,f.subject,raw,f.key,models);
  expect(await admitJob(f.db,f.subject,raw,f.key,models)).toBe(id);
  await expect(admitJob(f.db,f.subject,{...raw,question:'Another topic'},f.key,models)).rejects.toThrow('CONFLICT');
- expect((await readJob(f.db,f.subject,id))).not.toHaveProperty('question');
+ expect((await readJob(f.db,f.subject,id)).question).toBe(raw.question);expect((await readJob(f.db,f.subject,id))).not.toHaveProperty('snapshot');
  expect((await f.db.select().from(jobResearchInputs))[0].snapshot.question).toBe(raw.question);
  expect((await f.db.select().from(jobReservations))[0].reservedMicroUsd).toBeGreaterThan(100000n);
  const lease=(await claimJob(f.db,id))!;await startStep(f.db,lease,'input');
@@ -44,16 +45,6 @@ it('detects checkpoint tampering instead of replaying corrupt evidence',async()=
 });
 
 import {consumeResearch} from '@/server/deep-research/consumer';
-import type {DeepProviders} from '@/server/deep-research/providers';
-function providers():DeepProviders{
- const safety={modelId:'fixture',classify:async()=>({decision:'ALLOW',categoryCodes:[],policyVersion:'v1'}),usage:()=>({costMicroUsd:100n,inputTokens:1,outputTokens:1,actualModel:'fixture'})};
- return {input:safety,query:safety,evidence:safety,output:safety,
-  planner:{plan:async({previous})=>({value:{queries:previous.length?['SQLite PostgreSQL offline reliability','SQLite PostgreSQL offline benchmarks','SQLite PostgreSQL offline limitations']:['SQLite PostgreSQL offline architecture','SQLite PostgreSQL offline consistency','SQLite PostgreSQL offline synchronization'],focus:'Compare offline tradeoffs using primary sources'},cost:100n})},
-  search:{search:async()=>({results:[{title:'PostgreSQL documentation',url:'https://www.postgresql.org/docs/',content:'PostgreSQL uses a client server architecture. SQLite stores data locally. Offline synchronization needs application conflict handling.',score:.9}],credits:1})},
-  extract:{extract:async urls=>({pages:urls.map(url=>({url,content:'PostgreSQL uses a client server architecture. SQLite stores data locally. Offline synchronization needs application conflict handling.',retrievedAt:new Date().toISOString()})),failedUrls:[],rejectedUrls:[],credits:1})},
-  answer:{generate:async()=>({text:'SQLite stores data locally; PostgreSQL uses a client server architecture. [S1]',usage:{costMicroUsd:100n,inputTokens:1,outputTokens:1,actualModel:'fixture'}})},
- };
-}
 it('completes six searches and releases only the atomically approved three-section report',async()=>{
  const id=await admitJob(f.db,f.subject,input(),f.key,models);
  const p=providers();let calls=0;const search=p.search.search;p.search.search=async(...args)=>{calls++;return search(...args);};
@@ -86,4 +77,19 @@ it('checks cross-section interactions before publishing the assembled report',as
  p.output={...p.output,classify:async(value,signal)=>value.text.includes('complete assembled')?{decision:'BLOCK',categoryCodes:['FRAUD'],policyVersion:'v1'}:allow(value,signal)};
  expect(await consumeResearch(f.db,id,{providers:p})).toBe('FAILED');expect((await readJob(f.db,f.subject,id)).report).toBeUndefined();
  expect((await f.db.select().from(jobCheckpoints).where(eq(jobCheckpoints.jobId,id))).some(c=>c.step==='publish')).toBe(false);
+});
+
+import {researchExecutor,loadResearch} from '@/server/deep-research/executor';
+import {cancelJob} from '@/server/jobs/worker';
+it('does not reuse a prior provider receipt when a local prerequisite is missing',async()=>{
+ const id=await admitJob(f.db,f.subject,input(),f.key,models),p=providers();let invoked=false;
+ p.answer.usage=()=>({costMicroUsd:999n,inputTokens:1,outputTokens:1,actualModel:'fixture'});
+ p.answer.generate=async()=>{invoked=true;throw new Error('Must not call');};
+ const execute=researchExecutor(f.db,id,await loadResearch(f.db,id),p);
+ const result=await execute('draft-0',{signal:new AbortController().signal,deadlineAt:new Date(Date.now()+10000)});
+ expect(result).toEqual({value:{unavailable:true},cost:0n,stop:true});expect(invoked).toBe(false);await cancelJob(f.db,f.subject,id);
+});
+it('keeps the returned receipt when a paid plan has an invalid shape',async()=>{
+ const id=await admitJob(f.db,f.subject,input(),f.key,models),p=providers();p.planner.plan=async()=>({value:{invalid:true},cost:100n});
+ expect(await consumeResearch(f.db,id,{providers:p})).toBe('FAILED');const job=await readJob(f.db,f.subject,id);expect(job.spentMicroUsd).toBe('200');expect(job.heldMicroUsd).toBe('0');
 });

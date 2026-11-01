@@ -33,7 +33,7 @@ export function researchExecutor(db:JobDatabase,id:string,snapshot:ResearchSnaps
  // All operations are private. The consumer persists only validated results and
  // receipts under its current lease, never raw responses or provider errors.
  return async function execute(key:string,options:ExecutionOptions):Promise<StepResult>{
-  let receipt:(()=>bigint|null|undefined)|undefined;
+  let receipt:()=>bigint|null|undefined=()=>0n;
   const tracked=(provider:SafetyProvider):SafetyProvider=>{let called=false;receipt=()=>called?provider.usage?.()?.costMicroUsd:0n;return {...provider,classify:async(input,signal)=>{called=true;return provider.classify(input,signal);}};};
   try{
    if(key==='input'||key.startsWith('query-')){
@@ -43,16 +43,18 @@ export function researchExecutor(db:JobDatabase,id:string,snapshot:ResearchSnaps
     return known({allowed:check.verdict.decision==='ALLOW'},check.modelId===null?0n:receipt?.(),check.verdict.decision!=='ALLOW');
    }
    if(key==='plan'||key==='refine'){
-    receipt=()=>p.planner.usage?.()?.costMicroUsd;
     const previous=key==='refine'?researchPlan.parse(await saved('plan')).queries:[];
-    const result=await p.planner.plan({snapshot,previous,...(key==='refine'?{evidence:await evidence('initial-evidence')}: {})},options);
+    const input={snapshot,previous,...(key==='refine'?{evidence:await evidence('initial-evidence')}: {})};
+    receipt=()=>p.planner.usage?.()?.costMicroUsd;
+    const result=await p.planner.plan(input,options);receipt=()=>result.cost;
     const plan=researchPlan.parse(result.value);
     if(plan.queries.some(q=>!safeEvidenceText(q)||previous.some(prior=>prior.trim().toLowerCase()===q.trim().toLowerCase()))||!safeEvidenceText(plan.focus))return known({unavailable:true},result.cost,true);
     return known(plan,result.cost);
    }
    if(key.startsWith('search-')){
-    const results=await p.search.search(await query(Number(key.slice(7))),{...options,filters:{...preferences,timeRange:freshnessTimeRange(snapshot.question)??undefined,startDate:null,endDate:null}});
-    return known(rowsSchema.parse(results.results),15000n);
+    const text=await query(Number(key.slice(7)));receipt=()=>null;
+    const results=await p.search.search(text,{...options,filters:{...preferences,timeRange:freshnessTimeRange(snapshot.question)??undefined,startDate:null,endDate:null}});
+    receipt=()=>15000n;return known(rowsSchema.parse(results.results),15000n);
    }
    if(key==='initial-evidence'||key==='evidence'){
     const data=key==='initial-evidence'?buildEvidence(id,rank(await searches(3)),new Date()):validateEvidence(await saved('extract'));
@@ -63,15 +65,17 @@ export function researchExecutor(db:JobDatabase,id:string,snapshot:ResearchSnaps
    }
    if(key==='extract'){
     const rows=rank(await searches(6));if(!rows.length)return known(buildEvidence(id,[],new Date()),0n);
-    const result=await p.extract.extract(rows.slice(0,2).map(r=>r.url),options);
+    receipt=()=>null;const result=await p.extract.extract(rows.slice(0,2).map(r=>r.url),options);
+    receipt=()=>BigInt(result.credits)*15000n;
     const combined=rows.map(row=>{const page=result.pages.find(p=>p.url===row.url);return page?{...row,content:page.content,contentKind:'EXTRACTED_PAGE' as const,retrievedAt:page.retrievedAt}:row;});
     return known(buildEvidence(id,rank(combined),new Date()),BigInt(result.credits)*15000n);
    }
    if(key.startsWith('draft-')){
-    receipt=()=>p.answer.usage?.()?.costMicroUsd;
     const index=Number(key.slice(6)),selected=await evidence('evidence');
     const interpretation=snapshot.question+'\nWrite only this report section: '+sectionNames[index]+'. Use the supplied passages, identify disagreement and missing evidence explicitly, distinguish dates and estimates. Do not invent support or repeat other sections.';
+    receipt=()=>p.answer.usage?.()?.costMicroUsd;
     const result=await p.answer.generate({question:snapshot.question,interpretation,answerLanguage:snapshot.locale,evidence:selected},options);
+    receipt=()=>result.usage.costMicroUsd;
     return known(z.string().min(1).max(4000).parse(result.text),result.usage.costMicroUsd);
    }
    if(key.startsWith('output-')){
