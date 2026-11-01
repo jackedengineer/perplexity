@@ -4,7 +4,30 @@ Decision: **HOLD full release acceptance.** The public site and guest entry are
 already deployed. This section supersedes historical status below. The original
 record is also retained in [the October 23 checklist](release-checklist-20261023.md).
 
-## Durable job and paid-access foundation — development only
+## Hosted execution-check sandbox follow-up
+
+- [x] Deploy reviewed worker code to Trigger cloud using development Neon and
+  Razorpay TEST credentials only; no AI keys, production migration or live sale.
+- [x] **3/3** hosted worker cases (168.14 s): completion, terminated-run recovery
+  from prequeued delayed cloud delivery, and owner cancellation.
+- [x] **3/3** hosted billing cases (25.36 s): genuine provider-origin cancellation,
+  no unpaid access, forgery/duplicate handling, and expired inbox-lease recovery.
+- [x] Protected preview browser: Google sign-in, billing, progress, full reload,
+  completion and persisted Stop. No captured console warnings/errors; both
+  browser runs settle zero provider dollars and cancellation has no late completion.
+- [x] Disable the temporary test webhook and restore its exact-host Vercel protection;
+  preserve QuickBus and the existing retired-host redirect/exception. Public
+  production entry probes pass and paid job/billing APIs remain disabled.
+- [x] Reject reused test namespaces before cloud work without deleting their ledger.
+- [ ] Recurring automatic dispatch/recovery at an adequate cadence; paid executors
+  and quality/safety evaluation; full hosted billing lifecycle/provider-outage retry;
+  production migrations, live merchant/allowance policy, rollback and latency acceptance.
+
+[Isolation, evidence, repeat procedure and remaining gates](hosted-sandbox-verification.md).
+The $2 cap, production ceilings and unknown-cost holds are unchanged. No paid AI
+requests ran. A delayed cloud recovery test is not recurring scheduler acceptance.
+
+## Durable job and paid-access foundation — test only
 
 This change does not open Deep Research, browser tasks or live purchases. Both
 new feature flags remain off by default and reject Vercel production. Existing
@@ -59,7 +82,8 @@ holds remain unchanged. [Architecture, setup and limits](durable-jobs.md).
   existing five-second assertion; that failed trace is retained and is not a pass.
   No assertion, timeout, retry setting or financial limit was weakened. In-app
   billing refresh and persisted completion replay also passed. No paid AI calls.
-- [ ] Obtain successful CI and independent review on the final PR head.
+- [x] Quality CI and both independent reviews pass on `93d60e2`; all three threads
+  resolved. PR #18 merged as `fdfd03b`, preserving the focused commits.
 - [ ] Before enabling actual paid features: implement/evaluate the Deep Research
   evidence loop and browser-task approvals/executors; provision reviewed live
   manifests and separate search/browser/compute limits; verify hosted scheduler
