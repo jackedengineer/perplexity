@@ -46,6 +46,7 @@ holds remain unchanged. [Architecture, setup and limits](durable-jobs.md).
   unthrottled development-Neon request durations, not hosted research latency,
   field INP or a production SLO. The execution check deliberately waits at each
   checkpoint and makes no provider inference/search request.
+- [x] Open [PR #18](https://github.com/jackedengineer/perplexity/pull/18) with focused commits and documented launch gates.
 - [ ] Obtain successful CI and independent review on the final PR head.
 - [ ] Before enabling actual paid features: implement/evaluate the Deep Research
   evidence loop and browser-task approvals/executors; provision reviewed live

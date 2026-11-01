@@ -59,7 +59,7 @@ search or browser calls and no claim that research/agent work is implemented.
    inbox/reconciliation and billing status/cancellation UI. Test forgery, duplicates,
    out-of-order/reversed events, wrong environment/plan/currency, paid-through and
    unknown creation. Connect actual test credentials when browser setup is ready.
-7. [ ] Run final lint/types/offline tests/build/browser and development Neon checks;
+7. [x] Run final lint/types/offline tests/build/browser and development Neon checks;
    inspect secrets/bundles, record cleanup and limits, update release checklist,
    push focused commits and open one PR. No merge/production activation requested.
 
@@ -89,6 +89,6 @@ must be recorded honestly if credentials or merchant activation remain unavailab
 - Hosted scheduler/webhook delivery, billable executors, live feature activation
   and final GitHub CI/review remain explicit release gates.
 - [x] Focused implementation commits pushed to the requested GitHub repository.
-- [ ] Open the verified foundation PR and attach its CI/review handoff.
+- [x] Open [PR #18](https://github.com/jackedengineer/perplexity/pull/18) with verification and pending release gates. CI and independent review remain pending.
 
 Detailed evidence and limitations: [release checklist](../docs/release-checklist.md).
