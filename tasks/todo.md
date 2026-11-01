@@ -244,8 +244,14 @@ T21 implementation: [evaluation protocol](../evals/README.md). The 138 safety la
 
 ### T25 — Add durable dispatch with an outbox
 
+Development foundation implemented in `src/server/jobs`, `trigger/jobs.ts` and
+`src/db/job-schema.ts`; [verified scope](../docs/durable-jobs.md). Trigger Development,
+atomic outbox/reservations, scoped fencing, replay, Stop and real process recovery
+pass. Only an execution check is registered. RESEARCH submission and hosted
+scheduler activation remain open; do not equate this foundation with T26 quality.
+
 - [ ] Select and configure a durable runner/worker; add `RESEARCH` submission only after DB admission/outbox dispatch and authenticated job consumption exist.
-- [ ] Add job IDs, checkpoint/lease fencing, bounded retry policy and idempotent dispatch/consume semantics.
+- [x] Add job IDs, checkpoint/lease fencing, bounded retry policy and idempotent dispatch/consume semantics (development execution-check workflow).
 - [ ] Verify: crash between admission and dispatch is recoverable; duplicate delivery creates one canonical execution/result; unauthenticated worker calls fail.
 - Dependencies: T36. Files: `src/server/db/schema.ts`, `src/server/runs/outbox.ts`, `src/server/runs/dispatch.ts`, `tests/integration/outbox.test.ts` plus generated SQL.
 
@@ -304,19 +310,32 @@ items below intentionally include that unimplemented scope.
 
 ### T32 — Create Razorpay sandbox checkout intents
 
-- [ ] Configure one test-mode Razorpay adapter with server-owned INR price/plan mapping; registered verified users can create checkout intents with stable keys and current session/origin checks.
-- [ ] Use hosted checkout, server verification of signed callbacks and pending confirmation UI; preserve uncertain creation outcomes for reconciliation rather than blindly creating a second subscription.
+Development-only implementation: `src/server/payments`, `/api/billing`, `/billing`.
+The selected Pro plan is ₹999/month. Actual Razorpay TEST capture and retained
+paid-through cancellation passed; this does not activate live paid features.
+
+- [x] Configure one test-mode Razorpay adapter with server-owned INR price/plan mapping; registered verified users can create checkout intents with stable keys and current session/origin checks.
+- [x] Use hosted checkout, server verification of signed callbacks and pending confirmation UI; preserve uncertain creation outcomes for reconciliation rather than blindly creating a second subscription.
 - [ ] Verify: forged amount/plan/customer, repeated clicks, stale tabs and unknown provider outcomes cannot grant paid access or accidentally create duplicate billable subscriptions.
 - Dependencies: T31. Files: `src/server/billing/razorpay.ts`, `src/server/billing/checkouts.ts`, `src/app/api/billing/checkouts/route.ts`, `src/components/billing/checkout.tsx`, `tests/integration/checkout.test.ts`.
 
 ### T33 — Apply verified billing events exactly once
 
-- [ ] Add strict raw-byte webhook signature verification, normalized durable inbox events, owner/provider mappings and a unique paid invoice/payment grant path shared with server callback verification.
+Raw signature/inbox/cycle grant/reversal logic and local signed HTTP replay checks
+are implemented and tested. Provider-origin HTTPS webhook delivery, secret-rotation
+acceptance and final hosted failure/retry checks remain pending.
+
+- [x] Add strict raw-byte webhook signature verification, normalized durable inbox events, owner/provider mappings and a unique paid invoice/payment grant path shared with server callback verification.
 - [ ] Handle duplicate/out-of-order events, wrong environment/currency/plan, secret rotation and failed event processing without acknowledging and dropping work.
 - [ ] Verify: tampered payloads fail, different events for one paid cycle grant once, mandate-only events do not grant paid credits and safe retries preserve billing state.
 - Dependencies: T32. Files: `src/server/billing/webhooks.ts`, `src/server/billing/apply-event.ts`, `src/app/api/webhooks/razorpay/route.ts`, `src/server/db/schema.ts`, `tests/integration/billing-events.test.ts` plus generated SQL.
 
 ### T34 — Complete subscription lifecycle and reconciliation
+
+Test-mode status/cancel routes, bounded inbox/checkout reconciliation, paid-through
+job periods and conservative reversal tombstones exist. Scheduled code is defined,
+but hosted activation, next-cycle plan changes, commercial partial-refund policy,
+renewal/dispute delivery and production financial restore acceptance remain open.
 
 - [ ] Implement paid-through access, period credit expiry, failed renewal, next-cycle plan changes, end-of-period cancellation, refund/chargeback adjustments and security suspension.
 - [ ] Add owner-scoped billing/status/cancellation routes and a bounded scheduled reconciler for pending intents/inbox events; no browser success URL or stale session claim is entitlement authority.
