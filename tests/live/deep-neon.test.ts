@@ -35,6 +35,8 @@ it('replays an atomic saved research checkpoint with restricted runtime credenti
  p.query=providers().query;p.evidence=providers().evidence;p.output=providers().output;
  expect(await consumeResearch(f.runtime,id,{budgetKey:key,providers:p})).toBe('COMPLETED');
  expect((await readJob(f.runtime,subject,id)).report?.sections).toHaveLength(3);
+ const outsider=await f.identity();await f.owner.update(user).set({emailVerified:true}).where(eq(user.id,outsider.subject));
+ await expect(readJob(f.runtime,outsider.subject,id)).rejects.toThrow('NOT_FOUND');
  expect((await f.owner.select().from(jobCheckpoints).where(eq(jobCheckpoints.jobId,id))).filter(c=>c.step==='input')).toHaveLength(1);
 },120000);
 it('retains immutable research snapshots and denies runtime rewrite privileges',async()=>{
