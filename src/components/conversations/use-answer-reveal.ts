@@ -5,7 +5,7 @@ import {prepareAnswerReveal,revealUnitsAt} from './answer-reveal';
 const motionQuery='(prefers-reduced-motion: reduce)';
 function subscribeMotion(notify:()=>void){const query=window.matchMedia(motionQuery);query.addEventListener('change',notify);return()=>query.removeEventListener('change',notify);}
 const reducedMotion=()=>window.matchMedia(motionQuery).matches;
-export function useAnswerReveal(answer:CommittedAnswer|null) {
+export function useAnswerReveal(answer:Pick<CommittedAnswer,'messageId'|'answer'>|null) {
  const reduced=useSyncExternalStore(subscribeMotion,reducedMotion,()=>true);
  const model=useMemo(()=>answer?prepareAnswerReveal(answer.answer.document):null,[answer]);
  const id=answer?.messageId??null,finished=useRef<string|null>(null),frame=useRef<number|null>(null);

@@ -12,8 +12,8 @@ export const executionCheck={version:'execution-check-v1',deadlineMs:120_000,lea
 export function manifestFor(workflow:string){if(workflow===executionCheck.version)return executionCheck;if(workflow===deepResearch.version)return deepResearch;throw new JobError('INVALID_INPUT');}
 export const progressCodes=['QUEUED','RUNNING','STEP_STARTED','STEP_COMPLETED','RECOVERED','CANCELLED','COMPLETED','FAILED','EXPIRED','COST_UNKNOWN'] as const;
 export type ProgressCode=typeof progressCodes[number];
-export type JobView={id:string;workflow:string;state:JobState;createdAt:string;deadlineAt:string;cursor:number;heldMicroUsd:string;spentMicroUsd:string;report?:import('@/server/deep-research/view').PublicResearchReport};
+export type JobView={id:string;workflow:string;question?:string;notice?:string;state:JobState;createdAt:string;deadlineAt:string;cursor:number;heldMicroUsd:string;spentMicroUsd:string;report?:import('@/server/deep-research/view').PublicResearchReport};
 export type JobEvent={sequence:number;code:ProgressCode;step:string|null;createdAt:string};
 export class JobError extends Error {
- constructor(public code:'DISABLED'|'NOT_FOUND'|'PAYMENT_REQUIRED'|'CONFLICT'|'QUOTA'|'STALE'|'INVALID_INPUT'|'UNAVAILABLE'){super(code);}
+ constructor(public code:'DISABLED'|'NOT_FOUND'|'PAYMENT_REQUIRED'|'CONFLICT'|'QUOTA'|'STALE'|'INVALID_INPUT'|'UNAVAILABLE'|'INPUT_BLOCKED'|'REDACT_SECRET'){super(code);}
 }

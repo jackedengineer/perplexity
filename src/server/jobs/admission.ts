@@ -1,7 +1,8 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {and,eq,gt,inArray,lte,or,sql} from 'drizzle-orm';
-import {appUsers,durableJobs as jobs,jobPeriods as periods,jobReservations as reservations,jobSteps as steps,jobOutbox as outbox,jobEvents as events,operatorUsageBuckets as budgets,jobResearchInputs} from '@/db/schema';
+import {appUsers,durableJobs as jobs,jobPeriods as periods,jobReservations as reservations,jobSteps as steps,jobOutbox as outbox,jobEvents as events,operatorUsageBuckets as budgets,jobResearchInputs,jobCheckpoints} from '@/db/schema';
 import {JobError,manifestFor,jobSubmission,type JobView,type JobEvent,type JobState} from './contracts';
+import {SAFETY_RESPONSES} from '@/server/safety/responses';
 import {presentAnswer} from '@/server/answers/presentation';
 import {inspectInput} from '@/server/safety/deterministic';
 import {researchModels,researchReport} from '@/server/deep-research/contracts';
@@ -11,7 +12,7 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
  const parsed=jobSubmission.safeParse(raw);if(!parsed.success||!budgetKey)throw new JobError('INVALID_INPUT');
  const input=parsed.data,manifest=manifestFor(input.workflow);
  if(input.workflow==='deep-research-v1'&&!models)throw new JobError('DISABLED');
- if(input.workflow==='deep-research-v1'&&inspectInput({text:input.question,context:[]}))throw new JobError('INVALID_INPUT');
+ if(input.workflow==='deep-research-v1'){const blocked=inspectInput({text:input.question,context:[]});if(blocked)throw new JobError(blocked==='ACCIDENTAL_SECRET'?'REDACT_SECRET':'INPUT_BLOCKED');}
  const fingerprint=createHash('sha256').update(JSON.stringify(input.workflow==='deep-research-v1'?{version:input.version,workflow:input.workflow,question:input.question,locale:input.locale}:{version:input.version,workflow:input.workflow})).digest('hex');
  return db.transaction(async tx=>{
   await tx.execute(sql`SET LOCAL lock_timeout='2s'`);
@@ -43,19 +44,22 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
  });
 }
 export async function readJob(db:JobDatabase,subject:string,id:string):Promise<JobView>{
- const [row]=await db.select({job:jobs,reservation:reservations}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))
-  .innerJoin(reservations,eq(reservations.jobId,jobs.id)).where(and(eq(jobs.id,id),eq(appUsers.authSubject,subject))).limit(1);
+ const [row]=await db.select({job:jobs,reservation:reservations,question:sql<string|null>`${jobResearchInputs.snapshot}->>'question'`}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))
+  .innerJoin(reservations,eq(reservations.jobId,jobs.id)).leftJoin(jobResearchInputs,eq(jobResearchInputs.jobId,jobs.id)).where(and(eq(jobs.id,id),eq(appUsers.authSubject,subject))).limit(1);
  if(!row)throw new JobError('NOT_FOUND');const {job,reservation}=row;
+ let notice:string|undefined;
+ if(job.state==='FAILED'){const [failure]=await db.select({code:sql<string>`${jobCheckpoints.value}->>'notice'`}).from(jobCheckpoints).where(and(eq(jobCheckpoints.jobId,id),sql`${jobCheckpoints.value}->>'notice' IS NOT NULL`)).orderBy(sql`${jobCheckpoints.createdAt} DESC`).limit(1);notice=Object.values(SAFETY_RESPONSES).find(r=>r.code===failure?.code)?.text;}
  const privateReport=job.workflow==='deep-research-v1'&&job.state==='COMPLETED'?researchReport.parse(await readCheckpoint(db,id,'publish')):undefined;
  const report=privateReport?{question:privateReport.question,createdAt:privateReport.createdAt,sections:privateReport.sections.map(s=>({title:s.title,markdown:s.answer.markdown,answer:presentAnswer(s.answer)}))}:undefined;
- return {...(report?{report}:{}),id:job.id,workflow:job.workflow,state:job.state as JobState,createdAt:job.createdAt.toISOString(),deadlineAt:job.deadlineAt.toISOString(),cursor:job.nextEvent-1,heldMicroUsd:reservation.heldMicroUsd.toString(),spentMicroUsd:reservation.spentMicroUsd.toString()};
+ return {...(notice?{notice}:{}),...(row.question?{question:row.question}:{}),...(report?{report}:{}),id:job.id,workflow:job.workflow,state:job.state as JobState,createdAt:job.createdAt.toISOString(),deadlineAt:job.deadlineAt.toISOString(),cursor:job.nextEvent-1,heldMicroUsd:reservation.heldMicroUsd.toString(),spentMicroUsd:reservation.spentMicroUsd.toString()};
 }
 export async function listJobs(db:JobDatabase,subject:string){
- return db.select({id:jobs.id,state:jobs.state,createdAt:jobs.createdAt,workflow:jobs.workflow}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))
-  .where(eq(appUsers.authSubject,subject)).orderBy(sql`${jobs.createdAt} DESC`,jobs.id).limit(20);
+ return db.select({id:jobs.id,state:jobs.state,createdAt:jobs.createdAt,workflow:jobs.workflow,question:sql<string|null>`${jobResearchInputs.snapshot}->>'question'`}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))
+  .leftJoin(jobResearchInputs,eq(jobResearchInputs.jobId,jobs.id)).where(eq(appUsers.authSubject,subject)).orderBy(sql`${jobs.createdAt} DESC`,jobs.id).limit(20);
 }
 export async function readEvents(db:JobDatabase,subject:string,id:string,after:number):Promise<JobEvent[]>{
- await readJob(db,subject,id);
+ const [owned]=await db.select({id:jobs.id}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id)).where(and(eq(jobs.id,id),eq(appUsers.authSubject,subject))).limit(1);
+ if(!owned)throw new JobError('NOT_FOUND');
  const rows=await db.select().from(events).where(and(eq(events.jobId,id),gt(events.sequence,after))).orderBy(events.sequence).limit(100);
  return rows.map(e=>({sequence:e.sequence,code:e.code as JobEvent['code'],step:e.step,createdAt:e.createdAt.toISOString()}));
 }

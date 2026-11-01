@@ -1,5 +1,6 @@
 'use client';
-import {useState,type ReactNode} from 'react';
+import {useState,useMemo,type ReactNode} from 'react';
+import {useAnswerReveal} from '@/components/conversations/use-answer-reveal';
 import type {PublicResearchReport} from '@/server/deep-research/view';
 import type {AnswerNode,PublicAnswer} from '@/server/answers/view';
 function document(nodes:AnswerNode[],answer:PublicAnswer):ReactNode{
@@ -21,13 +22,17 @@ function document(nodes:AnswerNode[],answer:PublicAnswer):ReactNode{
   }
  });
 }
+function ReportSection({section,id}:{section:PublicResearchReport['sections'][number];id:string}){
+ const approved=useMemo(()=>({messageId:id,answer:section.answer}),[id,section.answer]),reveal=useAnswerReveal(approved);
+ return <section aria-label={section.title}><h2>{section.title}</h2><div className="deep-prose" aria-busy={reveal?.active??false} aria-live="off">{document(reveal?.document??section.answer.document,section.answer)}</div>{reveal?.active&&<button className="jobs-stop" onClick={reveal.finish}>Show full section</button>}</section>;
+}
 export function ResearchReport({report}:{report:PublicResearchReport}){
  const [copied,setCopied]=useState('');
  const sources=[...new Map(report.sections.flatMap(s=>[...s.answer.sources,...s.answer.additionalSources??[]]).map(s=>[s.url,s])).values()];
  const markdown=()=>`# ${report.question}\n\n`+report.sections.map(section=>`## ${section.title}\n\n${section.markdown}\n\n`+section.answer.sources.map(s=>`[${s.sourceId}]: ${s.url}`).join('\n')).join('\n\n');
  function download(){const url=URL.createObjectURL(new Blob([markdown()],{type:'text/markdown;charset=utf-8'})),link=window.document.createElement('a');link.href=url;link.download='research-report.md';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
  return <article className="deep-report" aria-labelledby="report-title"><div className="jobs-card-heading"><div><span className="jobs-eyebrow">RESEARCH COMPLETE</span><h2 id="report-title">{report.question}</h2></div><button className="jobs-stop" onClick={download}>Export</button></div>
-  {report.sections.map(section=><section key={section.title} aria-label={section.title}><h2>{section.title}</h2><div className="deep-prose">{document(section.answer.document,section.answer)}</div></section>)}
+  {report.sections.map(section=><ReportSection key={section.title} section={section} id={report.createdAt+':'+section.title}/>)}
   <details className="deep-sources"><summary>{sources.length} research sources</summary>{sources.map(source=><a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"><strong>{source.title}</strong><small>{source.domain} · {source.contentKind==='EXTRACTED_PAGE'?'Page excerpt':'Search passage'}</small></a>)}</details>
   <p className="jobs-note">Citations identify retrieved evidence; factual support has not been independently verified. Research can contain errors. Conflicts and missing evidence belong in the limitations above.</p>
   <div className="jobs-actions"><button className="jobs-stop" onClick={async()=>{try{await navigator.clipboard.writeText(markdown());setCopied('Report copied');}catch{setCopied('Copy unavailable. Use Export instead.');}}}>Copy report</button><span role="status">{copied}</span></div>

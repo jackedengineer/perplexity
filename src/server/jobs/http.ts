@@ -1,3 +1,4 @@
+import {SAFETY_RESPONSES} from '@/server/safety/responses';
 import {JobError,jobId,jobCursor,jobSubmission} from './contracts';
 import {requireEmptyBody} from '@/server/runs/recovery-http';
 import {AdmissionError} from '@/server/runs/errors';
@@ -24,8 +25,8 @@ export function sameOrigin(request:Request,origin:string){
 }
 export function jobFailure(error:unknown){
  const code=error instanceof JobError?error.code:error instanceof AdmissionError?error.code:'UNAVAILABLE';
- const statuses:Record<string,number>={DISABLED:404,NOT_FOUND:404,PAYMENT_REQUIRED:402,CONFLICT:409,QUOTA:429,STALE:409,INVALID_INPUT:400,UNAUTHENTICATED:401,INVALID_ORIGIN:403,RATE_LIMITED:429,TOO_LARGE:413};
- const messages:Record<string,string>={PAYMENT_REQUIRED:'A verified Pro test subscription is required.',QUOTA:'Your job allowance is used up.',CONFLICT:'Work is already in progress. Open it to continue.',UNAVAILABLE:'This service is temporarily unavailable. Please try again.'};
+ const statuses:Record<string,number>={DISABLED:404,NOT_FOUND:404,PAYMENT_REQUIRED:402,CONFLICT:409,QUOTA:429,STALE:409,INVALID_INPUT:400,INPUT_BLOCKED:400,REDACT_SECRET:400,UNAUTHENTICATED:401,INVALID_ORIGIN:403,RATE_LIMITED:429,TOO_LARGE:413};
+ const messages:Record<string,string>={INPUT_BLOCKED:SAFETY_RESPONSES.HARMFUL_ASSISTANCE.text,REDACT_SECRET:SAFETY_RESPONSES.REDACT_SECRET.text,PAYMENT_REQUIRED:'A verified Pro test subscription is required.',QUOTA:'Your job allowance is used up.',CONFLICT:'Work is already in progress. Open it to continue.',UNAVAILABLE:'This service is temporarily unavailable. Please try again.'};
  return Response.json({error:{code,message:messages[code]??'This request could not be completed.'}},{status:statuses[code]??503,headers:privateHeaders});
 }
 export function createJobsHttp(d:Dependencies){
