@@ -1,11 +1,27 @@
 import {maintainBilling} from '../src/server/payments/maintenance';
 import {task,schedules,tasks} from '@trigger.dev/sdk';
 import {z} from 'zod';
+import {eq,and} from 'drizzle-orm';
+import {durableJobs,jobReservations} from '../src/db/schema';
 import {workerDatabase,workerBudgetKey} from '../src/server/jobs/connection';
-import {consumeJob,dispatchJobs} from '../src/server/jobs/consumer';
-export const executeJob=task({id:'execute-job-v1',maxDuration:120,retry:{maxAttempts:1},queue:{name:'durable-jobs-v1',concurrencyLimit:1},
- run:async(raw:unknown)=>{const payload=z.strictObject({jobId:z.uuid()}).parse(raw);return consumeJob(workerDatabase(),payload.jobId,{budgetKey:workerBudgetKey()});}});
-export const maintainJobs=schedules.task({id:'maintain-jobs-v1',cron:{pattern:'* * * * *',environments:['STAGING']},maxDuration:60,retry:{maxAttempts:1},queue:{name:'job-maintenance-v1',concurrencyLimit:1},
- run:async()=>{const db=workerDatabase();const sent=await dispatchJobs(db,async claim=>{
-  await tasks.trigger<typeof executeJob>('execute-job-v1',{jobId:claim.jobId},{idempotencyKey:claim.key,idempotencyKeyTTL:'24h',maxAttempts:1});
- },10,workerBudgetKey());try{await maintainBilling(db);}catch{console.warn(JSON.stringify({event:'billing.maintenance',outcome:'UNAVAILABLE'}));}return sent;}});
+import {consumeJob} from '../src/server/jobs/consumer';
+import {automaticDispatch} from '../src/server/jobs/transport';
+const payload=z.strictObject({jobId:z.uuid()});
+export const executeJob=task({id:'execute-job-v1',maxDuration:900,retry:{maxAttempts:1},queue:{name:'durable-jobs-v1',concurrencyLimit:1},
+ run:async(raw:unknown)=>{return consumeJob(workerDatabase(),payload.parse(raw).jobId,{budgetKey:workerBudgetKey()});}});
+export const watchJob=task({id:'watch-job-v1',maxDuration:30,retry:{maxAttempts:1},queue:{name:'job-watch-v1',concurrencyLimit:1},
+ run:async(raw:unknown)=>{
+  const {jobId}=payload.parse(raw),db=workerDatabase(),key=workerBudgetKey();
+  const [job]=await db.select({state:durableJobs.state,deadlineAt:durableJobs.deadlineAt,generation:durableJobs.generation}).from(durableJobs)
+   .innerJoin(jobReservations,eq(durableJobs.id,jobReservations.jobId)).where(and(eq(durableJobs.id,jobId),eq(jobReservations.budgetKey,key)));
+  if(!job||!['QUEUED','RUNNING'].includes(job.state))return;
+  // Queue the successor before doing recovery, so losing this process cannot
+  // also lose an already-acknowledged watch chain. The absolute deadline bounds it.
+  if(job.deadlineAt.getTime()>Date.now())await tasks.trigger('watch-job-v1',{jobId},{delay:'45s',idempotencyKey:`watch:${jobId}:${Math.floor(Date.now()/40000)}`,idempotencyKeyTTL:'24h',maxAttempts:1},{retry:{maxAttempts:1}});
+  return automaticDispatch(db,key);
+ }});
+export const maintainJobs=schedules.task({id:'maintain-jobs-v1',
+ ...(process.env.ENABLE_JOB_SCHEDULE==='true'?{cron:{pattern:'* * * * *',environments:['PRODUCTION','STAGING'] as ['PRODUCTION','STAGING']}}:{}),
+ maxDuration:60,retry:{maxAttempts:1},queue:{name:'job-maintenance-v1',concurrencyLimit:1},
+ run:async()=>{const db=workerDatabase(),sent=await automaticDispatch(db,workerBudgetKey());
+  try{await maintainBilling(db);}catch{console.warn(JSON.stringify({event:'billing.maintenance',outcome:'UNAVAILABLE'}));}return sent;}});

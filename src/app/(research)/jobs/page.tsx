@@ -1,3 +1,4 @@
+import {configuredResearchModels} from '@/server/deep-research/configuration';
 import {billingEnabled} from '@/server/payments/service';
 import {notFound} from 'next/navigation';
 import {getCurrentSession} from '@/lib/current-session';
@@ -11,5 +12,6 @@ export default async function JobsPage({searchParams}:{searchParams:Promise<{job
  const params=await searchParams,parsed=jobId.safeParse(params.job);
  const initial=await listJobs(getDb(),session.user.id);
  const selected=parsed.success?parsed.data:initial.find(j=>['QUEUED','RUNNING'].includes(j.state))?.id??null;
- return <JobConsole key={selected??'new'} initialJobs={initial.map(j=>({...j,createdAt:j.createdAt.toISOString()}))} initialId={selected} billingAvailable={billingEnabled()}/>;
+ let deepAvailable=false;try{configuredResearchModels();deepAvailable=true;}catch{/* Default off until providers are configured. */}
+ return <JobConsole key={selected??'new'} initialJobs={initial.map(j=>({...j,createdAt:j.createdAt.toISOString()}))} initialId={selected} deepAvailable={deepAvailable} billingAvailable={billingEnabled()}/>;
 }

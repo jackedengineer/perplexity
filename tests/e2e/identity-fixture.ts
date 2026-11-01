@@ -6,13 +6,15 @@ export async function identityFixture(context: BrowserContext, name = "Curious T
   const url = process.env.DATABASE_URL;
   const secret = process.env.BETTER_AUTH_SECRET;
   if (!url || new URL(url).hostname !== "ep-sweet-night-az8bacv2-pooler.c-3.ap-southeast-1.aws.neon.tech" || !secret) throw new Error("Dedicated development Neon credentials required");
-  const db = new Pool({ connectionString: url, max: 1 });
+  const db = new Pool({ connectionString: url, max: 1, connectionTimeoutMillis:5000, query_timeout:10000, keepAlive:true });
+  db.on('error',()=>console.warn('Development identity connection unavailable'));
   const id = `e2e-${randomUUID()}`;
   const token = randomUUID();
   const cleanupRate = async () => {
     const direct = new URL(process.env.DATABASE_URL_DIRECT ?? 'http://missing');
     if (direct.hostname !== 'ep-sweet-night-az8bacv2.c-3.ap-southeast-1.aws.neon.tech') throw new Error('Dedicated development owner required for fixture cleanup');
-    const owner = new Pool({connectionString: direct.toString(), max: 1});
+    const owner = new Pool({connectionString: direct.toString(), max: 1,connectionTimeoutMillis:5000,query_timeout:10000,keepAlive:true});
+    owner.on('error',()=>console.warn('Development identity cleanup connection unavailable'));
     try { await owner.query('DELETE FROM request_rate_buckets WHERE bucket_key=$1', ['user:'+createHash('sha256').update('perplex:subject:'+id).digest('hex')]); }
     finally { await owner.end(); }
   };

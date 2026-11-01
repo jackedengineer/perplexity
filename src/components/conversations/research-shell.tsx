@@ -7,8 +7,8 @@ import { SessionControls } from "@/components/session-controls";
 import type { Conversation } from "@/server/conversations/contracts";
 import { Icon, ResearchMark, type IconName } from "./icons";
 
-export function ResearchShell({ children, recent, name, initialCollapsed, jobsEnabled = false }: {
-  children: React.ReactNode; recent: Conversation[]; name: string; initialCollapsed: boolean; jobsEnabled?: boolean;
+export function ResearchShell({ children, recent, name, initialCollapsed, jobsEnabled = false, deepResearchEnabled = false }: {
+  children: React.ReactNode; recent: Conversation[]; name: string; initialCollapsed: boolean; jobsEnabled?: boolean; deepResearchEnabled?: boolean;
 }) {
   const {data}=useModelAccess();
   const pathname = usePathname();
@@ -48,7 +48,7 @@ export function ResearchShell({ children, recent, name, initialCollapsed, jobsEn
       </div>
       <nav className="sidebar-navigation" aria-label={mobile ? "Mobile navigation" : "Primary navigation"}>
         <Link href="/workspace" className="sidebar-link" aria-label="New conversation" onClick={close}><Icon name="plus" /><span>New</span></Link>
-        {jobsEnabled && <Link href="/jobs" aria-label="Execution checks" className="sidebar-link" onClick={close}><Icon name="automation" /><span>Execution checks</span></Link>}
+        {jobsEnabled && <Link href="/jobs" aria-label={deepResearchEnabled?'Deep Research':'Execution checks'} className="sidebar-link" onClick={close}><Icon name="automation" /><span>{deepResearchEnabled?'Deep Research':'Execution checks'}</span></Link>}
         <div className="future-navigation">
           {([["computer", "Computer"], ["automation", "Automations"], ["artifact", "Artifacts"], ["settings", "Customize"]] as [IconName, string][]).map(([icon, label]) =>
             <button key={label} className="sidebar-link" disabled title={`${label} is not available yet`} aria-label={`${label} — coming later`}><Icon name={icon} /><span>{label}</span></button>)}

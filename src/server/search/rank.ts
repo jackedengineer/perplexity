@@ -15,9 +15,9 @@ function relevantWindow(text:string,query:Set<string>){
  }
  return {text:best,overlap:score};
 }
-export function rankEvidenceResults(results:RankedResult[],query:string,now:Date,preferences:RankingPreferences={}):RankedResult[]{
+export function rankEvidenceResults(results:RankedResult[],query:string,now:Date,preferences:RankingPreferences={},candidateLimit=10):RankedResult[]{
  const wanted=new Set(terms(query)),seenUrls=new Set<string>(),seenText=new Set<string>();
- const candidates=results.slice(0,10).flatMap((row,index)=>{
+ const candidates=results.slice(0,Math.min(30,Math.max(1,candidateLimit))).flatMap((row,index)=>{
   const url=canonicalSourceUrl(row.url);
   if(!url||row.title.length>300||!safeEvidenceText(row.title)||!safeRawEvidenceText(row.content))return [];
   const selected=relevantWindow(row.content,wanted),fingerprint=terms(selected.text).join(' ');

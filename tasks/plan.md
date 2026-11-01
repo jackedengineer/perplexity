@@ -1,6 +1,6 @@
 # Implementation plan
 
-Current work (1 November 2026): [durable paid-job foundation](durable-jobs-and-billing.md),
+Current work (1 November 2026): [bounded Deep Research](../docs/deep-research.md) on the [durable paid-job foundation](durable-jobs-and-billing.md),
 with job/step accounting, replay, cancellation/recovery and Razorpay test-mode access.
 The following earlier status is historical; the release checklist and current work
 record distinguish implemented foundations from enabled production features.

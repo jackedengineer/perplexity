@@ -11,7 +11,7 @@ it('rejects cross-origin submission, oversized bodies and caller-owned worker fi
  const post=(body:unknown,origin='http://localhost:3000')=>new Request('http://localhost:3000/api/jobs',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)});
  expect((await make().submit(post(base,'https://attacker.test'))).status).toBe(403);
  expect((await make().submit(post({...base,owner:'victim'}))).status).toBe(400);
- expect((await make().submit(post({text:'a'.repeat(5000)}))).status).toBe(413);
+ expect((await make().submit(post({text:'a'.repeat(10000)}))).status).toBe(413);
  expect((await make().submit(post(base))).status).toBe(202);
 });
 it('bounds replay cursor and keeps private responses uncached',async()=>{

@@ -16,6 +16,9 @@ function connect() {
       connectionTimeoutMillis: 5_000,
       idleTimeoutMillis: 30_000,
       statement_timeout: 10_000,
+      query_timeout: 10_000,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10_000,
       application_name: "perplex-web",
     });
     pool.on("error", () => console.error(JSON.stringify({ event: "database.pool_error" })));
