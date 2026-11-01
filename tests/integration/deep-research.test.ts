@@ -14,7 +14,7 @@ const input=()=>({version:1,workflow:'deep-research-v1',requestId:crypto.randomU
 it('requires explicit server configuration and rejects secrets before storage',async()=>{
  await expect(admitJob(f.db,f.subject,input(),f.key)).rejects.toThrow('DISABLED');
  const raw={...input(),question:'My key is sk-proj-'+ 'a'.repeat(50)};
- await expect(admitJob(f.db,f.subject,raw,f.key,models)).rejects.toThrow();
+ await expect(admitJob(f.db,f.subject,raw,f.key,models)).rejects.toThrow('REDACT_SECRET');
  expect(await f.db.select().from(jobResearchInputs)).toHaveLength(0);
 });
 it('snapshots private original, idempotency and all call reservations atomically',async()=>{
@@ -92,4 +92,16 @@ it('does not reuse a prior provider receipt when a local prerequisite is missing
 it('keeps the returned receipt when a paid plan has an invalid shape',async()=>{
  const id=await admitJob(f.db,f.subject,input(),f.key,models),p=providers();p.planner.plan=async()=>({value:{invalid:true},cost:100n});
  expect(await consumeResearch(f.db,id,{providers:p})).toBe('FAILED');const job=await readJob(f.db,f.subject,id);expect(job.spentMicroUsd).toBe('200');expect(job.heldMicroUsd).toBe('0');
+});
+
+it('shows the reviewed support template for distress without generating a report',async()=>{
+ const id=await admitJob(f.db,f.subject,input(),f.key,models),p=providers();p.input={...p.input,classify:async()=>({decision:'BLOCK',categoryCodes:['SELF_HARM_DISTRESS'],policyVersion:'v1'})};
+ expect(await consumeResearch(f.db,id,{providers:p})).toBe('FAILED');const view=await readJob(f.db,f.subject,id);expect(view.notice).toContain('You deserve support');expect(view.report).toBeUndefined();
+});
+
+it('locally excludes secondary domains when official documentation was requested',async()=>{
+ const id=await admitJob(f.db,f.subject,{...input(),question:'Compare SQLite and PostgreSQL using official documentation.'},f.key,models),p=providers();let drafted=false;
+ p.search.search=async()=>({results:[{title:'Unofficial article',url:'https://example.org/article',content:'SQLite and PostgreSQL offline comparisons.',score:1}],credits:1});
+ p.answer.generate=async()=>{drafted=true;throw new Error('No authoritative evidence');};
+ expect(await consumeResearch(f.db,id,{providers:p})).toBe('FAILED');expect(drafted).toBe(false);expect((await readJob(f.db,f.subject,id)).report).toBeUndefined();
 });

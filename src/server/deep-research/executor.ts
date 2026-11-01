@@ -3,15 +3,17 @@ import {eq} from 'drizzle-orm';
 import {jobResearchInputs} from '@/db/schema';
 import type {JobDatabase} from '@/server/jobs/store';
 import {JobError} from '@/server/jobs/contracts';
+import {resolveSafetyDecision} from '@/server/safety/responses';
 import type {SafetyProvider} from '@/server/safety/provider';
 import {createInputGate} from '@/server/safety/input';
 import {createEvidenceGate} from '@/server/safety/evidence';
 import {createReleaseGate} from '@/server/safety/release';
-import {buildEvidence,safeEvidenceText,validateEvidence} from '@/server/search/evidence';
-import {rankEvidenceResults,explicitPreferredDomains,type RankedResult} from '@/server/search/rank';
+import {buildEvidence,safeEvidenceText,validateEvidence,canonicalSourceUrl} from '@/server/search/evidence';
+import {rankEvidenceResults,type RankedResult} from '@/server/search/rank';
 import {freshnessTimeRange} from '@/server/search/freshness';
 import type {ExecutionOptions} from '@/server/ai/bounded';
 import {approvedPayloadSchema} from '@/server/contracts/answer';
+import {researchSourcePolicy} from './sources';
 import {readCheckpoint} from './checkpoints';
 import {researchSnapshot,researchPlan,researchReport,sectionNames,type ResearchSnapshot} from './contracts';
 import {createDeepProviders,type DeepProviders} from './providers';
@@ -23,8 +25,8 @@ export async function loadResearch(db:JobDatabase,id:string){
 export function researchExecutor(db:JobDatabase,id:string,snapshot:ResearchSnapshot,p:DeepProviders=createDeepProviders(snapshot)){
  const saved=(key:string)=>readCheckpoint(db,id,key);
  async function searches(count:number){return rowsSchema.parse((await Promise.all(Array.from({length:count},(_,i)=>saved(`search-${i+1}`)))).flatMap(v=>rowsSchema.parse(v)));}
- const preferences={freshness:freshnessTimeRange(snapshot.question)?'RECENT' as const:'ANY' as const,preferredDomains:explicitPreferredDomains(snapshot.question)};
- const rank=(rows:RankedResult[])=>rankEvidenceResults(rows,snapshot.question,new Date(),preferences,30);
+ const preferences={freshness:freshnessTimeRange(snapshot.question)?'RECENT' as const:'ANY' as const,...researchSourcePolicy(snapshot.question)};
+ const rank=(rows:RankedResult[])=>rankEvidenceResults(rows.filter(row=>{if(preferences.domainMode!=='restrict')return true;const url=canonicalSourceUrl(row.url);return !!url&&preferences.preferredDomains.some(domain=>new URL(url).hostname===domain||new URL(url).hostname.endsWith('.'+domain));}),snapshot.question,new Date(),preferences,30);
  const evidence=async(key:string)=>{const value=validateEvidence(await saved(key));if(!value||!value.sources.length)throw new JobError('UNAVAILABLE');return value;};
  async function query(index:number){const plan=researchPlan.parse(await saved(index<=3?'plan':'refine'));return plan.queries[(index-1)%3];}
  const known=(value:unknown,cost:bigint|null|undefined,stop=false):StepResult=>{
@@ -40,7 +42,8 @@ export function researchExecutor(db:JobDatabase,id:string,snapshot:ResearchSnaps
     const provider=tracked(key==='input'?p.input:p.query);
     const text=key==='input'?snapshot.question:await query(Number(key.slice(6)));
     const check=await createInputGate(provider,key==='input'?'safety.input':'safety.query').evaluate({text,context:key==='input'?[]:[{role:'USER',text:snapshot.question}]},options);
-    return known({allowed:check.verdict.decision==='ALLOW'},check.modelId===null?0n:receipt?.(),check.verdict.decision!=='ALLOW');
+    const decision=resolveSafetyDecision(check.verdict);
+    return known(decision.decision==='ALLOW'?{allowed:true}:{allowed:false,notice:decision.response.code},check.modelId===null?0n:receipt?.(),check.verdict.decision!=='ALLOW');
    }
    if(key==='plan'||key==='refine'){
     const previous=key==='refine'?researchPlan.parse(await saved('plan')).queries:[];
