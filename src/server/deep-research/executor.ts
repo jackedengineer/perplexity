@@ -70,7 +70,8 @@ export function researchExecutor(db:JobDatabase,id:string,snapshot:ResearchSnaps
     const rows=rank(await searches(6));if(!rows.length)return known(buildEvidence(id,[],new Date()),0n);
     receipt=()=>null;const result=await p.extract.extract(rows.slice(0,2).map(r=>r.url),options);
     receipt=()=>BigInt(result.credits)*15000n;
-    const combined=rows.map(row=>{const page=result.pages.find(p=>p.url===row.url);return page?{...row,content:page.content,contentKind:'EXTRACTED_PAGE' as const,retrievedAt:page.retrievedAt}:row;});
+    const rejected=new Set(result.rejectedUrls);
+    const combined=rows.filter(row=>!rejected.has(row.url)).map(row=>{const page=result.pages.find(p=>p.url===row.url);return page?{...row,content:page.content,contentKind:'EXTRACTED_PAGE' as const,retrievedAt:page.retrievedAt}:row;});
     return known(buildEvidence(id,rank(combined),new Date()),BigInt(result.credits)*15000n);
    }
    if(key.startsWith('draft-')){
