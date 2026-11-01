@@ -2,6 +2,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 import type {JobDatabase} from '@/server/jobs/store';
 import {JobError} from '@/server/jobs/contracts';
 import {claimJob,startStep,completeStep,completeJob,failJob,heartbeat} from '@/server/jobs/worker';
+import {readCheckpoint,checkpointStops} from './checkpoints';
 import {deepResearch} from './contracts';
 import {loadResearch,researchExecutor} from './executor';
 import type {DeepProviders} from './providers';
@@ -20,13 +21,16 @@ export async function consumeResearch(db:JobDatabase,id:string,options:{signal?:
   const execute=researchExecutor(db,id,await loadResearch(db,id),options.providers);
   for(const step of deepResearch.steps){
    if(signal.aborted)throw new JobError('STALE');
-   if(await startStep(db,lease,step.key)==='DONE')continue;
+   if(await startStep(db,lease,step.key)==='DONE'){
+    if(checkpointStops(await readCheckpoint(db,id,step.key))){await failJob(db,lease);return 'FAILED' as const;}
+    continue;
+   }
    currentStep=step.key;const started=performance.now();
    const result=await execute(step.key,{signal,deadlineAt:job.deadlineAt});
    if(signal.aborted)throw new JobError('STALE');
-   await completeStep(db,lease,step.key,result.cost,result.value);
+   await completeStep(db,lease,step.key,result.cost,result.value,!!result.stop);
    console.info(JSON.stringify({event:'jobs.step',jobId:id,step:step.key,outcome:result.stop?'DENIED':'SUCCEEDED',costMicroUsd:result.cost.toString(),durationMs:Math.round(performance.now()-started)}));
-   if(result.stop){await failJob(db,lease);return 'FAILED' as const;}
+   if(result.stop)return 'FAILED' as const;
   }
   await completeJob(db,lease);return 'COMPLETED' as const;
  }catch(error){

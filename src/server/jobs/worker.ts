@@ -75,9 +75,9 @@ export async function startStep(db:JobDatabase,lease:JobLease,key:string){
   await appendEvent(tx,lease.jobId,'STEP_STARTED',key);return 'START' as const;
  });
 }
-export async function completeStep(db:JobDatabase,lease:JobLease,key:string,cost:bigint,value?:unknown){
+export async function completeStep(db:JobDatabase,lease:JobLease,key:string,cost:bigint,value?:unknown,stop=false){
  return db.transaction(async tx=>{
-  const {now}=await validateLease(tx,lease);
+  const {now,job}=await validateLease(tx,lease);
   const [step]=await tx.select().from(steps).where(and(eq(steps.jobId,lease.jobId),eq(steps.key,key)));
   if(!step||step.generation!==lease.generation||cost<0n||cost>step.capMicroUsd)throw new JobError('STALE');
   if(step.state==='SUCCEEDED'){if(step.costMicroUsd!==cost)throw new JobError('CONFLICT');return;}
@@ -85,6 +85,8 @@ export async function completeStep(db:JobDatabase,lease:JobLease,key:string,cost
   if(value!==undefined)await tx.insert(jobCheckpoints).values({jobId:lease.jobId,step:key,value,hash:checkpointHash(value)});
   await tx.update(steps).set({state:'SUCCEEDED',costMicroUsd:cost,finishedAt:now}).where(and(eq(steps.jobId,lease.jobId),eq(steps.key,key)));
   await appendEvent(tx,lease.jobId,'STEP_COMPLETED',key);
+  // A denial checkpoint must never become replayable independently of failure.
+  if(stop)await settle(tx,job,'FAILED');
  });
 }
 export async function completeJob(db:JobDatabase,lease:JobLease){

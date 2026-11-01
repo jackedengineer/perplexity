@@ -17,3 +17,10 @@ export async function readCheckpoint(db:JobDatabase,id:string,step:string):Promi
  const [row]=await db.select().from(jobCheckpoints).where(and(eq(jobCheckpoints.jobId,id),eq(jobCheckpoints.step,step)));
  if(!row||checkpointHash(row.value)!==row.hash)throw new JobError('UNAVAILABLE');return row.value;
 }
+
+// Compatibility with already committed v1 stop receipts. Recovery cannot treat
+// a saved denial/unavailable outcome as permission to execute its next step.
+export function checkpointStops(value:unknown){
+ return value!==null&&typeof value==='object'&&!Array.isArray(value)&&
+  (('allowed' in value&&value.allowed===false)||('unavailable' in value&&value.unavailable===true));
+}
