@@ -149,6 +149,12 @@ HTTP tests or successful development task registration.
 - Billing: forged/altered signatures, duplicates/body mismatch, wrong plan/currency/
   amount/capture, cancellation, refunded/late events, ambiguous create and a new
   verified account without prior conversation history.
+- PR review recovery regressions: read-only plan outages leave no ambiguous
+  creation intent; three failing oldest checkouts back off so later captures are
+  reconciled; server-fetched full/partial refunds atomically revoke periods and
+  persist a reversal that delayed captures cannot undo. Mismatched payment,
+  invoice, currency and amount observations cannot revoke access. Polling and
+  signed webhook reversals share the payment advisory lock.
 - Real development PostgreSQL: three final cases passed in 58.89 seconds (earlier run: 70.55 seconds), including
   simultaneous independent connections, an actual separate-process crash/restart
   and durable cancellation. Captured fixture rows and zero-dollar namespace were

@@ -47,6 +47,18 @@ holds remain unchanged. [Architecture, setup and limits](durable-jobs.md).
   field INP or a production SLO. The execution check deliberately waits at each
   checkpoint and makes no provider inference/search request.
 - [x] Open [PR #18](https://github.com/jackedengineer/perplexity/pull/18) with focused commits and documented launch gates.
+- [x] Address all three initial PR #18 code findings in separate commits: retry
+  read-only plan failures before creating an intent; back off failed oldest
+  checkouts; atomically revoke full/partial refunds found by polling and retain
+  reversal tombstones against delayed captures. All four new regressions were
+  reproduced before fixing; malformed/mismatched refund observations retain access.
+- [x] Review-fix verification: **711/711** offline tests, **19/19** focused billing/
+  worker cases, lint and types pass. The unchanged desktop/mobile Neon browser
+  suite passes **4/4 in 2.6 minutes** (`.artifacts/pr18-review-browser-verified.log`).
+  The first run's mobile denial returned the correct 402 in 6.5 s, exceeding its
+  existing five-second assertion; that failed trace is retained and is not a pass.
+  No assertion, timeout, retry setting or financial limit was weakened. In-app
+  billing refresh and persisted completion replay also passed. No paid AI calls.
 - [ ] Obtain successful CI and independent review on the final PR head.
 - [ ] Before enabling actual paid features: implement/evaluate the Deep Research
   evidence loop and browser-task approvals/executors; provision reviewed live
