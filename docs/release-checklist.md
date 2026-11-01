@@ -34,8 +34,8 @@ holds remain unchanged. [Architecture, setup and limits](durable-jobs.md).
   cases (8.5 s)** and **12 answer-motion cases (1.1 min)**. Word reveal/citations
   and default-off paid boundaries retain their previous behavior.
 - [x] Full serial offline run: **705/705**; the latest focused configuration,
-  accounting and billing run: **19/19**, including the additional invoice-order
-  regression. Lint/types and production build pass. The first concurrent local
+  accounting and billing run: **20/20**, including the additional invoice-order
+  regression and an accepted-but-unconfirmed provider-create failure. Lint/types and production build pass. The first concurrent local
   run encountered PGlite startup timeouts and was stopped; it is not a pass.
   Original assertions, hook deadlines and CI concurrency gates remain unchanged.
 - [x] Dependency audit has **no high/critical** findings (four moderate development

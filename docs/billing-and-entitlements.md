@@ -1,11 +1,17 @@
 # Payments, model access and pricing
 
-> October 24 implementation scope: free-only trials and model/usage controls are
-> described in [guest access and credits](guest-access-and-credits.md). Razorpay,
-> paid tiers and Premium trials are deferred until the website is hosted. The
-> pricing and paid-flow sections below remain proposals, not enabled features.
+> Development update — 1 November 2026: the owner selected **Pro at ₹999/month**.
+> [The durable foundation](durable-jobs.md) implements Razorpay **TEST** checkout,
+> verified captured-cycle job access, a signed durable inbox and cancellation/
+> reconciliation. A real test payment and browser job flow passed. FAST remains
+> governed by [free credits](guest-access-and-credits.md); test Pro does not unlock
+> larger FAST models. Live purchases and unfinished research/browser tasks stay
+> disabled. The tier allowances and alternatives below are historical proposals,
+> not enabled commercial offers.
 
-Status: proposed design revision, 2026-10-22. Seller: India-based. Initial customers: mainly India. Small scale is intentional; billing correctness, security, failure recovery and cost accounting remain in scope. No payment account, subscription, live checkout or charge has been created.
+Historical design revision: 22 October 2026. India-based seller, mainly Indian
+customers. The statements about no accounts/subscriptions applied to that initial
+planning revision; test-only setup is now recorded in the linked foundation.
 
 ## 1. Provider choice
 

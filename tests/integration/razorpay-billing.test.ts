@@ -70,3 +70,11 @@ it('finds the confirmed paid invoice even when earlier scoped invoices are unpai
  });
  expect(await f.db.select().from(jobPeriods).where(eq(jobPeriods.paymentId,'pay_later'))).toHaveLength(1);
 });
+it('keeps an accepted-but-unconfirmed create durable and never retries the billable create',async()=>{
+ const subject='ambiguous-billing-'+crypto.randomUUID();await f.pg.query(`INSERT INTO "user"(id,name,email,email_verified) VALUES ($1,'Ambiguous checkout',$2,true)`,[subject,subject+'@example.test']);
+ let calls=0;const failing={...api,create:async()=>{calls++;throw new Error('Simulated lost provider acknowledgment');}},request={requestId:crypto.randomUUID(),priceKey:proPlan.priceKey};
+ await expect(startCheckout(f.db,subject,request,'plan_billing',failing)).rejects.toMatchObject({code:'UNAVAILABLE'});
+ expect(await startCheckout(f.db,subject,request,'plan_billing',failing)).toMatchObject({state:'UNKNOWN',subscriptionId:null});
+ await expect(startCheckout(f.db,subject,{...request,requestId:crypto.randomUUID()},'plan_billing',failing)).rejects.toMatchObject({code:'CONFLICT'});
+ expect(calls).toBe(1);
+});
