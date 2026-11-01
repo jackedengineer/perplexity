@@ -6,6 +6,29 @@ record is also retained in [the October 23 checklist](release-checklist-20261023
 
 ## Deep Research extension — reviewed activation still pending
 
+- [x] PR #20 merged at `bcfd3ea510644b89c30cd9f480ae45ef8fd91751`. Both fresh
+  exact-head reviews completed, Codex posted its clean-review confirmation, all
+  threads were resolved and Quality run 41335650275 passed on `3259ac7`.
+- [x] Reproduce/fix denial checkpoint recovery and unsafe extraction fallback.
+  Denial receipt and terminal settlement now commit atomically; legacy saved
+  denials cannot advance; explicitly rejected sources never reach drafting.
+  New candidate: **737/737 offline**, **4/4 actual development PostgreSQL**,
+  lint/types/build, **2/2** report browser and **10/10** default-off browser cases.
+  No paid provider requests were made for this review-fix verification.
+- [x] Owner confirmed ₹999/month and seven Deep Research runs; no voluntary
+  refunds, with statutory remedies preserved. Operator/contact confirmed.
+- [x] Vercel production deployment `dpl_kdiZfk1LVBKh3Ftzjb1EaWHi74EN`
+  reports Ready for merged `bcfd3ea`; canonical live workspace, model/quota
+  rendering and captured browser console pass. Six public entry probes pass.
+  This is deployment acceptance, not public Deep Research activation.
+- [x] Pricing/About/Contact/cancellation-refund drafts: production build, lint,
+  types and **4/4** desktop/320px browser cases, WCAG checks, public navigation
+  and disabled job/checkout boundaries. Drafts remain on a separate launch branch.
+- [ ] Publish final reviewed merchant pages and arrange Google-only reviewer
+  access. Razorpay SMS verification completed; website approval and Live keys
+  remain pending. Seven-run LIVE entitlement is not implemented by changing
+  the existing ten-job TEST allowance. [Activation record](paid-research-launch.md).
+
 - [x] Versioned strict submission and immutable private snapshots/checkpoints;
   paid TEST access, one active owner job, shared operator reservations and
   exact payload idempotency. Migration 0028 and grants applied in development only.
@@ -48,7 +71,7 @@ record is also retained in [the October 23 checklist](release-checklist-20261023
   The temporary two-hour development namespace ceiling was $0.40, then $0.42 and
   $0.55 to reserve the follow-up checks. Its prior spend and **$0.026 unknown-cost
   holds** remain recorded. This changed no production/operator/account ceiling.
-- [ ] CI and independent PR reviews; approved hosted worker credential installation,
+- [ ] Approved hosted worker credential installation,
   independent minute cadence and crash/recovery tests on the deployed candidate.
 - [ ] LIVE billing/allowances, paid-job retention/export/deletion policy, production
   migrations/grants/rollback and hosted performance; broader research-quality evals
