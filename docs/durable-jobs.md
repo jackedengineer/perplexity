@@ -2,9 +2,10 @@
 
 Status: development and hosted TEST foundation, 1 November 2026. Application
 production remains off. [Hosted follow-up evidence and limits](hosted-sandbox-verification.md).
-The only registered workflow is `execution-check-v1`: three non-billable system
-checkpoints. Deep Research's iterative evidence loop and browser-agent actions
-are **not implemented or sold** by this change. FAST research is unchanged.
+The foundation initially registered `execution-check-v1`: three non-billable
+system checkpoints. The later [Deep Research extension](deep-research.md) adds a
+bounded evidence loop behind its own default-off flag. Browser-agent actions and
+LIVE paid activation remain unavailable. FAST research is unchanged.
 
 ## Execution boundary
 

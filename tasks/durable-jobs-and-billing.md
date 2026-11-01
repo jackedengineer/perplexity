@@ -95,3 +95,11 @@ must be recorded honestly if credentials or merchant activation remain unavailab
 - [x] Open [PR #18](https://github.com/jackedengineer/perplexity/pull/18) with verification and explicit release gates; merged after CI and both final reviews passed.
 
 Detailed evidence and limitations: [release checklist](../docs/release-checklist.md).
+
+## Deep Research follow-up
+
+The bounded research executor, automatic dispatch and deadline-bounded recovery
+extension is implemented in [Deep Research v1](../docs/deep-research.md). It retains
+TEST-only entitlement and development database guards; no LIVE paid activation or
+browser-task executor is implied. Current acceptance and pending hosted gates are
+recorded in the [release checklist](../docs/release-checklist.md).

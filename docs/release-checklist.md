@@ -4,6 +4,62 @@ Decision: **HOLD full release acceptance.** The public site and guest entry are
 already deployed. This section supersedes historical status below. The original
 record is also retained in [the October 23 checklist](release-checklist-20261023.md).
 
+## Deep Research extension — reviewed activation still pending
+
+- [x] Versioned strict submission and immutable private snapshots/checkpoints;
+  paid TEST access, one active owner job, shared operator reservations and
+  exact payload idempotency. Migration 0028 and grants applied in development only.
+- [x] Six gated searches in two planning rounds, thirty-candidate ranking,
+  selected-page extraction with explicit snippet fallback, bounded three-section
+  drafting, citation validation, per-section and assembled-report output safety.
+  Official-documentation requests restrict reviewed domains at provider and server.
+- [x] Atomic step receipts/checkpoints and final publication/settlement; duplicate
+  delivery, restart from saved output, stale workers, unknown-cost holds, owned Stop
+  and revoked/expired access remain fenced. Unknown paid work is not auto-retried.
+- [x] Submission kick, durable watchdog-before-execution, deadline-bounded watch
+  chain and opt-in independent minute maintenance. Local supervised polling was
+  exercised automatically; this does not establish hosted minute-schedule acceptance.
+- [x] Real restricted-role development PostgreSQL recovery/immutability checks:
+  **2/2 in 66.05 s** (`.artifacts/deep-neon-verified.log`). A prior assertion
+  incorrectly checked the wrapped error text; final proof checks SQLSTATE 42501.
+  The interrupted connectivity run is not a pass; captured synthetic leftovers
+  were cleaned without deleting live research history or financial holds.
+- [x] Real in-app live report: **26/26 steps**, **106.683 s**, three approved
+  sections, citations only on sqlite.org/postgresql.org, full reload, export and
+  clean captured browser console. Separate live Stop persists after reload and
+  has no late report/completion. Current report holds zero uncertain cost.
+- [x] Desktop/mobile report presentation, source links, export, Stop/reload,
+  accessibility, no horizontal overflow, reduced motion and hydration checks.
+  Transport-simulated presentation cases are distinguished from the real live run.
+- [x] Final offline suite: **732/732 across 99 files in 100.96 s**, serial
+  execution with unchanged assertions/deadlines and no skipped cases. The prior
+  parallel attempt hit two PGlite startup-hook deadlines and is not a pass.
+- [x] Final lint/types/production build pass. **10/10** isolated public/default-off
+  production-build browser checks pass in **8.1 s**; high/critical audit gate passes
+  (one moderate production advisory remains; no dependency was added).
+- [x] Existing answer-motion browser regression: **12/12**. Fix the older rate-limit
+  fixture's wall-clock dependency and explicitly test minute rollover with retained
+  denial counts; production rate limits and all original assertions stay intact.
+- [x] Bound stalled client queries/idle pool errors. Redact a failed private test
+  log that serialized connection details, rotate the development owner credential,
+  and update ignored local connection files. Runtime/production credentials unchanged.
+- [x] Preserve the combined **$2** cap: replacement key still **$1.80**, non-resetting,
+  expires November 5. Final key metadata: usage $0.059538241 / remaining $1.740461759.
+  The temporary two-hour development namespace ceiling was $0.40, then $0.42 and
+  $0.55 to reserve the follow-up checks. Its prior spend and **$0.026 unknown-cost
+  holds** remain recorded. This changed no production/operator/account ceiling.
+- [ ] CI and independent PR reviews; approved hosted worker credential installation,
+  independent minute cadence and crash/recovery tests on the deployed candidate.
+- [ ] LIVE billing/allowances, paid-job retention/export/deletion policy, production
+  migrations/grants/rollback and hosted performance; broader research-quality evals
+  and audited unknown-cost resolution. Deep Research is not yet publicly sold.
+
+The first live attempt failed refinement, another was interrupted by Neon, and an
+initial completed report preferred secondary sources despite the requested official
+material. These do not count as passing the final quality policy. The corrected
+primary-source run above passes that bounded example; it is not a comprehensive
+accuracy benchmark. [Scope, setup, limits and rollout](deep-research.md).
+
 ## Hosted execution-check sandbox follow-up
 
 - [x] Deploy reviewed worker code to Trigger cloud using development Neon and
