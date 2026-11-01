@@ -176,6 +176,13 @@
       "when": 1793290793104,
       "tag": "0024_operator_renewal_lock_order",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793537711406,
+      "tag": "0025_low_doomsday",
+      "breakpoints": true
     }
   ]
 }

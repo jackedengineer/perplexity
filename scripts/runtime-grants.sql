@@ -25,3 +25,10 @@ GRANT INSERT ON guest_trials TO perplex_web;
 GRANT EXECUTE ON FUNCTION public.ensure_free_credits(uuid), public.link_guest_account(text,text) TO perplex_web;
 GRANT EXECUTE ON FUNCTION public.ensure_operator_day(text) TO perplex_web;
 GRANT SELECT, INSERT, UPDATE ON maintenance_status TO perplex_web;
+-- Durable job snapshots are insert-only; runtime may advance only lifecycle counters.
+GRANT SELECT, INSERT ON durable_jobs, job_periods, job_steps, job_events, job_reservations, job_outbox TO perplex_web;
+GRANT UPDATE (state, generation, lease_until, next_event, updated_at) ON durable_jobs TO perplex_web;
+GRANT UPDATE (state, reserved_jobs, spent_jobs) ON job_periods TO perplex_web;
+GRANT UPDATE (state, generation, cost_micro_usd, started_at, finished_at) ON job_steps TO perplex_web;
+GRANT UPDATE (spent_micro_usd, held_micro_usd, settled_at) ON job_reservations TO perplex_web;
+GRANT UPDATE (revision, state, attempts, lease_token, lease_until, available_at) ON job_outbox TO perplex_web;
