@@ -1,4 +1,4 @@
-import {and,eq,inArray,lte,or,sql} from 'drizzle-orm';
+import {and,eq,gt,inArray,lte,or,sql} from 'drizzle-orm';
 import {durableJobs as jobs,jobPeriods as periods,jobSteps as steps,jobReservations as reservations,jobOutbox as outbox,operatorUsageBuckets as budgets,appUsers} from '@/db/schema';
 import {JobError,activeJob,executionCheck,type JobState} from './contracts';
 import {appendEvent,databaseNow,lockJob,type JobDatabase,type JobTransaction} from './store';
@@ -33,14 +33,17 @@ async function settle(tx:JobTransaction,job:Job,state:JobState){
  await tx.update(steps).set({state:'SKIPPED',finishedAt:now}).where(and(eq(steps.jobId,job.id),eq(steps.state,'PENDING')));
  const charged=state==='COMPLETED'||all.some(s=>s.startedAt!==null||s.state==='STARTED'||s.state==='UNKNOWN');
  await tx.update(periods).set({reservedJobs:sql`${periods.reservedJobs}-1`,spentJobs:sql`${periods.spentJobs}+${charged?1:0}`}).where(eq(periods.id,job.periodId));
- await tx.update(jobs).set({state,generation:job.generation+1,leaseUntil:null,updatedAt:now}).where(eq(jobs.id,job.id));
+ const finished=await tx.update(jobs).set({state,generation:job.generation+1,leaseUntil:null,updatedAt:now})
+  .where(and(eq(jobs.id,job.id),state==='COMPLETED'?and(gt(jobs.deadlineAt,sql`clock_timestamp()`),gt(jobs.leaseUntil,sql`clock_timestamp()`)):undefined)).returning({id:jobs.id});
+ if(!finished.length)throw new JobError('STALE');
  await tx.update(outbox).set({state:'DELIVERED',leaseUntil:null,leaseToken:null}).where(eq(outbox.jobId,job.id));
  if(held>0n)await appendEvent(tx,job.id,'COST_UNKNOWN');
  await appendEvent(tx,job.id,state==='COMPLETED'?'COMPLETED':state==='CANCELLED'?'CANCELLED':state==='EXPIRED'?'EXPIRED':'FAILED');
 }
-export async function claimJob(db:JobDatabase,id:string):Promise<JobLease|null>{
+export async function claimJob(db:JobDatabase,id:string,budgetKey?:string):Promise<JobLease|null>{
  return db.transaction(async tx=>{
   const job=await lockJob(tx,id),now=await databaseNow(tx);
+  if(budgetKey&&!(await tx.select().from(reservations).where(and(eq(reservations.jobId,id),eq(reservations.budgetKey,budgetKey)))).length)throw new JobError('NOT_FOUND');
   if(job.state!=='QUEUED')return null;
   const [period]=await tx.select().from(periods).where(eq(periods.id,job.periodId)).for('share');
   if(job.deadlineAt<=now||!period||period.state!=='ACTIVE'||period.endsAt<=now){await settle(tx,job,job.deadlineAt<=now?'EXPIRED':'CANCELLED');return null;}
@@ -97,10 +100,10 @@ export async function cancelJob(db:JobDatabase,subject:string,id:string){
   const job=await lockJob(tx,id);await settle(tx,job,'CANCELLED');
  });
 }
-export async function recoverJobs(db:JobDatabase,limit=20){
+export async function recoverJobs(db:JobDatabase,limit=20,budgetKey?:string){
  // Discovery is bounded; each row gets its own short transaction and recheck.
- const candidates=await db.select({id:jobs.id}).from(jobs).innerJoin(periods,eq(periods.id,jobs.periodId))
-  .where(and(inArray(jobs.state,['QUEUED','RUNNING']),or(lte(jobs.deadlineAt,sql`clock_timestamp()`),lte(jobs.leaseUntil,sql`clock_timestamp()`),eq(periods.state,'REVOKED'),lte(periods.endsAt,sql`clock_timestamp()`))))
+ const candidates=await db.select({id:jobs.id}).from(jobs).innerJoin(periods,eq(periods.id,jobs.periodId)).innerJoin(outbox,eq(outbox.jobId,jobs.id)).innerJoin(reservations,eq(reservations.jobId,jobs.id))
+  .where(and(budgetKey?eq(reservations.budgetKey,budgetKey):undefined,inArray(jobs.state,['QUEUED','RUNNING']),or(and(eq(jobs.state,'QUEUED'),eq(outbox.state,'DELIVERED'),lte(outbox.availableAt,sql`clock_timestamp()-interval '30 seconds'`)),lte(jobs.deadlineAt,sql`clock_timestamp()`),lte(jobs.leaseUntil,sql`clock_timestamp()`),eq(periods.state,'REVOKED'),lte(periods.endsAt,sql`clock_timestamp()`))))
   .orderBy(jobs.deadlineAt,jobs.id).limit(Math.min(100,Math.max(1,limit)));
  let recovered=0;
  for(const {id} of candidates)await db.transaction(async tx=>{
@@ -108,6 +111,12 @@ export async function recoverJobs(db:JobDatabase,limit=20){
   const [period]=await tx.select().from(periods).where(eq(periods.id,job.periodId)).for('share');
   if(job.deadlineAt<=now){await settle(tx,job,'EXPIRED');recovered++;return;}
   if(!period||period.state!=='ACTIVE'||period.endsAt<=now){await settle(tx,job,'CANCELLED');recovered++;return;}
+  if(job.state==='QUEUED'){
+   const [dispatch]=await tx.select().from(outbox).where(eq(outbox.jobId,id)).for('update');
+   if(dispatch.state!=='DELIVERED'||dispatch.availableAt.getTime()>now.getTime()-30000)return;
+   await tx.update(outbox).set({state:'PENDING',revision:dispatch.revision+1,attempts:0,leaseUntil:null,leaseToken:null,availableAt:now}).where(eq(outbox.jobId,id));
+   await appendEvent(tx,id,'RECOVERED');recovered++;return;
+  }
   if(job.state!=='RUNNING'||!job.leaseUntil||job.leaseUntil>now)return;
   const started=await tx.select().from(steps).where(and(eq(steps.jobId,id),eq(steps.state,'STARTED')));
   if(started.some(s=>s.capMicroUsd>0n||s.kind!=='SYSTEM')){await settle(tx,job,'FAILED');recovered++;return;}

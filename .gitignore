@@ -12,3 +12,6 @@ test-results/
 .DS_Store
 .pnpm-store/
 .artifacts/
+
+# Trigger local build/session artifacts (may contain copied environment settings).
+.trigger/

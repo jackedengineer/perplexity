@@ -3,8 +3,8 @@ import {executionCheck,jobId,JobError} from './contracts';
 import {claimJob,heartbeat,startStep,completeStep,completeJob,recoverJobs} from './worker';
 import {claimDispatch,finishDispatch,type DispatchClaim} from './admission';
 import type {JobDatabase} from './store';
-export async function consumeJob(db:JobDatabase,rawId:string,options:{stepMs?:number;signal?:AbortSignal}={}){
- const id=jobId.parse(rawId),lease=await claimJob(db,id);if(!lease)return 'DUPLICATE' as const;
+export async function consumeJob(db:JobDatabase,rawId:string,options:{stepMs?:number;signal?:AbortSignal;budgetKey?:string}={}){
+ const id=jobId.parse(rawId),lease=await claimJob(db,id,options.budgetKey);if(!lease)return 'DUPLICATE' as const;
  try{
   for(const step of executionCheck.steps){
    if(await startStep(db,lease,step.key)==='DONE')continue;
@@ -25,10 +25,10 @@ export async function consumeJob(db:JobDatabase,rawId:string,options:{stepMs?:nu
   throw error;
  }
 }
-export async function dispatchJobs(db:JobDatabase,send:(claim:DispatchClaim)=>Promise<void>,limit=10){
- await recoverJobs(db);let sent=0;
+export async function dispatchJobs(db:JobDatabase,send:(claim:DispatchClaim)=>Promise<void>,limit=10,budgetKey?:string){
+ await recoverJobs(db,20,budgetKey);let sent=0;
  for(let i=0;i<Math.min(20,Math.max(1,limit));i++){
-  const claim=await claimDispatch(db);if(!claim)break;
+  const claim=await claimDispatch(db,budgetKey);if(!claim)break;
   try{await send(claim);await finishDispatch(db,claim,true);sent++;}
   catch{await finishDispatch(db,claim,false);break;}
  }

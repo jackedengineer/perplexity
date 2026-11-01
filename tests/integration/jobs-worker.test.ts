@@ -5,7 +5,7 @@ import {jobsFixture} from './jobs-fixture';
 import {admitJob,readEvents,readJob} from '@/server/jobs/admission';
 import {claimJob,startStep,completeStep,completeJob,cancelJob,recoverJobs,heartbeat} from '@/server/jobs/worker';
 let f:Awaited<ReturnType<typeof jobsFixture>>;
-beforeAll(async()=>{f=await jobsFixture();},30000);afterAll(()=>f.pg.close());
+beforeAll(async()=>{f=await jobsFixture();},30000);afterAll(()=>f?.pg.close());
 const admit=()=>admitJob(f.db,f.subject,{version:1,workflow:'execution-check-v1',requestId:crypto.randomUUID()},f.key);
 it('claims once, checkpoints completed work and fences a worker after recovery',async()=>{
  const id=await admit(),lease=await claimJob(f.db,id);expect(lease).not.toBeNull();expect(await claimJob(f.db,id)).toBeNull();
@@ -53,4 +53,20 @@ it('expires queued jobs even after dispatch exhaustion; settles once',async()=>{
  await recoverJobs(f.db);await recoverJobs(f.db);
  expect((await f.db.select().from(durableJobs).where(eq(durableJobs.id,id)))[0].state).toBe('EXPIRED');
  expect((await f.db.select().from(jobPeriods))[0].reservedJobs).toBe(0);
+});
+it('redelivers acknowledged dispatches whose consumer never starts',async()=>{
+ const id=await admit();await f.pg.query(`UPDATE job_outbox SET state='DELIVERED',available_at=now()-interval '1 minute' WHERE job_id=$1`,[id]);
+ expect(await recoverJobs(f.db)).toBe(1);
+ const [dispatch]=await f.db.select().from(jobOutbox).where(eq(jobOutbox.jobId,id));expect(dispatch).toMatchObject({state:'PENDING',revision:2});
+ await cancelJob(f.db,f.subject,id);
+});
+it('settles known step spend once and preserves unrelated unknown-cost holds',async()=>{
+ const before=await f.db.select().from(operatorUsageBuckets),id=await admit();
+ await f.pg.query(`UPDATE job_steps SET kind='MODEL',cap_micro_usd=1000,state='SUCCEEDED',cost_micro_usd=400,started_at=now() WHERE job_id=$1 AND key='checkpoint'`,[id]);
+ await f.pg.query('UPDATE job_reservations SET reserved_micro_usd=1000 WHERE job_id=$1',[id]);
+ await f.pg.exec('UPDATE operator_usage_buckets SET reserved_provider_micro_usd=reserved_provider_micro_usd+1000');
+ await cancelJob(f.db,f.subject,id);await cancelJob(f.db,f.subject,id);
+ const after=await f.db.select().from(operatorUsageBuckets);
+ for(const row of after){const prior=before.find(b=>b.id===row.id)!;expect(row.reservedProviderMicroUsd).toBe(prior.reservedProviderMicroUsd);expect(row.settledProviderMicroUsd).toBe(prior.settledProviderMicroUsd+400n);}
+ expect(await readJob(f.db,f.subject,id)).toMatchObject({spentMicroUsd:'400',heldMicroUsd:'0'});
 });
