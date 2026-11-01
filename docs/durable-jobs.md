@@ -1,6 +1,7 @@
 # Durable jobs and Pro billing foundation
 
-Status: development/test foundation, 1 November 2026. Production remains off.
+Status: development and hosted TEST foundation, 1 November 2026. Application
+production remains off. [Hosted follow-up evidence and limits](hosted-sandbox-verification.md).
 The only registered workflow is `execution-check-v1`: three non-billable system
 checkpoints. Deep Research's iterative evidence loop and browser-agent actions
 are **not implemented or sold** by this change. FAST research is unchanged.
@@ -136,10 +137,11 @@ against production. A staging cron adapter is defined but **not deployed or
 verified as hosted scheduled recovery** by this PR. The existing FAST production
 recovery schedule is separate and unchanged.
 
-The provider webhook cannot reach localhost. Hosted HTTPS delivery, provider
-webhook registration/retry, scheduler downtime/recovery and a reviewed production
-worker environment are still release gates. Do not infer them from local signed
-HTTP tests or successful development task registration.
+The provider webhook cannot reach localhost. The hosted follow-up verifies HTTPS
+provider delivery and delayed cloud recovery in a separate TEST setup. Recurring
+automatic dispatch/recovery, provider outage/redelivery, full payment lifecycle
+and a reviewed production worker environment remain release gates; see the
+[explicit acceptance boundaries](hosted-sandbox-verification.md).
 
 ## Verification evidence
 
@@ -174,8 +176,9 @@ HTTP tests or successful development task registration.
 
 No OpenRouter/Tavily inference/search requests were needed. The existing $2 total
 OpenRouter cap, key expiry, production operator/account ceilings and unknown holds
-remain unchanged. Razorpay tests moved no real funds. No production migrations,
-worker deployment or live checkout activation were performed.
+remain unchanged. Razorpay tests moved no real funds. No application-production
+migrations or live checkout activation were performed. The later hosted TEST
+worker deployment is recorded in the linked follow-up.
 
 ## Sources
 
