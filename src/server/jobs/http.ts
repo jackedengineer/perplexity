@@ -4,7 +4,7 @@ import {AdmissionError} from '@/server/runs/errors';
 type Backend={list:(subject:string)=>Promise<unknown>;admit:(subject:string,body:unknown)=>Promise<string>;read:(subject:string,id:string)=>Promise<unknown>;events:(subject:string,id:string,cursor:number)=>Promise<unknown>;cancel:(subject:string,id:string)=>Promise<void>};
 type Dependencies={enabled:()=>boolean;subject:()=>Promise<string|null>;origin:()=>string;consume:(subject:string)=>Promise<void>;backend:()=>Backend};
 export const privateHeaders={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
-export async function readBoundedBody(request:Request,max=2048){
+export async function readBoundedBytes(request:Request,max=2048){
  if(request.headers.get('content-type')?.split(';')[0].trim().toLowerCase()!=='application/json')throw new JobError('INVALID_INPUT');
  const reader=request.body?.getReader();if(!reader)throw new JobError('INVALID_INPUT');
  const signal=AbortSignal.any([request.signal,AbortSignal.timeout(3000)]),chunks:Uint8Array[]=[];let bytes=0;
@@ -12,12 +12,13 @@ export async function readBoundedBody(request:Request,max=2048){
  try{
   for(let count=0;count<256;count++){
    if(signal.aborted)throw new JobError('INVALID_INPUT');const next=await reader.read();if(signal.aborted)throw new JobError('INVALID_INPUT');
-   if(next.done)return Buffer.concat(chunks).toString('utf8');
+   if(next.done)return Buffer.concat(chunks);
    bytes+=next.value.byteLength;if(bytes>max)throw new AdmissionError('TOO_LARGE');chunks.push(next.value);
   }
   throw new JobError('INVALID_INPUT');
  }finally{signal.removeEventListener('abort',cancel);cancel();reader.releaseLock();}
 }
+export async function readBoundedBody(request:Request,max=2048){return new TextDecoder('utf-8',{fatal:true}).decode(await readBoundedBytes(request,max));}
 export function sameOrigin(request:Request,origin:string){
  if(request.method!=='POST'||request.headers.get('origin')!==new URL(origin).origin||new URL(request.url).search)throw new AdmissionError('INVALID_ORIGIN');
 }

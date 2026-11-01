@@ -51,3 +51,22 @@ it('holds an ambiguous create without trying a second subscription and reconcile
  checkoutId=id;await reconcileCheckout(f.db,id,{...api,subscriptions:async()=>[{...sub(),id:'sub_recovered'}],subscription:async()=>({...sub(),id:'sub_recovered'}),invoices:async()=>[]});
  expect((await f.db.select().from(billingCheckouts).where(eq(billingCheckouts.id,id)))[0]).toMatchObject({state:'READY',subscriptionId:'sub_recovered'});
 });
+it('can prepare paid access for a newly signed-in verified user without any prior conversation',async()=>{
+ const subject='new-billing-'+crypto.randomUUID();await f.pg.query(`INSERT INTO "user"(id,name,email,email_verified) VALUES ($1,'New subscriber',$2,true)`,[subject,subject+'@example.test']);
+ const response=await startCheckout(f.db,subject,{requestId:crypto.randomUUID(),priceKey:proPlan.priceKey},'plan_billing',{...api,create:async id=>({...sub(),id:'sub_newowner',notes:{checkoutId:id,priceKey:proPlan.priceKey}})});
+ expect(response.state).toBe('READY');expect(response.subscriptionId).toBe('sub_newowner');
+});
+it('authenticates raw bytes before rejecting malformed UTF-8 and never stores them',async()=>{
+ const raw=Buffer.from([0xff]);await expect(ingestWebhook(f.db,'evt_invalid_utf8',raw,createHmac('sha256',webhook).update(raw).digest('hex'),webhook)).rejects.toMatchObject({code:'INVALID_INPUT'});
+ expect(await f.db.select().from(billingInbox).where(eq(billingInbox.eventId,'evt_invalid_utf8'))).toHaveLength(0);
+});
+it('finds the confirmed paid invoice even when earlier scoped invoices are unpaid',async()=>{
+ const [row]=await f.pg.query<{id:string;auth_subject:string}>(`SELECT c.id,a.auth_subject FROM billing_checkouts c JOIN app_users a ON a.id=c.user_id WHERE c.subscription_id='sub_newowner'`).then(r=>r.rows);
+ const confirmation={checkoutId:row.id,razorpay_subscription_id:'sub_newowner',razorpay_payment_id:'pay_later',razorpay_signature:createHmac('sha256',secret).update('pay_later|sub_newowner').digest('hex')};
+ await confirmCheckout(f.db,row.auth_subject,confirmation,secret,{...api,
+  subscription:async()=>({...sub(),id:'sub_newowner',notes:{checkoutId:row.id,priceKey:proPlan.priceKey}}),
+  invoices:async()=>[...Array.from({length:15},()=>({status:'issued'})),{...invoice(),id:'inv_later',payment_id:'pay_later'}],
+  payment:async()=>({...payment(),id:'pay_later',invoice_id:'inv_later'}),
+ });
+ expect(await f.db.select().from(jobPeriods).where(eq(jobPeriods.paymentId,'pay_later'))).toHaveLength(1);
+});

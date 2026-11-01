@@ -36,13 +36,16 @@ async function ownedCheckout(db:JobDatabase,subject:string,id:string){
 async function lockedCheckout(tx:JobTransaction,id:string){
  const [row]=await tx.select().from(checkouts).where(eq(checkouts.id,id)).for('update');if(!row)throw new JobError('NOT_FOUND');return row;
 }
-async function reconcileCycles(db:JobDatabase,row:Checkout,api:RazorpayApi,onlyPayment?:string){
+async function reconcileCycles(db:JobDatabase,row:Checkout,api:RazorpayApi,onlyPayment?:string,deadline=performance.now()+10000){
  if(!row.subscriptionId)throw new JobError('CONFLICT');
  const sub=await api.subscription(row.subscriptionId);
  if(sub.id!==row.subscriptionId||sub.plan_id!==row.planId||sub.notes.checkoutId!==row.id||sub.notes.priceKey!==row.priceKey)throw new JobError('CONFLICT');
  const invoices=await api.invoices(sub.id);
+ let verified=0;
  for(const raw of invoices){
+  if(performance.now()>=deadline)throw new JobError('UNAVAILABLE');
   const parsed=invoiceSchema.safeParse(raw);if(!parsed.success||onlyPayment&&parsed.data.payment_id!==onlyPayment)continue;
+  if(verified++>=12)throw new JobError('UNAVAILABLE');
   const payment=await api.payment(parsed.data.payment_id);let cycle:ReturnType<typeof verifyCycle>;
   try{cycle=verifyCycle(parsed.data,payment);}catch{continue;}
   await db.transaction(async tx=>{
@@ -55,7 +58,8 @@ async function reconcileCycles(db:JobDatabase,row:Checkout,api:RazorpayApi,onlyP
    if(!saved||saved.userId!==row.userId||saved.subscriptionId!==sub.id||saved.invoiceId!==cycle.invoiceId)throw new JobError('CONFLICT');
   });
  }
- await db.update(checkouts).set({providerState:sub.status,state:sub.status==='cancelled'||sub.status==='expired'?'CANCELLED':sub.status==='completed'?'COMPLETED':'READY',updatedAt:sql`clock_timestamp()`}).where(and(eq(checkouts.id,row.id),sql`${checkouts.state} NOT IN ('CANCELLED','COMPLETED')`));
+ const next=sub.status==='cancelled'||sub.status==='expired'?'CANCELLED':sub.status==='completed'?'COMPLETED':'READY';
+ await db.update(checkouts).set({providerState:sql`CASE WHEN ${checkouts.state} IN ('CANCELLED','COMPLETED') THEN ${checkouts.providerState} ELSE ${sub.status} END`,state:sql`CASE WHEN ${checkouts.state} IN ('CANCELLED','COMPLETED') THEN ${checkouts.state} ELSE ${next} END`,updatedAt:sql`clock_timestamp()`}).where(eq(checkouts.id,row.id));
 }
 export async function confirmCheckout(db:JobDatabase,subject:string,raw:unknown,secret:string,api:RazorpayApi){
  const input=confirmationInput.parse(raw),row=await ownedCheckout(db,subject,input.checkoutId);
@@ -72,7 +76,8 @@ export async function cancelSubscription(db:JobDatabase,subject:string,id:string
 }
 export async function ingestWebhook(db:JobDatabase,eventId:string,bytes:Uint8Array,signature:string,secret:string){
  if(bytes.byteLength>65536||!/^[-A-Za-z0-9_]{1,100}$/u.test(eventId)||!verifySignature(bytes,signature,secret))throw new JobError('INVALID_INPUT');
- const event=normalizeWebhook(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))),bodyHash=createHash('sha256').update(bytes).digest('hex');
+ let parsed:unknown;try{parsed=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}catch{throw new JobError('INVALID_INPUT');}
+ const event=normalizeWebhook(parsed),bodyHash=createHash('sha256').update(bytes).digest('hex');
  await db.transaction(async tx=>{
   await tx.insert(inbox).values({eventId,bodyHash,...event}).onConflictDoNothing();
   const [prior]=await tx.select().from(inbox).where(eq(inbox.eventId,eventId));if(prior.bodyHash!==bodyHash)throw new JobError('CONFLICT');
@@ -93,9 +98,9 @@ export async function reconcileCheckout(db:JobDatabase,id:string,api:RazorpayApi
  }
  await reconcileCycles(db,row,api);
 }
-export async function processBillingInbox(db:JobDatabase,api:RazorpayApi,limit=5){
+export async function processBillingInbox(db:JobDatabase,api:RazorpayApi,limit=5,deadline=performance.now()+15000){
  let applied=0;
- for(let i=0;i<Math.min(10,Math.max(1,limit));i++){
+ for(let i=0;i<Math.min(10,Math.max(1,limit))&&performance.now()<deadline;i++){
   const claim=await db.transaction(async tx=>{
    const now=await databaseNow(tx);
    const [row]=await tx.select().from(inbox).where(and(lte(inbox.availableAt,now),sql`${inbox.attempts}<10`,or(eq(inbox.state,'PENDING'),and(eq(inbox.state,'PROCESSING'),lte(inbox.leaseUntil,now)))))

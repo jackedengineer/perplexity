@@ -9,9 +9,11 @@ export async function databaseNow(tx:JobTransaction){
  return new Date(result.now);
 }
 export async function ownerFor(tx:JobTransaction,subject:string){
- const [owner]=await tx.select({id:appUsers.id}).from(appUsers).innerJoin(user,eq(appUsers.authSubject,user.id))
+ const [identity]=await tx.select({id:user.id}).from(user)
   .where(and(eq(user.id,subject),eq(user.isAnonymous,false),eq(user.emailVerified,true))).limit(1);
- if(!owner)throw new JobError('PAYMENT_REQUIRED');
+ if(!identity)throw new JobError('PAYMENT_REQUIRED');
+ await tx.insert(appUsers).values({authSubject:subject}).onConflictDoNothing({target:appUsers.authSubject});
+ const [owner]=await tx.select({id:appUsers.id}).from(appUsers).where(eq(appUsers.authSubject,subject));
  return owner.id;
 }
 export async function lockJob(tx:JobTransaction,id:string){
