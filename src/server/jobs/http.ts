@@ -25,7 +25,7 @@ export function sameOrigin(request:Request,origin:string){
 export function jobFailure(error:unknown){
  const code=error instanceof JobError?error.code:error instanceof AdmissionError?error.code:'UNAVAILABLE';
  const statuses:Record<string,number>={DISABLED:404,NOT_FOUND:404,PAYMENT_REQUIRED:402,CONFLICT:409,QUOTA:429,STALE:409,INVALID_INPUT:400,UNAUTHENTICATED:401,INVALID_ORIGIN:403,RATE_LIMITED:429,TOO_LARGE:413};
- const messages:Record<string,string>={PAYMENT_REQUIRED:'A verified Pro test subscription is required.',QUOTA:'Your execution-check allowance is used up.',CONFLICT:'An execution check is already in progress. Open it to continue.',UNAVAILABLE:'This service is temporarily unavailable. Please try again.'};
+ const messages:Record<string,string>={PAYMENT_REQUIRED:'A verified Pro test subscription is required.',QUOTA:'Your job allowance is used up.',CONFLICT:'Work is already in progress. Open it to continue.',UNAVAILABLE:'This service is temporarily unavailable. Please try again.'};
  return Response.json({error:{code,message:messages[code]??'This request could not be completed.'}},{status:statuses[code]??503,headers:privateHeaders});
 }
 export function createJobsHttp(d:Dependencies){
@@ -36,7 +36,7 @@ export function createJobsHttp(d:Dependencies){
  async function respond(work:()=>Promise<Response>){try{return await work();}catch(error){return jobFailure(error);}}
  return {
   list:(request:Request)=>respond(async()=>{const {subject,backend}=await context();if(request.method!=='GET'||new URL(request.url).search)throw new JobError('INVALID_INPUT');return Response.json({jobs:await backend.list(subject)},{headers:privateHeaders});}),
-  submit:(request:Request)=>respond(async()=>{const {subject,backend}=await context();sameOrigin(request,d.origin());let raw:unknown;try{raw=JSON.parse(await readBoundedBody(request));}catch(error){if(error instanceof AdmissionError)throw error;throw new JobError('INVALID_INPUT');}
+  submit:(request:Request)=>respond(async()=>{const {subject,backend}=await context();sameOrigin(request,d.origin());let raw:unknown;try{raw=JSON.parse(await readBoundedBody(request,8192));}catch(error){if(error instanceof AdmissionError)throw error;throw new JobError('INVALID_INPUT');}
    const parsed=jobSubmission.safeParse(raw);if(!parsed.success)throw new JobError('INVALID_INPUT');
    return Response.json({id:await backend.admit(subject,parsed.data)},{status:202,headers:privateHeaders});}),
   read:(request:Request,id:string)=>respond(async()=>{const {subject,backend}=await context();const url=new URL(request.url),cursor=jobCursor.safeParse(url.searchParams.get('after')??'0');
