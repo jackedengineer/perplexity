@@ -42,3 +42,41 @@ it('detects checkpoint tampering instead of replaying corrupt evidence',async()=
  expect((await f.pg.query<{n:number}>('SELECT count(*)::int n FROM job_checkpoints')).rows[0].n).toBe(1);
  await f.db.execute(sql`SELECT 1`);
 });
+
+import {consumeResearch} from '@/server/deep-research/consumer';
+import type {DeepProviders} from '@/server/deep-research/providers';
+function providers():DeepProviders{
+ const safety={modelId:'fixture',classify:async()=>({decision:'ALLOW',categoryCodes:[],policyVersion:'v1'}),usage:()=>({costMicroUsd:100n,inputTokens:1,outputTokens:1,actualModel:'fixture'})};
+ return {input:safety,query:safety,evidence:safety,output:safety,
+  planner:{plan:async({previous})=>({value:{queries:previous.length?['SQLite PostgreSQL offline reliability','SQLite PostgreSQL offline benchmarks','SQLite PostgreSQL offline limitations']:['SQLite PostgreSQL offline architecture','SQLite PostgreSQL offline consistency','SQLite PostgreSQL offline synchronization'],focus:'Compare offline tradeoffs using primary sources'},cost:100n})},
+  search:{search:async()=>({results:[{title:'PostgreSQL documentation',url:'https://www.postgresql.org/docs/',content:'PostgreSQL uses a client server architecture. SQLite stores data locally. Offline synchronization needs application conflict handling.',score:.9}],credits:1})},
+  extract:{extract:async urls=>({pages:urls.map(url=>({url,content:'PostgreSQL uses a client server architecture. SQLite stores data locally. Offline synchronization needs application conflict handling.',retrievedAt:new Date().toISOString()})),failedUrls:[],rejectedUrls:[],credits:1})},
+  answer:{generate:async()=>({text:'SQLite stores data locally; PostgreSQL uses a client server architecture. [S1]',usage:{costMicroUsd:100n,inputTokens:1,outputTokens:1,actualModel:'fixture'}})},
+ };
+}
+it('completes six searches and releases only the atomically approved three-section report',async()=>{
+ const id=await admitJob(f.db,f.subject,input(),f.key,models);
+ const p=providers();let calls=0;const search=p.search.search;p.search.search=async(...args)=>{calls++;return search(...args);};
+ expect(await consumeResearch(f.db,id,{providers:p})).toBe('COMPLETED');expect(calls).toBe(6);
+ const job=await readJob(f.db,f.subject,id);expect(job.report?.sections).toHaveLength(3);expect(job.report?.sections[0].answer.sources[0].url).toBe('https://www.postgresql.org/docs/');
+ expect(await consumeResearch(f.db,id,{providers:p})).toBe('DUPLICATE');expect(calls).toBe(6);
+ expect(job.spentMicroUsd).toBe('106700');expect(job.heldMicroUsd).toBe('0');
+});
+it('blocks unsafe queries before search and never returns a private draft',async()=>{
+ const id=await admitJob(f.db,f.subject,input(),f.key,models),p=providers();let calls=0;
+ p.query={...p.query,classify:async()=>({decision:'BLOCK',categoryCodes:['FRAUD'],policyVersion:'v1'})};
+ p.search.search=async()=>{calls++;throw new Error('Must not search');};
+ expect(await consumeResearch(f.db,id,{providers:p})).toBe('FAILED');expect(calls).toBe(0);
+ expect((await readJob(f.db,f.subject,id)).report).toBeUndefined();
+});
+it('retains unknown provider exposure and never retries the paid operation',async()=>{
+ const id=await admitJob(f.db,f.subject,input(),f.key,models),p=providers();let calls=0;
+ p.search.search=async()=>{calls++;throw new Error('Lost response');};
+ expect(await consumeResearch(f.db,id,{providers:p})).toBe('FAILED');
+ expect((await readJob(f.db,f.subject,id)).heldMicroUsd).toBe('15000');
+ await recoverJobs(f.db);expect(await consumeResearch(f.db,id,{providers:p})).toBe('DUPLICATE');expect(calls).toBe(1);
+});
+it('rejects output without valid citations and exposes no partial report',async()=>{
+ const id=await admitJob(f.db,f.subject,input(),f.key,models),p=providers();p.answer.generate=async()=>({text:'Unsupported answer [S9]',usage:{costMicroUsd:100n,inputTokens:1,outputTokens:1,actualModel:'fixture'}});
+ expect(await consumeResearch(f.db,id,{providers:p})).toBe('FAILED');expect((await readJob(f.db,f.subject,id)).report).toBeUndefined();
+});
