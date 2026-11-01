@@ -16,13 +16,15 @@ if(process.env.LIVE_HOSTED_JOB_CHECKS!=='1'||!hosted.TRIGGER_SECRET_KEY?.startsW
  new URL(hosted.DATABASE_URL).hostname!=='ep-sweet-night-az8bacv2-pooler.c-3.ap-southeast-1.aws.neon.tech')throw new Error('Explicit isolated hosted sandbox required');
 configure({accessToken:hosted.TRIGGER_SECRET_KEY});
 const namespace=hosted.JOB_OPERATOR_BUDGET_KEY;
-let f:ReturnType<typeof createNeonFixture>,subject:string,owner:string;
+let f:ReturnType<typeof createNeonFixture>,subject:string,owner:string,namespaceCreated=false;
 const ids:string[]=[],remoteIds=new Set<string>();
 beforeAll(async()=>{
- f=createNeonFixture();const identity=await f.identity();subject=identity.subject;owner=identity.profile.id;
+ f=createNeonFixture();
+ if((await f.owner.select({id:operatorUsageBuckets.id}).from(operatorUsageBuckets).where(eq(operatorUsageBuckets.budgetKey,namespace))).length)throw new Error('Hosted verification needs a fresh namespace; existing ledger retained');
+ const identity=await f.identity();subject=identity.subject;owner=identity.profile.id;
  await f.owner.update(user).set({emailVerified:true}).where(eq(user.id,subject));
  await f.owner.insert(operatorUsageBuckets).values((['DAY','PERIOD'] as const).map(kind=>({budgetKey:namespace,kind,
-  startsAt:new Date(Date.now()-1000),endsAt:new Date(Date.now()+7200000),providerLimitMicroUsd:0n})));
+  startsAt:new Date(Date.now()-1000),endsAt:new Date(Date.now()+7200000),providerLimitMicroUsd:0n})));namespaceCreated=true;
  const suffix=crypto.randomUUID().replaceAll('-',''),subscription='sub_'+suffix;
  await f.owner.insert(billingCheckouts).values({userId:owner,requestId:crypto.randomUUID(),planId:'plan_hostedfixture',priceKey:'pro-monthly-inr-v1',environment:'TEST',subscriptionId:subscription,state:'READY'});
  await f.owner.insert(jobPeriods).values({userId:owner,environment:'TEST',paymentId:'pay_'+suffix,invoiceId:'inv_'+suffix,subscriptionId:subscription,
@@ -55,7 +57,7 @@ afterAll(async()=>{
    await f.owner.delete(durableJobs).where(inArray(durableJobs.id,ids));
   }
   if(owner){await f.owner.delete(jobPeriods).where(eq(jobPeriods.userId,owner));await f.owner.delete(billingCheckouts).where(eq(billingCheckouts.userId,owner));}
-  await f.owner.delete(operatorUsageBuckets).where(eq(operatorUsageBuckets.budgetKey,namespace));
+  if(namespaceCreated)await f.owner.delete(operatorUsageBuckets).where(eq(operatorUsageBuckets.budgetKey,namespace));
  }finally{await f.close();}
 });
 it('dispatches to hosted compute and persists each checkpoint once',async()=>{
