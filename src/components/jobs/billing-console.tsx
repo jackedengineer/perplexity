@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import {useRef,useState} from 'react';
 import './jobs.css';
+import {PRO_OFFER} from '@/lib/pro-offer';
 type Status={mode:string;amountPaise:number;checkouts:{id:string;requestId:string;state:string;providerState:string|null;cancelAtCycleEnd:boolean;subscriptionId:string|null}[];access:{endsAt:string;remaining:number}|null};
 type Confirmation={razorpay_payment_id:string;razorpay_subscription_id:string;razorpay_signature:string};
 type CheckoutOptions={key:string;subscription_id:string;name:string;description:string;handler:(data:Confirmation)=>void;modal:{ondismiss:()=>void}};
@@ -31,9 +32,9 @@ export function BillingConsole({initial}:{initial:Status}){
   setStatus(await read(await fetch(`/api/billing/${id}/cancel`,{method:'POST'})));setNotice('Renewal cancellation requested. Any verified paid-through period is retained.');
  }catch(e){setError(e instanceof Error?e.message:'Cancellation is not confirmed. Try again.');}finally{setBusy(false);}}
  return <section className="jobs-page" aria-labelledby="billing-heading"><header><span className="jobs-eyebrow">RAZORPAY · TEST MODE</span><h1 id="billing-heading">Pro subscription</h1><p>The selected Pro price is ₹999/month. This sandbox uses test payments only.</p></header>
-  <section className="jobs-card"><div className="jobs-card-heading"><div><h2>₹999 <small>/ month</small></h2><p>Future paid access to Deep Research and Tasks.</p></div><span className="jobs-badge">Not live</span></div>
-   <p className="jobs-note">The research loop and browser agent are still being built. A verified test cycle grants ten execution checks to validate the payment and job foundation. No real purchase is available here.</p>
-   <div className="jobs-actions"><button className="jobs-primary" disabled={busy||!!status.access} onClick={()=>checkout()}>{status.access?'Test access active':busy?'Connecting…':'Open Razorpay test checkout'}</button><Link href="/jobs">Execution checks ↗</Link></div>
+  <section className="jobs-card"><div className="jobs-card-heading"><div><h2>₹999 <small>/ month</small></h2><p>Deep Research with saved progress and cited reports.</p></div><span className="jobs-badge">Not live</span></div>
+   <p className="jobs-note">The planned live Pro offer includes {PRO_OFFER.deepResearchRuns} Deep Research runs per paid month. Browser Tasks are not included. This sandbox retains its separate ten-job test allowance for payment and research verification. No real purchase is available here.</p>
+   <div className="jobs-actions"><button className="jobs-primary" disabled={busy||!!status.access} onClick={()=>checkout()}>{status.access?'Test access active':busy?'Connecting…':'Open Razorpay test checkout'}</button><Link href="/jobs">Research workspace ↗</Link></div>
    {status.access&&<p className="jobs-receipt">{status.access.remaining} checks available · paid through {new Date(status.access.endsAt).toLocaleString('en-GB',{timeZone:'UTC',dateStyle:'medium',timeStyle:'short'})+' UTC'}</p>}
   </section>
   {status.checkouts.length>0&&<section className="jobs-card"><h2>Saved subscription</h2>{status.checkouts.map(checkout=><div className="billing-subscription" key={checkout.id}><p>{checkout.providerState??checkout.state} {checkout.cancelAtCycleEnd?'· renewal cancellation requested':''}</p><p className="jobs-note">{checkout.state==='UNKNOWN'||checkout.state==='CREATING'?'Verification is pending. We will not create a second subscription.':'Only captured, verified invoices grant access.'}</p>{checkout.subscriptionId&&!checkout.cancelAtCycleEnd&&!['CANCELLED','COMPLETED'].includes(checkout.state)&&<div className="jobs-actions">{!status.access&&checkout.state==='READY'&&<button className="jobs-primary" disabled={busy} onClick={()=>checkoutSaved(checkout.requestId)}>Resume test checkout</button>}<button className="jobs-stop" disabled={busy} onClick={()=>cancel(checkout.id)}>Cancel renewal</button></div>}</div>)}<div className="jobs-actions"><button className="jobs-stop" disabled={busy} onClick={refresh}>Refresh billing status</button></div></section>}
