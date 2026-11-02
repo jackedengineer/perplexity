@@ -2,7 +2,7 @@ import {SAFETY_RESPONSES} from '@/server/safety/responses';
 import {JobError,jobId,jobCursor,jobSubmission} from './contracts';
 import {requireEmptyBody} from '@/server/runs/recovery-http';
 import {AdmissionError} from '@/server/runs/errors';
-type Backend={list:(subject:string)=>Promise<unknown>;admit:(subject:string,body:unknown)=>Promise<string>;read:(subject:string,id:string)=>Promise<unknown>;events:(subject:string,id:string,cursor:number)=>Promise<unknown>;cancel:(subject:string,id:string)=>Promise<void>};
+type Backend={list:(subject:string)=>Promise<unknown>;admit:(subject:string,body:unknown)=>Promise<string>;read:(subject:string,id:string)=>Promise<unknown>;events:(subject:string,id:string,cursor:number)=>Promise<unknown>;cancel:(subject:string,id:string)=>Promise<void>;remove?:(subject:string,id:string)=>Promise<void>};
 type Dependencies={enabled:()=>boolean;subject:()=>Promise<string|null>;origin:()=>string;consume:(subject:string)=>Promise<void>;backend:()=>Backend};
 export const privateHeaders={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
 export async function readBoundedBytes(request:Request,max=2048){
@@ -45,5 +45,7 @@ export function createJobsHttp(d:Dependencies){
    const job=await backend.read(subject,id),events=await backend.events(subject,id,cursor.data);return Response.json({job,events},{headers:privateHeaders});}),
   cancel:(request:Request,id:string)=>respond(async()=>{const {subject,backend}=await context();sameOrigin(request,d.origin());if(!jobId.safeParse(id).success)throw new JobError('INVALID_INPUT');await requireEmptyBody(request);
    await backend.cancel(subject,id);return Response.json({job:await backend.read(subject,id)},{headers:privateHeaders});}),
+  remove:(request:Request,id:string)=>respond(async()=>{const {subject,backend}=await context();sameOrigin(request,d.origin());if(!jobId.safeParse(id).success)throw new JobError('INVALID_INPUT');await requireEmptyBody(request);
+   if(!backend.remove)throw new JobError('DISABLED');await backend.remove(subject,id);return Response.json({removed:true},{headers:privateHeaders});}),
  };
 }
