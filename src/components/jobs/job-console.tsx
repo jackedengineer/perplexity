@@ -1,5 +1,6 @@
 'use client';
 import {ResearchReport} from './research-report';
+import {DeleteResearch} from './delete-research';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 import {useEffect,useRef,useState} from 'react';
@@ -11,10 +12,11 @@ const researchMessages:Record<string,string>={STEP_STARTED:'Working on',STEP_COM
 class JobHttpError extends Error{constructor(message:string,public status:number){super(message);}}
 async function responseBody(response:Response){let body;try{body=await response.json();}catch{throw new JobHttpError('The service could not be reached. Please try again.',response.status);}
  if(!response.ok)throw new JobHttpError(body.error?.message??'Please try again in a moment.',response.status);return body;}
-export function JobConsole({initialJobs,initialId,billingAvailable,deepAvailable=false}:{initialJobs:Summary[];initialId:string|null;billingAvailable:boolean;deepAvailable?:boolean}){
+export function JobConsole({initialJobs,initialId,billingAvailable,deepAvailable=false,environment='TEST'}:{initialJobs:Summary[];initialId:string|null;billingAvailable:boolean;deepAvailable?:boolean;environment?:'TEST'|'LIVE'}){
  const router=useRouter(),[id,setId]=useState(initialId),[job,setJob]=useState<JobView|null>(null),[events,setEvents]=useState<JobEvent[]>([]);
  const [expanded,setExpanded]=useState(false);
- const [question,setQuestion]=useState(''),[mode,setMode]=useState<'research'|'check'>(deepAvailable?'research':'check');
+ const test=environment==='TEST',[removedIds,setRemovedIds]=useState<string[]>([]);
+ const [question,setQuestion]=useState(''),[mode,setMode]=useState<'research'|'check'>(deepAvailable||!test?'research':'check');
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[retry,setRetry]=useState(0),intent=useRef<string|null>(null);
  useEffect(()=>{
   if(!id)return;const controller=new AbortController();let cursor=0,failures=0,timer:ReturnType<typeof setTimeout>;
@@ -42,11 +44,12 @@ export function JobConsole({initialJobs,initialId,billingAvailable,deepAvailable
  const active=job&&['QUEUED','RUNNING'].includes(job.state);
  const compact=job?.workflow==='deep-research-v1'&&events.length>6,visibleEvents=compact&&!expanded?events.slice(-6):events;
  return <section className="jobs-page" aria-labelledby="jobs-heading">
-  <header><span className="jobs-eyebrow">PRO · TEST ENVIRONMENT</span><h1 id="jobs-heading">{deepAvailable?'Deep Research':'Durable execution'}</h1><p>Your work can keep going when you leave. Saved checkpoints let a worker resume safely.</p></header>
-  {deepAvailable&&<div className="deep-modes" role="group" aria-label="Work type"><button aria-pressed={mode==='research'} onClick={()=>setMode('research')} disabled={busy}>Deep Research</button><button aria-pressed={mode==='check'} onClick={()=>setMode('check')} disabled={busy}>Execution check</button></div>}
-  <section className="jobs-card" aria-labelledby="execution-title"><div className="jobs-card-heading"><div><h2 id="execution-title">{mode==='research'?'Explore a question in depth':'Execution check'}</h2><p>{mode==='research'?'Two research rounds, selected-page reading, and a cited report.':'Tests saved progress, recovery and Stop. No AI, web searches or browser actions.'}</p></div><span className="jobs-badge">Sandbox</span></div>
-   {mode==='research'?<div className="deep-composer"><label htmlFor="research-question">Research question</label><textarea id="research-question" value={question} maxLength={1000} rows={4} placeholder="What would you like to understand? Include your constraints and timeframe." disabled={busy} onChange={e=>{setQuestion(e.target.value);intent.current=null;}}/><small>{question.length}/1,000 · Pro test access · up to 15 minutes</small></div>:<p className="jobs-note">This check does not generate a research report or perform a task.</p>}
-   <div className="jobs-actions"><button className="jobs-primary" onClick={start} disabled={busy||!!active||!!id&&!job||mode==='research'&&!question.trim()}>{busy&&!active?'Starting…':mode==='research'?'Start research':'Run execution check'}</button>{billingAvailable&&<Link href="/billing">Pro test subscription ↗</Link>}</div>
+  <header><span className="jobs-eyebrow">{test?'PRO · TEST ENVIRONMENT':'PRO · PRIVATE RESEARCH'}</span><h1 id="jobs-heading">{deepAvailable||!test?'Deep Research':'Durable execution'}</h1><p>Your work can keep going when you leave. Saved checkpoints let a worker resume safely.</p></header>
+  {deepAvailable&&test&&<div className="deep-modes" role="group" aria-label="Work type"><button aria-pressed={mode==='research'} onClick={()=>setMode('research')} disabled={busy}>Deep Research</button><button aria-pressed={mode==='check'} onClick={()=>setMode('check')} disabled={busy}>Execution check</button></div>}
+  <section className="jobs-card" aria-labelledby="execution-title"><div className="jobs-card-heading"><div><h2 id="execution-title">{mode==='research'?'Explore a question in depth':'Execution check'}</h2><p>{mode==='research'?'Two research rounds, selected-page reading, and a cited report.':'Tests saved progress, recovery and Stop. No AI, web searches or browser actions.'}</p></div><span className="jobs-badge">{test?'Sandbox':'Pro'}</span></div>
+   {mode==='research'?<div className="deep-composer"><label htmlFor="research-question">Research question</label><textarea id="research-question" value={question} maxLength={1000} rows={4} placeholder="What would you like to understand? Include your constraints and timeframe." disabled={busy} onChange={e=>{setQuestion(e.target.value);intent.current=null;}}/><small>{question.length}/1,000 · {test?'Pro test access':'Verified Pro access'} · up to 15 minutes</small></div>:<p className="jobs-note">This check does not generate a research report or perform a task.</p>}
+   {!test&&!deepAvailable&&<p className="jobs-note" role="status">New research is paused. Your saved reports and Stop remain available.</p>}
+   <div className="jobs-actions"><button className="jobs-primary" onClick={start} disabled={busy||!!active||!!id&&!job||mode==='research'&&(!question.trim()||!deepAvailable)}>{busy&&!active?'Starting…':mode==='research'?'Start research':'Run execution check'}</button>{billingAvailable&&<Link href="/billing">{test?'Pro test subscription ↗':'Pro billing ↗'}</Link>}</div>
   </section>
   {id&&<section className="jobs-card" aria-labelledby="progress-title" aria-busy={!job&&!error}><div className="jobs-card-heading"><div><h2 id="progress-title">{job?.workflow==='deep-research-v1'&&job.state==='COMPLETED'?'Research report ready':job?messages[job.state]??job.state:'Loading saved progress…'}</h2><p>Closing this page does not cancel the job.</p></div>{active&&<button className="jobs-stop" disabled={busy} onClick={cancel}>{busy?'Stopping…':'Stop'}</button>}</div>
    {job?.notice&&<p className="jobs-note" role="status">{job.notice}</p>}
@@ -56,7 +59,8 @@ export function JobConsole({initialJobs,initialId,billingAvailable,deepAvailable
    {job&&job.heldMicroUsd!=='0'&&<p className="jobs-note">An uncertain provider cost remains reserved for reconciliation.</p>}
   </section>}
   {job?.report&&<ResearchReport report={job.report}/>}
+  {job?.workflow==='deep-research-v1'&&<DeleteResearch key={job.id} id={job.id} disabled={busy} onDeleted={()=>{setRemovedIds(ids=>[...ids,job.id]);setId(null);setJob(null);setEvents([]);router.replace('/jobs',{scroll:false});router.refresh();}}/>}
   {error&&<div className="jobs-error" role="alert"><p>{error}</p>{id&&<button onClick={()=>setRetry(n=>n+1)}>Reconnect to saved progress</button>}</div>}
-  {initialJobs.length>0&&<section className="jobs-history"><h2>Recent work</h2>{initialJobs.map(j=><Link key={j.id} href={`/jobs?job=${j.id}`} onClick={()=>{setEvents([]);setJob(null);setId(j.id);setRetry(n=>n+1);}}><span title={j.question??undefined}>{j.question??(j.workflow==='deep-research-v1'?'Deep Research':'Execution check')}</span><span>{j.id===job?.id?job.state:j.state}<small>{new Date(j.createdAt).toLocaleDateString('en-GB',{timeZone:'UTC',day:'numeric',month:'short',year:'numeric'})}</small></span></Link>)}</section>}
+  {initialJobs.some(j=>!removedIds.includes(j.id))&&<section className="jobs-history"><h2>Recent work</h2>{initialJobs.filter(j=>!removedIds.includes(j.id)).map(j=><Link key={j.id} href={`/jobs?job=${j.id}`} onClick={()=>{setEvents([]);setJob(null);setId(j.id);setRetry(n=>n+1);}}><span title={j.question??undefined}>{j.question??(j.workflow==='deep-research-v1'?'Deep Research':'Execution check')}</span><span>{j.id===job?.id?job.state:j.state}<small>{new Date(j.createdAt).toLocaleDateString('en-GB',{timeZone:'UTC',day:'numeric',month:'short',year:'numeric'})}</small></span></Link>)}</section>}
  </section>;
 }
