@@ -204,6 +204,13 @@
       "when": 1793552608511,
       "tag": "0028_deep_research",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793602240179,
+      "tag": "0029_bitter_shockwave",
+      "breakpoints": true
     }
   ]
 }

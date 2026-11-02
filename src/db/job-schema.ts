@@ -5,13 +5,13 @@ import {operatorUsageBuckets,budgetKind} from './run-schema';
 import {billingCheckouts} from './billing-schema';
 const instant=(name:string)=>timestamp(name,{withTimezone:true,precision:3});
 const money=(name:string)=>bigint(name,{mode:'bigint'});
-// Test-cycle access is deliberately separate from live entitlements and FAST free credits.
+// Mode is part of the originating paid-checkout identity; TEST grants stay TEST.
 export const jobPeriods=pgTable('job_periods',{
  id:uuid('id').primaryKey().defaultRandom(),userId:uuid('user_id').notNull().references(()=>appUsers.id),
  environment:varchar('environment',{length:8}).notNull(),paymentId:varchar('payment_id',{length:80}).notNull().unique(),invoiceId:varchar('invoice_id',{length:80}).notNull().unique(),
  subscriptionId:varchar('subscription_id',{length:80}).notNull(),startsAt:instant('starts_at').notNull(),endsAt:instant('ends_at').notNull(),
  state:varchar('state',{length:16}).notNull().default('ACTIVE'),jobLimit:integer('job_limit').notNull(),reservedJobs:integer('reserved_jobs').notNull().default(0),spentJobs:integer('spent_jobs').notNull().default(0),
-},t=>[uniqueIndex('job_period_id_owner').on(t.id,t.userId),foreignKey({columns:[t.subscriptionId,t.userId],foreignColumns:[billingCheckouts.subscriptionId,billingCheckouts.userId],name:'job_period_paid_checkout_owner'}),index('job_period_owner_window').on(t.userId,t.endsAt),check('job_period_valid',sql`${t.environment}='TEST' AND ${t.endsAt}>${t.startsAt} AND ${t.state} IN ('ACTIVE','REVOKED') AND ${t.jobLimit} BETWEEN 1 AND 100 AND ${t.reservedJobs}>=0 AND ${t.spentJobs}>=0 AND ${t.reservedJobs}+${t.spentJobs}<=${t.jobLimit}`)]);
+},t=>[uniqueIndex('job_period_id_owner').on(t.id,t.userId),foreignKey({columns:[t.subscriptionId,t.userId,t.environment],foreignColumns:[billingCheckouts.subscriptionId,billingCheckouts.userId,billingCheckouts.environment],name:'job_period_paid_checkout_owner'}),index('job_period_owner_window').on(t.userId,t.environment,t.endsAt),check('job_period_valid',sql`((${t.environment}='TEST' AND ${t.jobLimit} BETWEEN 1 AND 100) OR (${t.environment}='LIVE' AND ${t.jobLimit}=7)) AND ${t.endsAt}>${t.startsAt} AND ${t.state} IN ('ACTIVE','REVOKED') AND ${t.reservedJobs}>=0 AND ${t.spentJobs}>=0 AND ${t.reservedJobs}+${t.spentJobs}<=${t.jobLimit}`)]);
 export const durableJobs=pgTable('durable_jobs',{
  id:uuid('id').primaryKey().defaultRandom(),userId:uuid('user_id').notNull().references(()=>appUsers.id),
  requestId:uuid('request_id').notNull(),fingerprint:varchar('fingerprint',{length:64}).notNull(),workflow:varchar('workflow',{length:64}).notNull(),
