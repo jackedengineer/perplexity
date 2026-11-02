@@ -52,7 +52,7 @@ export function createRazorpay(config:{keyId:string;keySecret:string;allowLive?:
  return {
   keyId:config.keyId,
   plan:async(id:string)=>{const result=await request('plans/'+ref(id,planId));return z.object({id:planId,period:z.literal('monthly'),interval:z.literal(1),item:z.object({amount:z.literal(99900),currency:z.literal('INR')})}).parse(result);},
-  create:async(checkoutId:string,id:string)=>subscriptionSchema.parse(await request('subscriptions',{plan_id:ref(id,planId),total_count:12,quantity:1,customer_notify:0,expire_by:Math.floor(Date.now()/1000)+3600,notes:{checkoutId:z.uuid().parse(checkoutId),priceKey:offer.priceKey}})),
+  create:async(checkoutId:string,id:string)=>subscriptionSchema.parse(await request('subscriptions',{plan_id:ref(id,planId),total_count:mode==='LIVE'?1:12,quantity:1,customer_notify:0,expire_by:Math.floor(Date.now()/1000)+3600,notes:{checkoutId:z.uuid().parse(checkoutId),priceKey:offer.priceKey}})),
   subscription:async(id:string)=>subscriptionSchema.parse(await request('subscriptions/'+ref(id,subscriptionId))),
   subscriptions:async()=>z.object({items:z.array(z.unknown()).max(100)}).parse(await request('subscriptions?count=100')).items.flatMap(item=>{const parsed=subscriptionSchema.safeParse(item);return parsed.success?[parsed.data]:[];}),
   invoices:async(id:string)=>z.object({items:z.array(z.unknown()).max(100)}).parse(await request('invoices?subscription_id='+ref(id,subscriptionId)+'&count=100')).items,

@@ -1,14 +1,15 @@
 import {afterAll,beforeAll,expect,it,vi} from 'vitest';
 import {createHmac} from 'node:crypto';
 import {and,eq} from 'drizzle-orm';
-import {billingCheckouts,billingInbox,jobPeriods} from '@/db/schema';
+import {billingCheckouts,billingInbox,jobPeriods,operatorUsageBuckets,maintenanceStatus} from '@/db/schema';
+import type {LivePilot} from '@/server/payments/pilot';
 import {billingStatus,cancelSubscription,confirmCheckout,ingestWebhook,processBillingInbox,reconcileCheckout,startCheckout} from '@/server/payments/billing';
 import {reconcileDueCheckouts} from '@/server/payments/maintenance';
 import {liveOffer,testOffer} from '@/server/payments/offer';
 import type {RazorpayApi} from '@/server/payments/razorpay';
 import {jobsFixture} from './jobs-fixture';
 
-let f:Awaited<ReturnType<typeof jobsFixture>>,checkoutId='';
+let f:Awaited<ReturnType<typeof jobsFixture>>,checkoutId='',pilot:LivePilot;
 const secret='synthetic-live-key-secret-for-tests',webhook='synthetic-live-webhook-secret-for-tests';
 const now=Math.floor(Date.now()/1000),subscription=()=>({id:'sub_liveflow',plan_id:'plan_liveflow',status:'active' as const,quantity:1 as const,notes:{checkoutId,priceKey:liveOffer.priceKey}});
 const invoice={id:'inv_liveflow',payment_id:'pay_liveflow',status:'paid',amount:99900,amount_paid:99900,currency:'INR',billing_start:now-10,billing_end:now+2592000};
@@ -17,7 +18,10 @@ const create=vi.fn(async(id:string)=>{checkoutId=id;return subscription();});
 const cancel=vi.fn(async()=>({...subscription(),status:'cancelled' as const}));
 const api:RazorpayApi={keyId:'rzp_live_fixture',plan:async()=>({id:'plan_liveflow',period:'monthly',interval:1,item:{amount:99900,currency:'INR'}}),
  create,subscription:async()=>subscription(),subscriptions:async()=>[subscription()],invoices:async()=>[invoice],payment:async()=>payment,cancel};
-beforeAll(async()=>{f=await jobsFixture();},30000);
+beforeAll(async()=>{f=await jobsFixture();pilot={budgetKey:f.key,providerExpiresAt:new Date(Date.now()+40*86400000)};
+ await f.db.update(operatorUsageBuckets).set({endsAt:pilot.providerExpiresAt,providerLimitMicroUsd:5_000_000n});
+ await f.db.insert(maintenanceStatus).values({name:'paid-worker:'+f.key,startedAt:new Date(),completedAt:new Date(),outcome:'COMPLETED'});
+},30000);
 afterAll(()=>f?.pg.close());
 const grant=async()=>{
  const raw={checkoutId,razorpay_subscription_id:'sub_liveflow',razorpay_payment_id:invoice.payment_id,
@@ -30,9 +34,9 @@ it('rejects caller-selected test price before provider IO and persists one separ
  const plan=vi.fn(api.plan),request={requestId:crypto.randomUUID(),priceKey:liveOffer.priceKey};
  await expect(startCheckout(f.db,f.subject,{...request,priceKey:testOffer.priceKey},'plan_liveflow',{...api,plan})).rejects.toMatchObject({code:'INVALID_INPUT'});
  expect(plan).not.toHaveBeenCalled();expect(create).not.toHaveBeenCalled();
- const result=await startCheckout(f.db,f.subject,request,'plan_liveflow',api);
+ const result=await startCheckout(f.db,f.subject,request,'plan_liveflow',api,pilot);
  expect(result).toMatchObject({mode:'LIVE',priceKey:liveOffer.priceKey,state:'READY'});
- expect(await startCheckout(f.db,f.subject,request,'plan_liveflow',api)).toEqual(result);
+ expect(await startCheckout(f.db,f.subject,request,'plan_liveflow',api,pilot)).toEqual(result);
  expect(create).toHaveBeenCalledTimes(1);expect(await periods()).toHaveLength(0);
 });
 it('grants seven only after linked captured payment and never changes the historical test grant',async()=>{

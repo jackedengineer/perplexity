@@ -3,6 +3,7 @@ import {JobError} from '@/server/jobs/contracts';
 import {createRazorpay,planId} from './razorpay';
 import {paymentMode} from './offer';
 import {cloudflareProductionDatabase} from '@/server/jobs/configuration';
+import {livePilotConfiguration} from './pilot';
 export function paymentConfiguration(env:Record<string,string|undefined>=process.env){
  const keys=z.object({RAZORPAY_KEY_ID:z.string(),RAZORPAY_KEY_SECRET:z.string().min(16),RAZORPAY_PRO_PLAN_ID:planId,RAZORPAY_WEBHOOK_SECRET:z.string().min(32)}).safeParse(env);
  if(!keys.success)throw new JobError('DISABLED');
@@ -19,5 +20,6 @@ export function paymentConfiguration(env:Record<string,string|undefined>=process
  }
  // Billing reads, cancellation and signed recovery remain available with purchases paused.
  // Live purchases require a separate fulfillment readiness check in the HTTP service.
- return {mode,purchasesEnabled:mode==='TEST',api:createRazorpay({keyId:keys.data.RAZORPAY_KEY_ID,keySecret:keys.data.RAZORPAY_KEY_SECRET,allowLive:mode==='LIVE'}),planId:keys.data.RAZORPAY_PRO_PLAN_ID,keySecret:keys.data.RAZORPAY_KEY_SECRET,webhookSecret:keys.data.RAZORPAY_WEBHOOK_SECRET};
+ let pilot;try{if(mode==='LIVE')pilot=livePilotConfiguration(env);}catch{/* Recovery remains enabled when new purchases are paused. */}
+ return {mode,purchasesEnabled:mode==='TEST'||!!pilot,pilot,api:createRazorpay({keyId:keys.data.RAZORPAY_KEY_ID,keySecret:keys.data.RAZORPAY_KEY_SECRET,allowLive:mode==='LIVE'}),planId:keys.data.RAZORPAY_PRO_PLAN_ID,keySecret:keys.data.RAZORPAY_KEY_SECRET,webhookSecret:keys.data.RAZORPAY_WEBHOOK_SECRET};
 }

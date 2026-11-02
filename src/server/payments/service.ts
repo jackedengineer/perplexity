@@ -14,6 +14,7 @@ import {createRequestLimiter} from '@/server/runs/rate-limit';
 import {requireEmptyBody} from '@/server/runs/recovery-http';
 import {checkoutInput,confirmationInput} from './razorpay';
 import {startCheckout,confirmCheckout,cancelSubscription,billingStatus,ingestWebhook,processBillingInbox} from './billing';
+import {assertPilotCapacity} from './pilot';
 export function billingEnabled(){try{
  const c=paymentConfiguration();
  // Pause admissions independently of billing reads/cancellation/reconciliation.
@@ -21,7 +22,11 @@ export function billingEnabled(){try{
  return true;
 }catch{return false;}}
 export function purchasesEnabled(){try{return paymentConfiguration().purchasesEnabled&&jobsEnabled();}catch{return false;}}
-export async function currentBillingStatus(subject:string){return {...await billingStatus(getDb(),subject,paymentConfiguration().mode),purchasesEnabled:purchasesEnabled()};}
+export async function currentBillingStatus(subject:string){
+ const c=paymentConfiguration();let enabled=purchasesEnabled();
+ if(enabled&&c.mode==='LIVE'){try{await getDb().transaction(tx=>assertPilotCapacity(tx,c.pilot!));}catch{enabled=false;}}
+ return {...await billingStatus(getDb(),subject,c.mode),purchasesEnabled:enabled};
+}
 async function identity(){
  if(!billingEnabled())throw new JobError('DISABLED');const session=await getCurrentSession();if(!session||session.user.isAnonymous||!session.user.emailVerified)throw new AdmissionError('UNAUTHENTICATED');
  await createRequestLimiter(getDb(),'billing-http-v1',{userMinute:20,userDay:200,anonymousMinute:1,anonymousDay:1}).consume('billing:'+session.user.id);return session.user.id;
@@ -34,7 +39,7 @@ export const paymentsHttp={
  status:()=>respond(async()=>Response.json(await currentBillingStatus(await identity()),{headers:privateHeaders})),
  checkout:(request:Request)=>respond(async()=>{
   const subject=await identity();sameOrigin(request,getServerEnv().BETTER_AUTH_URL);if(!purchasesEnabled())throw new JobError('DISABLED');const input=checkoutInput.parse(JSON.parse(await readBoundedBody(request)));const c=paymentConfiguration();
-  return Response.json(await startCheckout(getDb(),subject,input,c.planId,c.api),{status:202,headers:privateHeaders});
+  return Response.json(await startCheckout(getDb(),subject,input,c.planId,c.api,c.pilot),{status:202,headers:privateHeaders});
  }),
  confirm:(request:Request)=>respond(async()=>{
   const subject=await identity();sameOrigin(request,getServerEnv().BETTER_AUTH_URL);const input=confirmationInput.parse(JSON.parse(await readBoundedBody(request)));const c=paymentConfiguration();

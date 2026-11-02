@@ -5,11 +5,13 @@ import {JobError} from '@/server/jobs/contracts';
 import {databaseNow,ownerFor,type JobDatabase,type JobTransaction} from '@/server/jobs/store';
 import {checkoutInput,confirmationInput,normalizeWebhook,verifySignature,verifyCycle,verifiedRefund,invoiceSchema,type RazorpayApi} from './razorpay';
 import {offerFor,paymentMode,type PaymentMode} from './offer';
+import {assertPilotCapacity,type LivePilot} from './pilot';
 type Checkout=typeof checkouts.$inferSelect;
 const view=(row:Checkout,keyId:string)=>({checkoutId:row.id,subscriptionId:row.subscriptionId,keyId,state:row.state,mode:paymentMode(keyId),priceKey:row.priceKey});
-export async function startCheckout(db:JobDatabase,subject:string,raw:unknown,planId:string,api:RazorpayApi){
+export async function startCheckout(db:JobDatabase,subject:string,raw:unknown,planId:string,api:RazorpayApi,pilot?:LivePilot){
  const input=checkoutInput.parse(raw),mode=paymentMode(api.keyId),offer=offerFor(mode);
  if(input.priceKey!==offer.priceKey)throw new JobError('INVALID_INPUT');
+ if(mode==='LIVE'&&!pilot)throw new JobError('DISABLED');
  // A failed read cannot make a billable create ambiguous. Validate before the
  // durable creation intent; only the create attempt may enter UNKNOWN.
  try{if((await api.plan(planId)).id!==planId)throw new JobError('UNAVAILABLE');}catch{throw new JobError('UNAVAILABLE');}
@@ -21,6 +23,7 @@ export async function startCheckout(db:JobDatabase,subject:string,raw:unknown,pl
   if(open)throw new JobError('CONFLICT');
   const [active]=await tx.select({id:periods.id}).from(periods).where(and(eq(periods.userId,owner),eq(periods.environment,mode),eq(periods.state,'ACTIVE'),gt(periods.endsAt,sql`clock_timestamp()`))).limit(1);
   if(active)throw new JobError('CONFLICT');
+  if(mode==='LIVE')await assertPilotCapacity(tx,pilot!);
   const [row]=await tx.insert(checkouts).values({userId:owner,requestId:input.requestId,priceKey:input.priceKey,environment:mode,planId,state:'CREATING'}).returning();return {row,create:true};
  });
  if(!prepared.create)return view(prepared.row,api.keyId);

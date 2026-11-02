@@ -25,5 +25,6 @@ it('does not reinterpret TEST configuration or accept missing mode as production
 it('supports LIVE billing recovery on the production Cloudflare origin without opening purchases',()=>{
  const keys={RAZORPAY_KEY_ID:'rzp_live_synthetic',RAZORPAY_KEY_SECRET:'s'.repeat(32),RAZORPAY_PRO_PLAN_ID:'plan_synthetic',RAZORPAY_WEBHOOK_SECRET:'w'.repeat(32)};
  expect(paymentConfiguration({...production,...keys,ENABLE_RAZORPAY_LIVE_BILLING:'true'})).toMatchObject({mode:'LIVE',purchasesEnabled:false});
+ expect(paymentConfiguration({...production,...keys,ENABLE_RAZORPAY_LIVE_BILLING:'true',ENABLE_RAZORPAY_LIVE_CHECKOUT:'true',PAID_PILOT_PROVIDER_EXPIRES_AT:'2026-12-12T00:00:00Z'})).toMatchObject({mode:'LIVE',purchasesEnabled:true});
  expect(()=>paymentConfiguration({...production,...keys,ENABLE_RAZORPAY_LIVE_BILLING:'true',BETTER_AUTH_URL:'https://preview.example.test'})).toThrow();
 });

@@ -28,6 +28,6 @@ it('requires explicit live adapter permission and writes server-selected offer n
  await api.create(id,'plan_fixture');
  const [url,request]=fetcher.mock.calls[0] as unknown as [string,RequestInit];
  expect(url).toBe('https://api.razorpay.com/v1/subscriptions');
- expect(JSON.parse(request.body as string)).toMatchObject({plan_id:'plan_fixture',quantity:1,notes:{checkoutId:id,priceKey:liveOffer.priceKey}});
+ expect(JSON.parse(request.body as string)).toMatchObject({plan_id:'plan_fixture',quantity:1,total_count:1,notes:{checkoutId:id,priceKey:liveOffer.priceKey}});
  expect(fetcher).toHaveBeenCalledTimes(1);
 });
