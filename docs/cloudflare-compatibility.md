@@ -1,5 +1,9 @@
 # Free Cloudflare compatibility proof
 
+Current follow-up: [CPU optimizations and acceptance limits](cloudflare-cpu.md).
+The optimized public preview passes 42 combined browser checks and 771 offline
+tests. Production cutover remains on hold; historical initial-proof evidence follows.
+
 Authorized November 2, 2026: preserve the $2 combined OpenRouter cap, use free
 Cloudflare resources, verify the application in the browser, push focused commits
 and open a PR. Intended eventual hostname: `perplexity.jacked.dev` (owner's domain,

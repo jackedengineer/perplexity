@@ -371,8 +371,10 @@ renewal/dispute delivery and production financial restore acceptance remain open
   757 offline tests and ten public workerd browser cases pass, without paid AI calls.
 - [x] CF04 public probe: isolated hosted Free upload; ten public browser cases pass,
   actual startup/CPU/wall-time evidence recorded. No production credentials or DNS.
-- [ ] Free production fit: CPU P50 14.871 ms/P99 258.282 ms require optimization
-  and retesting or separately approved hosting; full hosted OAuth/DB/AI acceptance
-  remains pending. See [report](../docs/cloudflare-compatibility.md).
+- [x] CPU follow-up: defer cookieless auth and populate read-only public prerenders;
+  771 offline and 42 Node/Workers/database/hosted browser cases pass.
+- [ ] Free production fit: improved public CPU does not clear dynamic/authenticated
+  hosted acceptance. Tail estimates remain above 10 ms and controlled analytics
+  counts remain incomplete. See [CPU report](../docs/cloudflare-cpu.md).
 - [ ] Later activation: reviewed production worker/billing, sustainable operating
   funding, final domain/OAuth/Turnstile/Razorpay, migrations and hosted acceptance.
