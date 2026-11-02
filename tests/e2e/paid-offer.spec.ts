@@ -27,7 +27,7 @@ test('merchant information pages are public, accessible and fit narrow screens',
     expect(result.violations).toEqual([]);
     const nav=page.getByRole('navigation',{name:'Policies and support'});
     await expect(nav.getByRole('link')).toHaveCount(6);
-    if(route==='/terms'||route==='/privacy')await expect(page.getByText('Updated 2 November 2026. Live paid purchases remain closed.',{exact:true})).toBeVisible();
+    if(route==='/terms'||route==='/privacy')await expect(page.getByText('Updated 2 November 2026. Paid pilot availability is checked in Billing.',{exact:true})).toBeVisible();
   }
   await page.getByRole('link',{name:'Pricing',exact:true}).click();
   await expect(page).toHaveURL(/\/pricing$/);

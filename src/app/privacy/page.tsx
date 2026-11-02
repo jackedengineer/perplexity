@@ -2,14 +2,14 @@ import {PublicPolicy} from '@/components/public-policy';
 
 export const metadata={title:'Privacy policy'};
 export default function PrivacyPage(){
-  return <PublicPolicy title="Privacy policy" notice="Updated 2 November 2026. Live paid purchases remain closed.">
+  return <PublicPolicy title="Privacy policy" notice="Updated 2 November 2026. Paid pilot availability is checked in Billing.">
     <p>Review-account update: 2 November 2026. An operator-provisioned temporary review account additionally
       uses an application password stored as a salted password hash. This is separate from Google sign-in;
       we do not receive a Google password. Review access expires within seven days. Account/security records
       and saved test content are retained under the policies below until removed through the relevant support
       or deletion process; expiry does not promise immediate data erasure.</p>
     <p>This notice describes the independent perplexity research application at
-      perplexity-gold-alpha.vercel.app. Contact the project operator at
+      perplexity.jacked.dev and its deployment-hosted entry. Contact the project operator at
       {' '}<a href="mailto:trainwithchirag@gmail.com">trainwithchirag@gmail.com</a> about privacy or your data.</p>
     <h2>What we collect</h2>
     <ul>
@@ -31,7 +31,7 @@ export default function PrivacyPage(){
     <h2>Who processes research data</h2>
     <ul>
       <li><strong>Google</strong> authenticates your account when you choose Google sign-in.</li>
-      <li><strong>Vercel and Neon</strong> host the application and its database.</li>
+      <li><strong>Cloudflare, Vercel and Neon</strong> provide application hosting, deployment infrastructure and the database.</li>
       <li><strong>OpenRouter and the selected model provider</strong> process questions, relevant conversation
         context, source excerpts and proposed answers for planning, generation and safety checks. We configure
         routes that require no provider data collection and zero-data-retention support. These routing
@@ -42,9 +42,9 @@ export default function PrivacyPage(){
     </ul>
     <p>These services have their own privacy policies and operational obligations. Infrastructure and
       providers may process data outside India; the production database is configured in Singapore.
-      This release does not include advertising, paid checkout or sale of user data.</p>
-    <h2>Prepared payments and durable research</h2>
-    <p>Live purchases remain closed. When enabled, Razorpay will collect payment-method and mandate
+      We do not sell user data or use it for advertising.</p>
+    <h2>Payments and durable research</h2>
+    <p>When paid checkout is available, Razorpay collects payment-method and mandate
       details directly in its checkout. The application will retain subscription, invoice and payment
       identifiers, payment state, verified paid-through dates, cancellation status, limited signed-event
       records and usage counters to provide access and reconcile payments. We do not store card numbers,
@@ -52,7 +52,7 @@ export default function PrivacyPage(){
       reconciliation and to prevent duplicate grants.</p>
     <p>Deep Research uses private saved questions, step checkpoints, progress and cited reports.
       Trigger.dev hosts the configured durable worker and receives job identifiers and execution data;
-      its environment is separate from the browser. Live paid purchases remain closed while production research delivery is being prepared.</p>
+      its environment is separate from the browser. Access and new purchases depend on the configured paid offer and funded capacity.</p>
     <h2>Cookies and guest sessions</h2>
     <p>Essential cookies keep you signed in and protect account actions. Sessions have a seven-day rolling
       validity and a separate thirty-day absolute limit. A guest-trial marker lasts thirty days to prevent
@@ -62,6 +62,11 @@ export default function PrivacyPage(){
     <p>Saved registered conversations remain until you delete them. Scheduled cleanup targets unlinked guest
       conversations, retrieved excerpts and private planning/non-content safety records after thirty days;
       cleanup occurs when the maintenance job runs. Approved answers retain citation links after excerpts expire.</p>
+    <p>For Deep Research, scheduled cleanup removes private evidence and intermediate checkpoints from
+      terminal jobs after 24 hours. The approved report, its citation links and original question remain
+      until you delete the research. Export is available on completed reports. Delete research stops active
+      work and removes its saved question, report and private checkpoints; content-free tombstones, progress
+      metadata and financial usage records remain to preserve settlement and replay protection.</p>
     <p>Deleting a conversation removes its visible messages and associated research content from the active
       application database and stops active work from saving a late answer. Content-free deletion markers,
       abuse controls and financial usage records remain for reconciliation and replay protection. This does

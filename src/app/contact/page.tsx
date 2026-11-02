@@ -15,6 +15,6 @@ export default function ContactPage(){
     <p>Send account-related requests from the email address used to sign in. We may verify ownership before
       disclosing private records or making account changes. Read our <Link href="/privacy">privacy policy</Link>
       {' '}and planned <Link href="/refunds">cancellation and refund policy</Link> for details.</p>
-    <p>Live purchases are not available yet. A test checkout does not create a real paid subscription.</p>
+    <p>Paid pilot availability is checked in Billing. A TEST checkout does not create a real paid subscription.</p>
   </PublicPolicy>;
 }
