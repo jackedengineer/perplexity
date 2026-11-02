@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getCurrentSession } from "@/lib/current-session";
 import { GoogleSignIn } from "@/components/google-sign-in";
 import {PolicyLinks} from '@/components/public-policy';
+import {reviewerConfiguration} from '@/lib/reviewer-policy';
 
 export const metadata = { title: "Welcome back" };
 export default async function SignIn({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
@@ -13,6 +14,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
   const challengeRequired=requiresGuestChallenge(process.env.BETTER_AUTH_URL??"https://invalid");
   const guestEnabled=process.env.ENABLE_GUEST_TRIALS === "true"&&(!challengeRequired||Boolean(process.env.TURNSTILE_SITE_KEY&&process.env.TURNSTILE_SECRET_KEY));
   const { error } = await searchParams;
+  const reviewerEnabled=!!reviewerConfiguration(process.env.REVIEWER_LOGIN_CONFIG,process.env.BETTER_AUTH_URL);
   return <main id="main" className="auth-layout">
     <section className="auth-story" aria-label="Welcome to Perplex">
       <Link href="/" className="wordmark">perplexity<span aria-hidden="true">✳</span></Link>
@@ -31,6 +33,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
         <h2>A mind full<br />of possibilities.</h2>
         <p className="auth-description">Sign in to make yourself at home.</p>
         <GoogleSignIn initialError={Boolean(error)} />
+        {reviewerEnabled&&<p className="privacy-note"><Link className="back-link" href="/reviewer-sign-in">Temporary review access →</Link></p>}
         {!identity && guestEnabled && <GuestSignIn siteKey={process.env.TURNSTILE_SITE_KEY} />}
         <p className="privacy-note">We use your name and email to create your account.<br />Your Google password stays with Google.</p>
         <PolicyLinks />
