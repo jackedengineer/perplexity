@@ -25,7 +25,11 @@ export function billingEnabled(){try{
 export function purchasesEnabled(){try{return paymentConfiguration().purchasesEnabled&&jobsEnabled();}catch{return false;}}
 export async function currentBillingStatus(subject:string){
  const c=paymentConfiguration();let enabled=purchasesEnabled();
- if(enabled&&c.mode==='LIVE')await wakeCloudflareJobs();
+ if(enabled&&c.mode==='LIVE')try{await wakeCloudflareJobs();}catch{
+  // The dispatch hint can pause purchases, but must not hide owned billing or
+  // turn a completed confirmation/cancellation into an apparent failure.
+  enabled=false;console.warn(JSON.stringify({event:'billing.wake',outcome:'UNAVAILABLE'}));
+ }
  const status=await billingStatus(getDb(),subject,c.mode);
  // An owned READY intent can resume its existing seat, without creating a
  // second subscription. Other owners only see purchases paused.
