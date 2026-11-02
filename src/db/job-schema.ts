@@ -17,7 +17,7 @@ export const durableJobs=pgTable('durable_jobs',{
  requestId:uuid('request_id').notNull(),fingerprint:varchar('fingerprint',{length:64}).notNull(),workflow:varchar('workflow',{length:64}).notNull(),
  periodId:uuid('period_id').notNull().references(()=>jobPeriods.id),state:varchar('state',{length:16}).notNull().default('QUEUED'),
  generation:integer('generation').notNull().default(0),leaseUntil:instant('lease_until'),nextEvent:integer('next_event').notNull().default(1),
- deadlineAt:instant('deadline_at').notNull(),createdAt:instant('created_at').notNull().defaultNow(),updatedAt:instant('updated_at').notNull().defaultNow(),
+ deadlineAt:instant('deadline_at').notNull(),createdAt:instant('created_at').notNull().defaultNow(),updatedAt:instant('updated_at').notNull().defaultNow(),deletedAt:instant('deleted_at'),
 },t=>[foreignKey({columns:[t.periodId,t.userId],foreignColumns:[jobPeriods.id,jobPeriods.userId],name:'job_paid_period_owner'}),uniqueIndex('job_owner_intent').on(t.userId,t.requestId),uniqueIndex('job_one_active_owner').on(t.userId).where(sql`${t.state} IN ('QUEUED','RUNNING')`),
  index('job_recovery_scan').on(t.state,t.leaseUntil,t.deadlineAt),check('job_snapshot_valid',sql`${t.workflow} IN ('execution-check-v1','deep-research-v1') AND ${t.fingerprint} ~ '^[a-f0-9]{64}$' AND ${t.generation}>=0 AND ${t.nextEvent}>0 AND ${t.deadlineAt}>${t.createdAt} AND ${t.state} IN ('QUEUED','RUNNING','COMPLETED','CANCELLED','FAILED','EXPIRED')`)]);
 export const jobReservations=pgTable('job_reservations',{

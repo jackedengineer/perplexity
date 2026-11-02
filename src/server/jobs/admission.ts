@@ -1,5 +1,5 @@
 import {createHash,randomUUID} from 'node:crypto';
-import {and,eq,gt,inArray,lte,or,sql} from 'drizzle-orm';
+import {and,eq,gt,inArray,isNull,lte,or,sql} from 'drizzle-orm';
 import {appUsers,durableJobs as jobs,jobPeriods as periods,jobReservations as reservations,jobSteps as steps,jobOutbox as outbox,jobEvents as events,operatorUsageBuckets as budgets,jobResearchInputs,jobCheckpoints} from '@/db/schema';
 import {JobError,manifestFor,jobSubmission,type JobView,type JobEvent,type JobState} from './contracts';
 import {SAFETY_RESPONSES} from '@/server/safety/responses';
@@ -23,7 +23,7 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
   const owner=await ownerFor(tx,subject);
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'job-admission:'+owner},0))`);
   const [prior]=await tx.select().from(jobs).where(and(eq(jobs.userId,owner),eq(jobs.requestId,input.requestId)));
-  if(prior){if(prior.fingerprint!==fingerprint)throw new JobError('CONFLICT');return prior.id;}
+  if(prior){if(prior.deletedAt)throw new JobError('NOT_FOUND');if(prior.fingerprint!==fingerprint)throw new JobError('CONFLICT');return prior.id;}
   if((await tx.select({id:jobs.id}).from(jobs).where(and(eq(jobs.userId,owner),inArray(jobs.state,['QUEUED','RUNNING']))).limit(1)).length)throw new JobError('CONFLICT');
   const now=await databaseNow(tx);
   const [period]=await tx.select().from(periods).where(and(eq(periods.userId,owner),eq(periods.environment,environment),eq(periods.state,'ACTIVE'),lte(periods.startsAt,now),gt(periods.endsAt,now)))
@@ -49,7 +49,7 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
 }
 export async function readJob(db:JobDatabase,subject:string,id:string):Promise<JobView>{
  const [row]=await db.select({job:jobs,reservation:reservations,question:sql<string|null>`${jobResearchInputs.snapshot}->>'question'`}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))
-  .innerJoin(reservations,eq(reservations.jobId,jobs.id)).leftJoin(jobResearchInputs,eq(jobResearchInputs.jobId,jobs.id)).where(and(eq(jobs.id,id),eq(appUsers.authSubject,subject))).limit(1);
+  .innerJoin(reservations,eq(reservations.jobId,jobs.id)).leftJoin(jobResearchInputs,eq(jobResearchInputs.jobId,jobs.id)).where(and(eq(jobs.id,id),eq(appUsers.authSubject,subject),isNull(jobs.deletedAt))).limit(1);
  if(!row)throw new JobError('NOT_FOUND');const {job,reservation}=row;
  let notice:string|undefined;
  if(job.state==='FAILED'){const [failure]=await db.select({code:sql<string>`${jobCheckpoints.value}->>'notice'`}).from(jobCheckpoints).where(and(eq(jobCheckpoints.jobId,id),sql`${jobCheckpoints.value}->>'notice' IS NOT NULL`)).orderBy(sql`${jobCheckpoints.createdAt} DESC`).limit(1);notice=Object.values(SAFETY_RESPONSES).find(r=>r.code===failure?.code)?.text;}
@@ -59,10 +59,10 @@ export async function readJob(db:JobDatabase,subject:string,id:string):Promise<J
 }
 export async function listJobs(db:JobDatabase,subject:string){
  return db.select({id:jobs.id,state:jobs.state,createdAt:jobs.createdAt,workflow:jobs.workflow,question:sql<string|null>`${jobResearchInputs.snapshot}->>'question'`}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))
-  .leftJoin(jobResearchInputs,eq(jobResearchInputs.jobId,jobs.id)).where(eq(appUsers.authSubject,subject)).orderBy(sql`${jobs.createdAt} DESC`,jobs.id).limit(20);
+  .leftJoin(jobResearchInputs,eq(jobResearchInputs.jobId,jobs.id)).where(and(eq(appUsers.authSubject,subject),isNull(jobs.deletedAt))).orderBy(sql`${jobs.createdAt} DESC`,jobs.id).limit(20);
 }
 export async function readEvents(db:JobDatabase,subject:string,id:string,after:number):Promise<JobEvent[]>{
- const [owned]=await db.select({id:jobs.id}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id)).where(and(eq(jobs.id,id),eq(appUsers.authSubject,subject))).limit(1);
+ const [owned]=await db.select({id:jobs.id}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id)).where(and(eq(jobs.id,id),eq(appUsers.authSubject,subject),isNull(jobs.deletedAt))).limit(1);
  if(!owned)throw new JobError('NOT_FOUND');
  const rows=await db.select().from(events).where(and(eq(events.jobId,id),gt(events.sequence,after))).orderBy(events.sequence).limit(100);
  return rows.map(e=>({sequence:e.sequence,code:e.code as JobEvent['code'],step:e.step,createdAt:e.createdAt.toISOString()}));

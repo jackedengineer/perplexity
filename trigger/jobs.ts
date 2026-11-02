@@ -10,6 +10,7 @@ import {jobConfiguration} from '../src/server/jobs/configuration';
 import {recordJobMaintenance} from '../src/server/jobs/maintenance';
 import {paymentConfiguration} from '../src/server/payments/config';
 import {configuredResearchModels} from '../src/server/deep-research/configuration';
+import {pruneJobEvidence} from '../src/server/jobs/privacy';
 const payload=z.strictObject({jobId:z.uuid()});
 export const executeJob=task({id:'execute-job-v1',maxDuration:900,retry:{maxAttempts:1},queue:{name:'durable-jobs-v1',concurrencyLimit:1},
  run:async(raw:unknown)=>{return consumeJob(workerDatabase(),payload.parse(raw).jobId,{budgetKey:workerBudgetKey(),environment:jobConfiguration().mode});}});
@@ -30,5 +31,5 @@ export const maintainJobs=schedules.task({id:'maintain-jobs-v1',
  run:async()=>{const db=workerDatabase(),key=workerBudgetKey(),mode=jobConfiguration().mode;
   return recordJobMaintenance(db,key,async()=>{
    if(mode==='LIVE'){paymentConfiguration();configuredResearchModels();}
-   const sent=await automaticDispatch(db,key);await maintainBilling(db);return sent;
+   const sent=await automaticDispatch(db,key);await maintainBilling(db);await pruneJobEvidence(db);return sent;
   });}});

@@ -36,3 +36,4 @@ GRANT SELECT, INSERT ON billing_checkouts, billing_inbox, billing_reversals TO p
 GRANT UPDATE (subscription_id, state, provider_state, cancel_at_cycle_end, updated_at) ON billing_checkouts TO perplex_web;
 GRANT UPDATE (state, attempts, lease_token, lease_until, available_at) ON billing_inbox TO perplex_web;
 GRANT SELECT, INSERT ON job_research_inputs, job_checkpoints TO perplex_web;
+GRANT EXECUTE ON FUNCTION public.perplex_delete_job_content(uuid,text), public.perplex_prune_job_evidence() TO perplex_web;

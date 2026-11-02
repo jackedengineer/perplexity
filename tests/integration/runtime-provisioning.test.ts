@@ -40,3 +40,11 @@ it('allows maintenance recording but not audit deletion or budget escalation',as
   await expect(pg.exec('UPDATE operator_usage_buckets SET provider_limit_micro_usd=999999')).rejects.toMatchObject({code:'42501'});
  }finally{await pg.exec('RESET ROLE');}
 });
+it('grants narrow paid-content cleanup functions without raw deletion or undelete privileges',async()=>{
+ const {rows}=await pg.query(`SELECT
+  has_function_privilege('perplex_web','public.perplex_delete_job_content(uuid,text)','EXECUTE') AS erase,
+  has_function_privilege('perplex_web','public.perplex_prune_job_evidence()','EXECUTE') AS prune,
+  has_table_privilege('perplex_web','public.job_checkpoints','DELETE') AS raw_delete,
+  has_column_privilege('perplex_web','public.durable_jobs','deleted_at','UPDATE') AS undelete`);
+ expect(rows[0]).toEqual({erase:true,prune:true,raw_delete:false,undelete:false});
+});
