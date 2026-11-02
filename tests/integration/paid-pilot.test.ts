@@ -2,7 +2,7 @@ import {afterAll,beforeAll,expect,it,vi} from 'vitest';
 import {eq} from 'drizzle-orm';
 import {billingCheckouts,jobPeriods,maintenanceStatus,operatorUsageBuckets} from '@/db/schema';
 import {assertPilotCapacity,type LivePilot} from '@/server/payments/pilot';
-import {reconcileCheckout} from '@/server/payments/billing';
+import {cancelSubscription,reconcileCheckout} from '@/server/payments/billing';
 import type {RazorpayApi} from '@/server/payments/razorpay';
 import {jobsFixture} from './jobs-fixture';
 let f:Awaited<ReturnType<typeof jobsFixture>>,policy:LivePilot;
@@ -50,5 +50,26 @@ it('releases a natively expired unpaid checkout but retains an active paid-throu
   startsAt:new Date(Date.now()-1000),endsAt:new Date(Date.now()+30*86400000),jobLimit:7}).returning();
  await expect(check()).rejects.toMatchObject({code:'QUOTA'});
  await f.db.update(jobPeriods).set({state:'REVOKED'}).where(eq(jobPeriods.id,paid.id));
+ await expect(check()).resolves.toBeUndefined();
+});
+
+it('keeps completed payment capacity reserved before confirmation or webhook delivery',async()=>{
+ const [row]=await f.db.insert(billingCheckouts).values({userId:f.owner,requestId:crypto.randomUUID(),planId:'plan_completed',priceKey:'pro-live-monthly-inr-v1',environment:'LIVE',state:'READY',subscriptionId:'sub_completed'}).returning();
+ const sub={id:'sub_completed',plan_id:row.planId,status:'completed' as const,quantity:1 as const,notes:{checkoutId:row.id,priceKey:'pro-live-monthly-inr-v1' as const}};
+ const now=Math.floor(Date.now()/1000),invoice={id:'inv_completed',payment_id:'pay_completed',status:'paid',amount:99900,amount_paid:99900,currency:'INR',billing_start:now-10,billing_end:now+2592000};
+ const unexpected=async()=>{throw new Error('Unexpected provider mutation');};
+ const api:RazorpayApi={keyId:'rzp_live_fixture',plan:unexpected,create:unexpected,subscriptions:unexpected,cancel:async()=>sub,subscription:async()=>sub,
+  invoices:async()=>[invoice],payment:async()=>({id:invoice.payment_id,invoice_id:invoice.id,status:'captured',amount:99900,currency:'INR',amount_refunded:0})};
+ // Completed is authoritative, but invoice delivery can lag. No paid grant may
+ // be fabricated, and another account must not acquire the sole funded seat.
+ await cancelSubscription(f.db,f.subject,row.id,{...api,invoices:async()=>[]});
+ await expect(check()).rejects.toMatchObject({code:'QUOTA'});
+ expect(await f.db.select().from(jobPeriods).where(eq(jobPeriods.subscriptionId,sub.id))).toHaveLength(0);
+ // Native reconciliation eventually observes the captured invoice. The same
+ // capacity stays occupied while the legitimate owner receives seven reports.
+ await reconcileCheckout(f.db,row.id,api);
+ expect((await f.db.select().from(jobPeriods).where(eq(jobPeriods.subscriptionId,sub.id)))[0]).toMatchObject({state:'ACTIVE',jobLimit:7});
+ await expect(check()).rejects.toMatchObject({code:'QUOTA'});
+ await f.db.update(jobPeriods).set({endsAt:new Date(Date.now()-1000)}).where(eq(jobPeriods.subscriptionId,sub.id));
  await expect(check()).resolves.toBeUndefined();
 });

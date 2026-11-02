@@ -1,5 +1,23 @@
 # Current release checks — 2 November 2026
 
+## Follow-up payment capacity check — 13:55 UTC
+
+- [x] PR #24's cancellation adapter passed all 866 tests, lint/types, the
+  Cloudflare build, both Quality CI jobs and code review; it deployed as Worker
+  `d9f99d02-2ec0-4e4a-b2ef-5537aee84c85` and billing reloaded successfully.
+- [x] Security review reproduced a completed-payment race: cancellation could
+  mark checkout COMPLETED before invoice reconciliation, temporarily freeing the
+  sole funded pilot seat. New checkout starts were paused while fixing it;
+  guest/signed-in research and existing billing access remain available.
+- [x] The capacity gate now retains COMPLETED subscriptions without a recorded
+  LIVE period. The regression failed before the fix and then passed: delayed
+  invoices cannot release capacity or fabricate access; native reconciliation
+  grants the real seven-report period and holds capacity until paid-through ends.
+- [ ] Final CI and fresh code/security reviews for this capacity fix.
+- [ ] Deploy and verify the capacity fix, then restore the approved live checkout.
+- [ ] A real customer must complete the first captured payment; no agent-created
+  charge, mandate, refund or LIVE entitlement is part of these checks.
+
 ## Launch acceptance update — 13:43 UTC
 
 - [x] PR #21 merged as `d5fd5e010834fc36e9fcc7c7ad5de97e11e25c4d` after
