@@ -1,5 +1,6 @@
+import {PRO_OFFER} from '@/lib/pro-offer';
 import {createHash,randomUUID} from 'node:crypto';
-import {and,eq,gt,inArray,lte,or,sql} from 'drizzle-orm';
+import {and,eq,gt,inArray,isNull,lte,or,sql} from 'drizzle-orm';
 import {appUsers,durableJobs as jobs,jobPeriods as periods,jobReservations as reservations,jobSteps as steps,jobOutbox as outbox,jobEvents as events,operatorUsageBuckets as budgets,jobResearchInputs,jobCheckpoints} from '@/db/schema';
 import {JobError,manifestFor,jobSubmission,type JobView,type JobEvent,type JobState} from './contracts';
 import {SAFETY_RESPONSES} from '@/server/safety/responses';
@@ -8,24 +9,35 @@ import {inspectInput} from '@/server/safety/deterministic';
 import {researchModels,researchReport} from '@/server/deep-research/contracts';
 import {readCheckpoint} from '@/server/deep-research/checkpoints';
 import {appendEvent,databaseNow,ownerFor,type JobDatabase} from './store';
-export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetKey:string,models?:import('zod').infer<typeof researchModels>){
+import type {JobEnvironment} from './configuration';
+export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetKey:string,models?:import('zod').infer<typeof researchModels>,environment:JobEnvironment='TEST',beforeCommit?:()=>Promise<void>){
  const parsed=jobSubmission.safeParse(raw);if(!parsed.success||!budgetKey)throw new JobError('INVALID_INPUT');
  const input=parsed.data,manifest=manifestFor(input.workflow);
+ if(environment==='LIVE'&&(input.workflow!=='deep-research-v1'||!budgetKey.startsWith('live-')))throw new JobError('INVALID_INPUT');
  if(input.workflow==='deep-research-v1'&&!models)throw new JobError('DISABLED');
  if(input.workflow==='deep-research-v1'){const blocked=inspectInput({text:input.question,context:[]});if(blocked)throw new JobError(blocked==='ACCIDENTAL_SECRET'?'REDACT_SECRET':'INPUT_BLOCKED');}
- const fingerprint=createHash('sha256').update(JSON.stringify(input.workflow==='deep-research-v1'?{version:input.version,workflow:input.workflow,question:input.question,locale:input.locale}:{version:input.version,workflow:input.workflow})).digest('hex');
+ // Preserve historical TEST intent hashes; LIVE intents cannot replay them.
+ const intent=input.workflow==='deep-research-v1'?{version:input.version,workflow:input.workflow,question:input.question,locale:input.locale}:{version:input.version,workflow:input.workflow};
+ const fingerprint=createHash('sha256').update(JSON.stringify(environment==='LIVE'?{environment,...intent}:intent)).digest('hex');
  return db.transaction(async tx=>{
   await tx.execute(sql`SET LOCAL lock_timeout='2s'`);
   const owner=await ownerFor(tx,subject);
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'job-admission:'+owner},0))`);
   const [prior]=await tx.select().from(jobs).where(and(eq(jobs.userId,owner),eq(jobs.requestId,input.requestId)));
-  if(prior){if(prior.fingerprint!==fingerprint)throw new JobError('CONFLICT');return prior.id;}
+  if(prior){if(prior.deletedAt)throw new JobError('NOT_FOUND');if(prior.fingerprint!==fingerprint)throw new JobError('CONFLICT');if(['QUEUED','RUNNING'].includes(prior.state))await beforeCommit?.();return prior.id;}
   if((await tx.select({id:jobs.id}).from(jobs).where(and(eq(jobs.userId,owner),inArray(jobs.state,['QUEUED','RUNNING']))).limit(1)).length)throw new JobError('CONFLICT');
   const now=await databaseNow(tx);
-  const [period]=await tx.select().from(periods).where(and(eq(periods.userId,owner),eq(periods.environment,'TEST'),eq(periods.state,'ACTIVE'),lte(periods.startsAt,now),gt(periods.endsAt,now)))
+  const [period]=await tx.select().from(periods).where(and(eq(periods.userId,owner),eq(periods.environment,environment),eq(periods.state,'ACTIVE'),lte(periods.startsAt,now),gt(periods.endsAt,now)))
    .orderBy(periods.endsAt,periods.id).limit(1).for('update');
   if(!period)throw new JobError('PAYMENT_REQUIRED');
   if(period.reservedJobs+period.spentJobs>=period.jobLimit)throw new JobError('QUOTA');
+  // Financial step rows survive content deletion. Bound billable starts under
+  // the existing owner/period locks, separately from delivered report credits.
+  if(environment==='LIVE'){
+   const attempts=await tx.select({id:jobs.id}).from(jobs).where(and(eq(jobs.periodId,period.id),
+    sql`EXISTS (SELECT 1 FROM ${steps} WHERE ${steps.jobId}=${jobs.id} AND ${steps.capMicroUsd}>0 AND ${steps.startedAt} IS NOT NULL)`)).limit(PRO_OFFER.maxStartedAttempts);
+   if(attempts.length>=PRO_OFFER.maxStartedAttempts)throw new JobError('QUOTA');
+  }
   await tx.execute(sql`SELECT ensure_operator_day(${budgetKey})`);
   // Same ascending UUID operator lock order as FAST and the reviewed renewal function.
   const windows=await tx.select().from(budgets).where(and(eq(budgets.budgetKey,budgetKey),lte(budgets.startsAt,now),gt(budgets.endsAt,now))).orderBy(budgets.id).limit(3).for('update');
@@ -40,12 +52,15 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
   await tx.insert(steps).values(manifest.steps.map(s=>({jobId:job.id,...s})));
   if(input.workflow==='deep-research-v1')await tx.insert(jobResearchInputs).values({jobId:job.id,snapshot:{question:input.question,locale:input.locale,models:researchModels.parse(models),policy:'v1',version:'deep-research-v1'}});
   await tx.insert(outbox).values({jobId:job.id});await appendEvent(tx,job.id,'QUEUED');
+  // A failed external wake-up rolls back the whole admission, rather than
+  // accepting work whose dispatch hint was never durably recorded.
+  await beforeCommit?.();
   return job.id;
  });
 }
 export async function readJob(db:JobDatabase,subject:string,id:string):Promise<JobView>{
  const [row]=await db.select({job:jobs,reservation:reservations,question:sql<string|null>`${jobResearchInputs.snapshot}->>'question'`}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))
-  .innerJoin(reservations,eq(reservations.jobId,jobs.id)).leftJoin(jobResearchInputs,eq(jobResearchInputs.jobId,jobs.id)).where(and(eq(jobs.id,id),eq(appUsers.authSubject,subject))).limit(1);
+  .innerJoin(reservations,eq(reservations.jobId,jobs.id)).leftJoin(jobResearchInputs,eq(jobResearchInputs.jobId,jobs.id)).where(and(eq(jobs.id,id),eq(appUsers.authSubject,subject),isNull(jobs.deletedAt))).limit(1);
  if(!row)throw new JobError('NOT_FOUND');const {job,reservation}=row;
  let notice:string|undefined;
  if(job.state==='FAILED'){const [failure]=await db.select({code:sql<string>`${jobCheckpoints.value}->>'notice'`}).from(jobCheckpoints).where(and(eq(jobCheckpoints.jobId,id),sql`${jobCheckpoints.value}->>'notice' IS NOT NULL`)).orderBy(sql`${jobCheckpoints.createdAt} DESC`).limit(1);notice=Object.values(SAFETY_RESPONSES).find(r=>r.code===failure?.code)?.text;}
@@ -55,10 +70,10 @@ export async function readJob(db:JobDatabase,subject:string,id:string):Promise<J
 }
 export async function listJobs(db:JobDatabase,subject:string){
  return db.select({id:jobs.id,state:jobs.state,createdAt:jobs.createdAt,workflow:jobs.workflow,question:sql<string|null>`${jobResearchInputs.snapshot}->>'question'`}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))
-  .leftJoin(jobResearchInputs,eq(jobResearchInputs.jobId,jobs.id)).where(eq(appUsers.authSubject,subject)).orderBy(sql`${jobs.createdAt} DESC`,jobs.id).limit(20);
+  .leftJoin(jobResearchInputs,eq(jobResearchInputs.jobId,jobs.id)).where(and(eq(appUsers.authSubject,subject),isNull(jobs.deletedAt))).orderBy(sql`${jobs.createdAt} DESC`,jobs.id).limit(20);
 }
 export async function readEvents(db:JobDatabase,subject:string,id:string,after:number):Promise<JobEvent[]>{
- const [owned]=await db.select({id:jobs.id}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id)).where(and(eq(jobs.id,id),eq(appUsers.authSubject,subject))).limit(1);
+ const [owned]=await db.select({id:jobs.id}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id)).where(and(eq(jobs.id,id),eq(appUsers.authSubject,subject),isNull(jobs.deletedAt))).limit(1);
  if(!owned)throw new JobError('NOT_FOUND');
  const rows=await db.select().from(events).where(and(eq(events.jobId,id),gt(events.sequence,after))).orderBy(events.sequence).limit(100);
  return rows.map(e=>({sequence:e.sequence,code:e.code as JobEvent['code'],step:e.step,createdAt:e.createdAt.toISOString()}));

@@ -1,5 +1,5 @@
 import {models,providers} from './deep-fixture';
-import {afterAll,beforeAll,expect,it} from 'vitest';
+import {afterAll,beforeAll,expect,it,vi} from 'vitest';
 import {eq,sql} from 'drizzle-orm';
 import {jobsFixture} from './jobs-fixture';
 import {admitJob,readJob} from '@/server/jobs/admission';
@@ -104,4 +104,15 @@ it('locally excludes secondary domains when official documentation was requested
  p.search.search=async()=>({results:[{title:'Unofficial article',url:'https://example.org/article',content:'SQLite and PostgreSQL offline comparisons.',score:1}],credits:1});
  p.answer.generate=async()=>{drafted=true;throw new Error('No authoritative evidence');};
  expect(await consumeResearch(f.db,id,{providers:p})).toBe('FAILED');expect(drafted).toBe(false);expect((await readJob(f.db,f.subject,id)).report).toBeUndefined();
+});
+
+import * as providerModule from '@/server/deep-research/providers';
+it('passes explicit invocation credentials to the provider factory without changing process configuration',async()=>{
+ const id=await admitJob(f.db,f.subject,input(),f.key,models),environment={OPENROUTER_API_KEY:'dedicated-test-only',TAVILY_API_KEY:'dedicated-search-test-only'};
+ const original=process.env.OPENROUTER_API_KEY;
+ const factory=vi.spyOn(providerModule,'createDeepProviders').mockImplementation((snapshot,env)=>{
+  expect(snapshot.models).toEqual(models);expect(env).toBe(environment);return providers();
+ });
+ try{expect(await consumeResearch(f.db,id,{providerEnvironment:environment})).toBe('COMPLETED');expect(factory).toHaveBeenCalledOnce();expect(process.env.OPENROUTER_API_KEY).toBe(original);}
+ finally{factory.mockRestore();}
 });

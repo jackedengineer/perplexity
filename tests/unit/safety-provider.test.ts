@@ -10,6 +10,19 @@ const wire = { classification: "ALLOW", policyVersion: "v1" };
 const envelope = (content: unknown = JSON.stringify(wire), finish_reason = "stop", extra = {}) => ({ choices: [{ finish_reason,
   message: { role: "assistant", content, ...extra } }], usage: { prompt_tokens: 1, completion_tokens: 1 } });
 const json = (value: unknown) => new Response(JSON.stringify(value),{ headers: { "content-type": "application/json" } });
+it('records transport/status diagnostics without provider bodies, keys or questions',async()=>{
+ const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+ try{
+  for(const failure of [async()=>{throw new TypeError('Unsupported credentials option PRIVATE KEY');},async()=>new Response('PRIVATE QUESTION',{status:403})]){
+   await expect(createOpenRouterSafetyProvider(config(),failure).classify(input,new AbortController().signal)).rejects.toThrow();
+  }
+  expect(warn.mock.calls.map(([line])=>JSON.parse(String(line)))).toEqual([
+   {event:'safety.provider_failure',phase:'transport',reason:'CREDENTIALS_OPTION'},
+   {event:'safety.provider_failure',phase:'http',status:403},
+  ]);
+  expect(JSON.stringify(warn.mock.calls)).not.toMatch(/PRIVATE|Explain account|synthetic-test-key/);
+ }finally{warn.mockRestore();}
+});
 it.each(["openai/gpt-4.1-nano","openai/gpt-4.1-mini","mistralai/mistral-small-3.2-24b-instruct"])("omits unsupported reasoning controls for %s without relaxing routing",async(modelId)=>{
   const fetcher=vi.fn<typeof fetch>().mockResolvedValue(json(envelope()));
   await createOpenRouterSafetyProvider({...config(),modelId,provider:"azure"},fetcher).classify(input,new AbortController().signal);
@@ -31,7 +44,7 @@ it("uses one isolated, tool-free, nonstreaming strict-schema request with fixed 
   expect(await provider.classify(input,new AbortController().signal)).toEqual({ decision: "ALLOW", categoryCodes: [], policyVersion: "v1" });
   const [url,options] = fetcher.mock.calls[0];
   expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
-  expect(options).toMatchObject({ method: "POST", cache: "no-store", redirect: "error", credentials: "omit" });
+  expect(options).toMatchObject({ method: "POST", cache: "no-store", redirect: "manual", credentials: "omit" });
   const body = JSON.parse(options!.body as string);
   expect(body).toMatchObject({ model: "test/classifier-v1", stream: false, temperature: 0, max_completion_tokens: 384, tools: [], tool_choice: "none",
     provider: { only: ["test-provider"], allow_fallbacks: false, require_parameters: true, data_collection: "deny", zdr: true },

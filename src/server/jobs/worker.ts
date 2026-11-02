@@ -3,6 +3,7 @@ import {durableJobs as jobs,jobPeriods as periods,jobSteps as steps,jobReservati
 import {JobError,activeJob,manifestFor,type JobState} from './contracts';
 import {checkpointHash} from '@/server/deep-research/checkpoints';
 import {appendEvent,databaseNow,lockJob,type JobDatabase,type JobTransaction} from './store';
+import type {JobEnvironment} from './configuration';
 export type JobLease={jobId:string;generation:number};
 type Job=typeof jobs.$inferSelect;
 async function validateLease(tx:JobTransaction,lease:JobLease){
@@ -14,7 +15,7 @@ async function validateLease(tx:JobTransaction,lease:JobLease){
 }
 async function settle(tx:JobTransaction,job:Job,state:JobState){
  if(!activeJob(job.state))return;
- await tx.select({id:periods.id}).from(periods).where(eq(periods.id,job.periodId)).for('update');
+ const [period]=await tx.select().from(periods).where(eq(periods.id,job.periodId)).for('update');
  const now=await databaseNow(tx),all=await tx.select().from(steps).where(eq(steps.jobId,job.id));
  let spent=0n,held=0n;
  for(const step of all){
@@ -32,7 +33,9 @@ async function settle(tx:JobTransaction,job:Job,state:JobState){
  await tx.update(reservations).set({spentMicroUsd:spent,heldMicroUsd:held,settledAt:now}).where(eq(reservations.jobId,job.id));
  await tx.update(steps).set({state:'UNKNOWN',finishedAt:now}).where(and(eq(steps.jobId,job.id),eq(steps.state,'STARTED')));
  await tx.update(steps).set({state:'SKIPPED',finishedAt:now}).where(and(eq(steps.jobId,job.id),eq(steps.state,'PENDING')));
- const charged=state==='COMPLETED'||all.some(s=>s.startedAt!==null||s.state==='STARTED'||s.state==='UNKNOWN');
+ // LIVE sells completed reports. Failed/stopped attempts retain their actual
+ // provider spend and unknown holds above, without consuming a report credit.
+ const charged=state==='COMPLETED'||period.environment==='TEST'&&all.some(s=>s.startedAt!==null||s.state==='STARTED'||s.state==='UNKNOWN');
  await tx.update(periods).set({reservedJobs:sql`${periods.reservedJobs}-1`,spentJobs:sql`${periods.spentJobs}+${charged?1:0}`}).where(eq(periods.id,job.periodId));
  const finished=await tx.update(jobs).set({state,generation:job.generation+1,leaseUntil:null,updatedAt:now})
   .where(and(eq(jobs.id,job.id),state==='COMPLETED'?and(gt(jobs.deadlineAt,sql`clock_timestamp()`),gt(jobs.leaseUntil,sql`clock_timestamp()`)):undefined)).returning({id:jobs.id});
@@ -41,12 +44,13 @@ async function settle(tx:JobTransaction,job:Job,state:JobState){
  if(held>0n)await appendEvent(tx,job.id,'COST_UNKNOWN');
  await appendEvent(tx,job.id,state==='COMPLETED'?'COMPLETED':state==='CANCELLED'?'CANCELLED':state==='EXPIRED'?'EXPIRED':'FAILED');
 }
-export async function claimJob(db:JobDatabase,id:string,budgetKey?:string):Promise<JobLease|null>{
+export async function claimJob(db:JobDatabase,id:string,budgetKey?:string,environment:JobEnvironment='TEST'):Promise<JobLease|null>{
  return db.transaction(async tx=>{
   const job=await lockJob(tx,id),now=await databaseNow(tx);
   if(budgetKey&&!(await tx.select().from(reservations).where(and(eq(reservations.jobId,id),eq(reservations.budgetKey,budgetKey)))).length)throw new JobError('NOT_FOUND');
   if(job.state!=='QUEUED')return null;
   const [period]=await tx.select().from(periods).where(eq(periods.id,job.periodId)).for('share');
+  if(period&&period.environment!==environment)throw new JobError('NOT_FOUND');
   if(job.deadlineAt<=now||!period||period.state!=='ACTIVE'||period.endsAt<=now){await settle(tx,job,job.deadlineAt<=now?'EXPIRED':'CANCELLED');return null;}
   const generation=job.generation+1;
   await tx.update(jobs).set({state:'RUNNING',generation,leaseUntil:new Date(now.getTime()+manifestFor(job.workflow).leaseMs),updatedAt:now}).where(eq(jobs.id,id));

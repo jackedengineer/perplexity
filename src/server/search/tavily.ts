@@ -42,7 +42,7 @@ export function createTavilySearch(apiKey: string, request: typeof fetch = fetch
       return boundedSearch(options,async(signal)=>{
         const response = await request("https://api.tavily.com/search",{
           method: "POST",headers: { Authorization: `Bearer ${apiKey}`,"Content-Type": "application/json" },
-          redirect: "error",credentials: "omit",cache: "no-store",signal,
+          redirect: "manual",credentials: "omit",cache: "no-store",signal,
           body: JSON.stringify({ query: parsed.data,topic: "general",search_depth: "basic",max_results: 5,chunks_per_source: 3,
             ...(filters?{include_published_date:true,...(filters.freshness==='RECENT'?{time_range:filters.timeRange??'month'}:{}),...(filters.freshness==='SPECIFIC_RANGE'?{start_date:filters.startDate,end_date:filters.endDate,filter_by_published_date:true}:{}),...(filters.preferredDomains.length?{include_domains:filters.preferredDomains,include_domains_mode:filters.domainMode??'prefer'}:{})}:{}),
             auto_parameters: false,include_answer: false,include_raw_content: false,include_images: false,

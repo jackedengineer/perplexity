@@ -12,7 +12,7 @@ export function createTavilyExtract(apiKey:string,request:typeof fetch=fetch):Ex
   const urls=z.array(z.string().max(2048)).min(1).max(2).parse([...selectedUrls]);
   if(new Set(urls).size!==urls.length||urls.some(url=>canonicalSourceUrl(url)!==url))throw new RetrievalError('INVALID_INPUT');
   return boundedSearch(options,async signal=>{
-   const response=await request('https://api.tavily.com/extract',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},redirect:'error',credentials:'omit',cache:'no-store',signal,
+   const response=await request('https://api.tavily.com/extract',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},redirect:'manual',credentials:'omit',cache:'no-store',signal,
     body:JSON.stringify({urls,extract_depth:'basic',format:'text',include_images:false,include_favicon:false,include_usage:true,timeout:5})});
    if(!response.ok||signal.aborted||response.headers.get('content-type')?.split(';')[0].trim()!=='application/json'){void response.body?.cancel().catch(()=>{});throw new RetrievalError();}
    const decoded=responseSchema.parse(await readSearchResponse(response,signal)),returned=[...decoded.results,...decoded.failed_results];

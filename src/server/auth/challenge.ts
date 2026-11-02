@@ -9,7 +9,7 @@ export async function verifyGuestChallenge(token:string|null,env:Record<string,s
  if(!env.TURNSTILE_SECRET_KEY||!token||token.length>2048)throw new AdmissionError('CONFIGURATION_UNAVAILABLE');
  const response=await request('https://challenges.cloudflare.com/turnstile/v0/siteverify',{
   method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:env.TURNSTILE_SECRET_KEY,response:token}),
-  signal:AbortSignal.any([signal,AbortSignal.timeout(5000)]),redirect:'error',credentials:'omit',cache:'no-store',
+  signal:AbortSignal.any([signal,AbortSignal.timeout(5000)]),redirect:'manual',credentials:'omit',cache:'no-store',
  });
  if(!response.ok)throw new AdmissionError('CONFIGURATION_UNAVAILABLE');
  const reader=response.body?.getReader();if(!reader)throw new AdmissionError('CONFIGURATION_UNAVAILABLE');

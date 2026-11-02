@@ -17,5 +17,5 @@ export function createDeepProviders(snapshot:ResearchSnapshot,env:Record<string,
  const safety=parseSafetyModel(env)!,planner=parsePlannerModel(env)!,answer=parseAnswerModel(env)!;
  return {input:createOpenRouterSafetyProvider(safety,request),query:createOpenRouterSafetyProvider(safety,request),
   evidence:createOpenRouterSafetyProvider(safety,request,EVIDENCE_SAFETY_PROMPT),output:createOpenRouterSafetyProvider(safety,request,OUTPUT_SAFETY_PROMPT),
-  planner:createDeepPlanner(planner,request),answer:createAnswerProvider(answer,request),search:createTavilySearch(env.TAVILY_API_KEY!,request),extract:createTavilyExtract(env.TAVILY_API_KEY!,request)};
+  planner:createDeepPlanner(planner,request),answer:createAnswerProvider(answer,request,1200,45000),search:createTavilySearch(env.TAVILY_API_KEY!,request),extract:createTavilyExtract(env.TAVILY_API_KEY!,request)};
 }

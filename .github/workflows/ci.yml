@@ -60,6 +60,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
         timeout-minutes: 15
       - run: pnpm test:e2e
+      - run: pnpm exec playwright test --config playwright.offer.config.ts
       - run: pnpm test:e2e:motion
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()

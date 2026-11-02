@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import {notFound,redirect} from 'next/navigation';
+import {connection} from 'next/server';
 import {getCurrentSession} from '@/lib/current-session';
 import {reviewerConfiguration} from '@/lib/reviewer-policy';
 import {ReviewerSignIn} from '@/components/reviewer-sign-in';
@@ -7,6 +8,7 @@ import './reviewer.css';
 
 export const metadata={title:'Temporary review access',robots:{index:false,follow:false}};
 export default async function ReviewerSignInPage(){
+  await connection();
   const policy=reviewerConfiguration(process.env.REVIEWER_LOGIN_CONFIG,process.env.BETTER_AUTH_URL);
   if(!policy)notFound();
   const identity=await getCurrentSession();

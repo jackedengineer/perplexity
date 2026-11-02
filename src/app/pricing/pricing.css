@@ -1,0 +1,6 @@
+.pricing-offer { border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin: 32px 0; }
+.pricing-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.pricing-heading h2 { margin: 0; }
+.pricing-heading span { font-size: 13px; border: 1px solid var(--line); border-radius: 24px; padding: 4px 12px; }
+.pricing-offer .pricing-amount { font-size: clamp(40px, 8vw, 56px); line-height: 1.2; margin: 24px 0 8px; letter-spacing: -0.04em; }
+.pricing-amount small { font-size: 16px; color: var(--muted); letter-spacing: normal; }

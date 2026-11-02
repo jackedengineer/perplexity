@@ -6,6 +6,13 @@ import {jobsFixture} from './jobs-fixture';
 let f:Awaited<ReturnType<typeof jobsFixture>>;
 beforeAll(async()=>{f=await jobsFixture();},30000);afterAll(()=>f?.pg.close());
 const submit=()=>({version:1 as const,workflow:'execution-check-v1' as const,requestId:crypto.randomUUID()});
+it('rolls back admission and every reservation when the durable wake-up cannot be recorded',async()=>{
+ const before=await f.db.select().from(operatorUsageBuckets);
+ await expect(admitJob(f.db,f.subject,submit(),f.key,undefined,'TEST',async()=>{throw new Error('Wake unavailable');})).rejects.toThrow('Wake unavailable');
+ expect(await f.db.select().from(jobOutbox)).toHaveLength(0);
+ expect((await f.db.select().from(jobPeriods))[0].reservedJobs).toBe(0);
+ expect(await f.db.select().from(operatorUsageBuckets)).toEqual(before);
+});
 it('atomically admits a paid owned job, steps, reservation, events and outbox; replay charges once',async()=>{
  const input=submit(),id=await admitJob(f.db,f.subject,input,f.key);
  expect(await admitJob(f.db,f.subject,input,f.key)).toBe(id);

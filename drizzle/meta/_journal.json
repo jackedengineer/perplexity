@@ -204,6 +204,20 @@
       "when": 1793552608511,
       "tag": "0028_deep_research",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793602240179,
+      "tag": "0029_bitter_shockwave",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1793615103281,
+      "tag": "0030_paid_job_content",
+      "breakpoints": true
     }
   ]
 }

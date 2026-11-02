@@ -96,3 +96,28 @@ it('retains a distinct reference-resolving interpretation',async()=>{
  const payload=JSON.parse(JSON.parse(String(fetcher.mock.calls[0][1]?.body)).messages[1].content);
  expect(payload).toMatchObject({question:'What about it?',interpretation:'Why do rainbows form?'});
 });
+
+it('allows a slower Deep Research draft without changing ordinary limits or retrying',async()=>{
+ vi.useFakeTimers();
+ try{
+  const fetcher=vi.fn<typeof fetch>().mockImplementation(()=>new Promise(resolve=>setTimeout(()=>resolve(response()),15000)));
+  const pending=createAnswerProvider(config,fetcher,1200,45000).generate(input(),{...options(),deadlineAt:new Date(Date.now()+60000)});
+  const outcome=pending.then(value=>({value}),()=>({value:null}));
+  await vi.advanceTimersByTimeAsync(16000);
+  expect((await outcome).value?.text).toBe('Water refracts sunlight. [S1]');
+  expect(fetcher).toHaveBeenCalledOnce();
+ }finally{vi.useRealTimers();}
+});
+
+it('keeps Stop and the job deadline authoritative during extended drafts',async()=>{
+ vi.useFakeTimers();
+ try{
+  for(const stop of [true,false]){
+   const controller=new AbortController(),fetcher=vi.fn<typeof fetch>().mockImplementation(()=>new Promise(()=>{}));
+   const pending=createAnswerProvider(config,fetcher,1200,45000).generate(input(),{signal:controller.signal,deadlineAt:new Date(Date.now()+2000)});
+   const outcome=pending.then(()=>false,()=>true);
+   await vi.advanceTimersByTimeAsync(1000);if(stop)controller.abort();
+   await vi.advanceTimersByTimeAsync(1001);expect(await outcome).toBe(true);expect(fetcher).toHaveBeenCalledOnce();
+  }
+ }finally{vi.useRealTimers();}
+});

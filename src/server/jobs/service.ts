@@ -1,6 +1,5 @@
 import 'server-only';
 import {after} from 'next/server';
-import {configuredResearchModels} from '@/server/deep-research/configuration';
 import {kickJobs} from './transport';
 import {getDb} from '@/db';
 import {getCurrentSession} from '@/lib/current-session';
@@ -9,10 +8,14 @@ import {createRequestLimiter} from '@/server/runs/rate-limit';
 import {admitJob,listJobs,readJob,readEvents} from './admission';
 import {cancelJob} from './worker';
 import {createJobsHttp} from './http';
-import {sandboxDatabaseUrl,workerBudgetKey} from './connection';
-export function jobsEnabled(){try{sandboxDatabaseUrl({...process.env,JOB_DATABASE_URL:undefined});workerBudgetKey();return true;}catch{return false;}}
-export const jobsHttp=createJobsHttp({enabled:jobsEnabled,subject:async()=>{const s=await getCurrentSession();return s&&!s.user.isAnonymous&&s.user.emailVerified?s.user.id:null;},origin:()=>getServerEnv().BETTER_AUTH_URL,
+import {jobAccessConfiguration,jobConfiguration} from './configuration';
+import {removeJobContent} from './privacy';
+import {wakeCloudflareJobs} from './cloudflare-wake';
+import {cloudflareProviderEnvironment,configuredJobResearchModels} from './cloudflare-configuration';
+export function jobsEnabled(){try{jobConfiguration({...process.env,JOB_DATABASE_URL:undefined});if(process.env.JOB_EXECUTION_BACKEND==='cloudflare')cloudflareProviderEnvironment(process.env);return true;}catch{return false;}}
+export function jobsAvailable(){try{jobAccessConfiguration({...process.env,JOB_DATABASE_URL:undefined});return true;}catch{return false;}}
+export const jobsHttp=createJobsHttp({enabled:jobsAvailable,admissionsEnabled:jobsEnabled,subject:async()=>{const s=await getCurrentSession();return s&&!s.user.isAnonymous&&s.user.emailVerified?s.user.id:null;},origin:()=>getServerEnv().BETTER_AUTH_URL,
  consume:subject=>createRequestLimiter(getDb(),'jobs-http-v1',{userMinute:90,userDay:2000,anonymousMinute:1,anonymousDay:1}).consume('jobs:'+subject),
- backend:()=>{const db=getDb();return {list:s=>listJobs(db,s),admit:async(s,body)=>{let models;try{models=configuredResearchModels();}catch{/* Existing checks remain usable when research is off. */}
- const id=await admitJob(db,s,body,process.env.JOB_OPERATOR_BUDGET_KEY??'',models);
- after(async()=>{try{await kickJobs(id);}catch{console.warn(JSON.stringify({event:'jobs.kick',outcome:'UNAVAILABLE'}));}});return id;},read:(s,id)=>readJob(db,s,id),events:(s,id,c)=>readEvents(db,s,id,c),cancel:(s,id)=>cancelJob(db,s,id)};}});
+ backend:()=>{const db=getDb();return {list:s=>listJobs(db,s),admit:async(s,body)=>{let models;try{models=configuredJobResearchModels();}catch{/* Existing checks remain usable when research is off. */}
+ const config=jobConfiguration();const id=await admitJob(db,s,body,config.budgetKey,models,config.mode,()=>wakeCloudflareJobs());
+ after(async()=>{try{await kickJobs(id);}catch{console.warn(JSON.stringify({event:'jobs.kick',outcome:'UNAVAILABLE'}));}});return id;},read:(s,id)=>readJob(db,s,id),events:(s,id,c)=>readEvents(db,s,id,c),cancel:(s,id)=>cancelJob(db,s,id),remove:(s,id)=>removeJobContent(db,s,id)};}});

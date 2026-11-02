@@ -6,10 +6,11 @@ import {executionCheck,jobId,JobError} from './contracts';
 import {claimJob,heartbeat,startStep,completeStep,completeJob,recoverJobs} from './worker';
 import {claimDispatch,finishDispatch,type DispatchClaim} from './admission';
 import type {JobDatabase} from './store';
-export async function consumeJob(db:JobDatabase,rawId:string,options:{stepMs?:number;signal?:AbortSignal;budgetKey?:string}={}){
+import type {JobEnvironment} from './configuration';
+export async function consumeJob(db:JobDatabase,rawId:string,options:{stepMs?:number;signal?:AbortSignal;budgetKey?:string;environment?:JobEnvironment;providerEnvironment?:Record<string,string|undefined>}={}){
  const id=jobId.parse(rawId);const [job]=await db.select({workflow:durableJobs.workflow}).from(durableJobs).where(eq(durableJobs.id,id));
  if(job?.workflow==='deep-research-v1')return consumeResearch(db,id,options);
- const lease=await claimJob(db,id,options.budgetKey);if(!lease)return 'DUPLICATE' as const;
+ const lease=await claimJob(db,id,options.budgetKey,options.environment);if(!lease)return 'DUPLICATE' as const;
  try{
   for(const step of executionCheck.steps){
    if(await startStep(db,lease,step.key)==='DONE')continue;
@@ -30,12 +31,13 @@ export async function consumeJob(db:JobDatabase,rawId:string,options:{stepMs?:nu
   throw error;
  }
 }
-export async function dispatchJobs(db:JobDatabase,send:(claim:DispatchClaim)=>Promise<void>,limit=10,budgetKey?:string){
+export async function dispatchJobs(db:JobDatabase,send:(claim:DispatchClaim)=>Promise<void>,limit=10,budgetKey?:string,strict=false,dispatchEnabled=true){
  await recoverJobs(db,20,budgetKey);let sent=0;
+ if(!dispatchEnabled)return sent;
  for(let i=0;i<Math.min(20,Math.max(1,limit));i++){
   const claim=await claimDispatch(db,budgetKey);if(!claim)break;
   try{await send(claim);await finishDispatch(db,claim,true);sent++;}
-  catch{await finishDispatch(db,claim,false);break;}
+  catch(error){await finishDispatch(db,claim,false);if(strict)throw error;break;}
  }
  return sent;
 }

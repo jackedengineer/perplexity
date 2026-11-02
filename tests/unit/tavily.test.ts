@@ -8,7 +8,7 @@ it("uses one fixed endpoint and server-owned parameters, ignoring generated answ
   const result = await createTavilySearch("test-key",request).search(fixture.query,options());
   const [url,init] = request.mock.calls[0];
   expect(url).toBe("https://api.tavily.com/search");
-  expect(init).toMatchObject({ redirect: "error", credentials: "omit", cache: "no-store" });
+  expect(init).toMatchObject({ redirect: "manual", credentials: "omit", cache: "no-store" });
   expect(JSON.parse(String(init?.body))).toMatchObject({ max_results: 5, search_depth: "basic", auto_parameters: false,
     include_answer: false, include_raw_content: false, include_images: false, include_usage: true });
   expect(result).toEqual({ results: fixture.results, credits: 1 }); expect(request).toHaveBeenCalledOnce();

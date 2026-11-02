@@ -63,11 +63,19 @@ export function createOpenRouterSafetyProvider(config: SafetyModelConfig, reques
       try {
         response = await request("https://openrouter.ai/api/v1/chat/completions",{
           method: "POST", headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
-          cache: "no-store", redirect: "error", credentials: "omit", signal,
+          cache: "no-store", redirect: "manual", credentials: "omit", signal,
           body,
         });
-      } catch { throw new SafetyProviderError("PROVIDER_UNAVAILABLE"); }
+      } catch(error) {
+        // Classify known transport-option failures without logging exception
+        // messages: they can contain keys, headers or private request content.
+        const message=error instanceof Error?error.message:'';
+        const reason=/credentials/i.test(message)?'CREDENTIALS_OPTION':/cache/i.test(message)?'CACHE_OPTION':/redirect/i.test(message)?'REDIRECT_OPTION':signal.aborted?'ABORTED':'NETWORK';
+        console.warn(JSON.stringify({event:'safety.provider_failure',phase:'transport',reason}));
+        throw new SafetyProviderError("PROVIDER_UNAVAILABLE");
+      }
       if (!response.ok || response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
+        console.warn(JSON.stringify({event:'safety.provider_failure',phase:'http',status:response.status}));
         void response.body?.cancel().catch(()=>undefined);
         throw new SafetyProviderError("PROVIDER_UNAVAILABLE");
       }

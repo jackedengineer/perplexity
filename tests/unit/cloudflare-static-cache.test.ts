@@ -5,7 +5,7 @@ import {join,resolve} from 'node:path';
 import {promisify} from 'node:util';
 import {expect,it} from 'vitest';
 const run=promisify(execFile),script=resolve('scripts/verify-cloudflare-static-cache.mjs');
-const publicRoutes=()=>Object.fromEntries(['/','/privacy','/terms','/_not-found','/_global-error'].map(path=>[path,{initialRevalidateSeconds:false}]));
+const publicRoutes=()=>Object.fromEntries(['/','/privacy','/terms','/about','/contact','/refunds','/_not-found','/_global-error'].map(path=>[path,{initialRevalidateSeconds:false}]));
 async function verify(routes:Record<string,unknown>,dynamicRoutes:Record<string,unknown>={}){
  const cwd=await mkdtemp(join(tmpdir(),'perplex-public-cache-'));
  try{
@@ -17,11 +17,11 @@ async function verify(routes:Record<string,unknown>,dynamicRoutes:Record<string,
 it('accepts only immutable public build output',async()=>{
  expect((await verify(publicRoutes())).stdout).toContain('auth/private/API routes are excluded');
 });
-it.each(['/workspace','/search/private-id','/reviewer-sign-in','/api/auth/get-session','/api/conversations'])('rejects accidentally prerendered private/runtime routes: %s',async path=>{
+it.each(['/workspace','/search/private-id','/reviewer-sign-in','/api/auth/get-session','/api/conversations','/pricing','/billing','/jobs'])('rejects accidentally prerendered private/runtime routes: %s',async path=>{
  await expect(verify({...publicRoutes(),[path]:{initialRevalidateSeconds:false}})).rejects.toThrow('Unexpected prerendered routes');
 });
-it('permits only a default-disabled reviewer 404, never a cached login form',async()=>{
- expect((await verify({...publicRoutes(),'/reviewer-sign-in':{initialStatus:404,initialRevalidateSeconds:false}})).stdout).toContain('excluded');
+it('rejects even a disabled reviewer 404 so later runtime activation can work',async()=>{
+ await expect(verify({...publicRoutes(),'/reviewer-sign-in':{initialStatus:404,initialRevalidateSeconds:false}})).rejects.toThrow('Unexpected prerendered routes');
 });
 it('rejects dynamic route prerenders and revalidation that the read-only cache cannot support',async()=>{
  await expect(verify(publicRoutes(),{'/search/[id]':{}})).rejects.toThrow('Unexpected prerendered routes');
