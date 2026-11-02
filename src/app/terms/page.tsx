@@ -2,7 +2,7 @@ import {PublicPolicy} from '@/components/public-policy';
 
 export const metadata={title:'Terms of use'};
 export default function TermsPage(){
-  return <PublicPolicy title="Terms of use">
+  return <PublicPolicy title="Terms of use" notice="Updated 2 November 2026. Live paid purchases remain closed.">
     <p>These terms concern the independent perplexity project at perplexity-gold-alpha.vercel.app.
       The support contact is <a href="mailto:trainwithchirag@gmail.com">trainwithchirag@gmail.com</a>.</p>
     <h2>The service</h2>

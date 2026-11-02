@@ -2,7 +2,7 @@ import {PublicPolicy} from '@/components/public-policy';
 
 export const metadata={title:'Privacy policy'};
 export default function PrivacyPage(){
-  return <PublicPolicy title="Privacy policy">
+  return <PublicPolicy title="Privacy policy" notice="Updated 2 November 2026. Live paid purchases remain closed.">
     <p>Review-account update: 2 November 2026. An operator-provisioned temporary review account additionally
       uses an application password stored as a salted password hash. This is separate from Google sign-in;
       we do not receive a Google password. Review access expires within seven days. Account/security records

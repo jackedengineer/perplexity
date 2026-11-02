@@ -38,6 +38,8 @@ authorization to increase spending, buy a hosting plan or enable checkout.
   **Production Secret** settings. TEST preview settings and QuickBus are unchanged.
 - The secret was supplied in chat. Rotate it before activation, update the two
   approved destinations and re-run the read-only check; never commit its value.
+  Use `BILLING_ENV_FILE=<ignored file> pnpm billing:verify` for the repeatable
+  read-only plan/authentication check. It makes one metadata request, no mutation.
 - Migration 0029 applied to development Neon. Production remains through 0024;
   the reviewed paid-job migrations 0025–0029 and restricted grants are pending.
 
@@ -58,6 +60,10 @@ authorization to increase spending, buy a hosting plan or enable checkout.
   No dependency was added. Exact-head CI and external reviews are still required.
 
 ## Proposed first paid operating month — not activated
+
+The owner declined the approximately $50 starting envelope and requested cheaper
+alternatives on November 2. The original proposal below is retained as a costed
+reference, not the selected plan. No service subscription or cap increase is approved.
 
 Start with **at most five paying customers**, not unrestricted public checkout.
 The current manifest reserves at most $0.200250 per complete attempt across model
@@ -107,6 +113,56 @@ The six search rounds and one selected-page extraction need a conservative seven
 credits per attempt under the current basic-search configuration; 70 attempts
 budget up to 490 credits. This quota is currently 50, not 500. Free credits are
 shared with ordinary research; reserve them explicitly rather than double counting.
+
+### Lower-cost alternatives requested by the owner
+
+Use a one-customer initial pilot with a **proposed $5 provider period**, rather
+than five customers/$20. Fourteen attempts at the current full reservation ceiling
+need $2.803500. This leaves a bounded buffer, not permission for unbounded attempts
+or guaranteed margin. This is still a proposed increase beyond the existing $2
+verification pool; it has not been provisioned. The same funding/expiry, renewal,
+paid-content and fulfillment gates apply.
+
+| Option | Indicative monthly base plus $5 provider ceiling | Work and limitation |
+| --- | ---: | --- |
+| Keep Vercel Pro; Trigger Free; separate Cloudflare Free cron dispatcher | $25 | Smallest hosting change; validate external minute dispatch and Trigger's $5 included runtime credits |
+| Netlify Personal; Trigger Free; Cloudflare Free cron | $14 | Node-oriented Next adapter; new hostname/OAuth/Turnstile/webhook and merchant approval changes; validate 60-second streaming and `after()` behavior |
+| Cloudflare Workers Paid; Trigger Free; same-platform cron | $10 | Lowest proposed base, but larger runtime migration: validate adapter, PostgreSQL/TLS, Better Auth, approved streaming and background continuation |
+
+These are planning estimates before tax, payment fees, extra usage and optional
+domain costs, not enforceable all-in invoice limits or validated deployments.
+Keep auto-recharge off and verify actual provider hard-stop controls. A minute
+dispatcher must have a fixed maintenance target, no arbitrary task/payload input,
+idempotency and bounded CPU/time; it cannot be a publicly triggerable paid-work API.
+Cloudflare Free's 10ms CPU limit requires measurement for that tiny dispatcher;
+do not move the full Next app to that free runtime on an assumption.
+
+Trigger Free includes $5 monthly runtime credits and stops when exhausted. External
+minute dispatch avoids its hosted-cron cadence restriction, but task invocations
+and compute still consume those credits. Measure idle maintenance plus actual job
+cost before admitting a paying customer; stop selling before recovery funding runs
+out. No free hosted-worker capacity is guaranteed by this proposal.
+
+Netlify Free permits commercial projects but its current 300-credit hard limit
+pauses the whole team when exhausted. It can be used for a migration proof, not
+assumed sufficient for an always-available payment receiver. Personal currently
+starts at $9 with 1,000 credits; keep auto-recharge disabled if selected.
+
+Recommendation: keep the $25 option if preserving the approved hostname and launch
+speed matter most; evaluate the $10 Cloudflare option if minimum recurring cost is
+the priority. Do not start a hosting migration until the owner selects a route.
+Neither choice removes the need to implement and verify production job mode and
+renewal funding; swapping hosting is not itself paid-feature activation.
+
+Sources checked November 2:
+[Netlify commercial Free](https://www.netlify.com/blog/introducing-netlify-free-plan/)
+(use only its commercial-use statement; its historical quotas are superseded),
+[current Netlify pricing](https://www.netlify.com/pricing/),
+[Netlify Next support](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/),
+[Netlify streaming limit](https://docs.netlify.com/build/functions/api/),
+[Cloudflare Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/),
+[Cloudflare CPU limits](https://developers.cloudflare.com/workers/platform/limits/),
+[OpenNext Next.js 16 support](https://opennext.js.org/cloudflare).
 
 ## Remaining activation sequence
 

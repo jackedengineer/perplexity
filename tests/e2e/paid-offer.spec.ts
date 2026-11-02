@@ -19,7 +19,7 @@ test('public offer explains the seven-run plan without opening unready purchases
 });
 
 test('merchant information pages are public, accessible and fit narrow screens',async({page})=>{
-  for(const route of ['/pricing','/refunds','/about','/contact']){
+  for(const route of ['/pricing','/refunds','/about','/terms','/privacy','/contact']){
     const response=await page.goto(route);expect(response?.status()).toBe(200);
     await expect(page.getByRole('heading',{level:1})).toHaveCount(1);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
@@ -27,6 +27,7 @@ test('merchant information pages are public, accessible and fit narrow screens',
     expect(result.violations).toEqual([]);
     const nav=page.getByRole('navigation',{name:'Policies and support'});
     await expect(nav.getByRole('link')).toHaveCount(6);
+    if(route==='/terms'||route==='/privacy')await expect(page.getByText('Updated 2 November 2026. Live paid purchases remain closed.',{exact:true})).toBeVisible();
   }
   await page.getByRole('link',{name:'Pricing',exact:true}).click();
   await expect(page).toHaveURL(/\/pricing$/);
