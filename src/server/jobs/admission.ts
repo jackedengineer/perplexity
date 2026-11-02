@@ -8,12 +8,16 @@ import {inspectInput} from '@/server/safety/deterministic';
 import {researchModels,researchReport} from '@/server/deep-research/contracts';
 import {readCheckpoint} from '@/server/deep-research/checkpoints';
 import {appendEvent,databaseNow,ownerFor,type JobDatabase} from './store';
-export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetKey:string,models?:import('zod').infer<typeof researchModels>){
+import type {JobEnvironment} from './configuration';
+export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetKey:string,models?:import('zod').infer<typeof researchModels>,environment:JobEnvironment='TEST'){
  const parsed=jobSubmission.safeParse(raw);if(!parsed.success||!budgetKey)throw new JobError('INVALID_INPUT');
  const input=parsed.data,manifest=manifestFor(input.workflow);
+ if(environment==='LIVE'&&(input.workflow!=='deep-research-v1'||!budgetKey.startsWith('live-')))throw new JobError('INVALID_INPUT');
  if(input.workflow==='deep-research-v1'&&!models)throw new JobError('DISABLED');
  if(input.workflow==='deep-research-v1'){const blocked=inspectInput({text:input.question,context:[]});if(blocked)throw new JobError(blocked==='ACCIDENTAL_SECRET'?'REDACT_SECRET':'INPUT_BLOCKED');}
- const fingerprint=createHash('sha256').update(JSON.stringify(input.workflow==='deep-research-v1'?{version:input.version,workflow:input.workflow,question:input.question,locale:input.locale}:{version:input.version,workflow:input.workflow})).digest('hex');
+ // Preserve historical TEST intent hashes; LIVE intents cannot replay them.
+ const intent=input.workflow==='deep-research-v1'?{version:input.version,workflow:input.workflow,question:input.question,locale:input.locale}:{version:input.version,workflow:input.workflow};
+ const fingerprint=createHash('sha256').update(JSON.stringify(environment==='LIVE'?{environment,...intent}:intent)).digest('hex');
  return db.transaction(async tx=>{
   await tx.execute(sql`SET LOCAL lock_timeout='2s'`);
   const owner=await ownerFor(tx,subject);
@@ -22,7 +26,7 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
   if(prior){if(prior.fingerprint!==fingerprint)throw new JobError('CONFLICT');return prior.id;}
   if((await tx.select({id:jobs.id}).from(jobs).where(and(eq(jobs.userId,owner),inArray(jobs.state,['QUEUED','RUNNING']))).limit(1)).length)throw new JobError('CONFLICT');
   const now=await databaseNow(tx);
-  const [period]=await tx.select().from(periods).where(and(eq(periods.userId,owner),eq(periods.environment,'TEST'),eq(periods.state,'ACTIVE'),lte(periods.startsAt,now),gt(periods.endsAt,now)))
+  const [period]=await tx.select().from(periods).where(and(eq(periods.userId,owner),eq(periods.environment,environment),eq(periods.state,'ACTIVE'),lte(periods.startsAt,now),gt(periods.endsAt,now)))
    .orderBy(periods.endsAt,periods.id).limit(1).for('update');
   if(!period)throw new JobError('PAYMENT_REQUIRED');
   if(period.reservedJobs+period.spentJobs>=period.jobLimit)throw new JobError('QUOTA');

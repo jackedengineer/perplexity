@@ -8,9 +8,10 @@ import {loadResearch,researchExecutor} from './executor';
 import type {DeepProviders} from './providers';
 import {durableJobs} from '@/db/schema';
 import {eq} from 'drizzle-orm';
-export async function consumeResearch(db:JobDatabase,id:string,options:{signal?:AbortSignal;budgetKey?:string;providers?:DeepProviders}={}){
+import type {JobEnvironment} from '@/server/jobs/configuration';
+export async function consumeResearch(db:JobDatabase,id:string,options:{signal?:AbortSignal;budgetKey?:string;providers?:DeepProviders;environment?:JobEnvironment}={}){
  let currentStep='configuration';
- const lease=await claimJob(db,id,options.budgetKey);if(!lease)return 'DUPLICATE' as const;
+ const lease=await claimJob(db,id,options.budgetKey,options.environment);if(!lease)return 'DUPLICATE' as const;
  const [job]=await db.select().from(durableJobs).where(eq(durableJobs.id,id));
  const controller=new AbortController(),stopHeartbeat=new AbortController();
  const signal=AbortSignal.any([controller.signal,...(options.signal?[options.signal]:[]),AbortSignal.timeout(Math.max(1,job.deadlineAt.getTime()-Date.now()))]);

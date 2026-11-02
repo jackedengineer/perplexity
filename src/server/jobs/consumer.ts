@@ -6,10 +6,11 @@ import {executionCheck,jobId,JobError} from './contracts';
 import {claimJob,heartbeat,startStep,completeStep,completeJob,recoverJobs} from './worker';
 import {claimDispatch,finishDispatch,type DispatchClaim} from './admission';
 import type {JobDatabase} from './store';
-export async function consumeJob(db:JobDatabase,rawId:string,options:{stepMs?:number;signal?:AbortSignal;budgetKey?:string}={}){
+import type {JobEnvironment} from './configuration';
+export async function consumeJob(db:JobDatabase,rawId:string,options:{stepMs?:number;signal?:AbortSignal;budgetKey?:string;environment?:JobEnvironment}={}){
  const id=jobId.parse(rawId);const [job]=await db.select({workflow:durableJobs.workflow}).from(durableJobs).where(eq(durableJobs.id,id));
  if(job?.workflow==='deep-research-v1')return consumeResearch(db,id,options);
- const lease=await claimJob(db,id,options.budgetKey);if(!lease)return 'DUPLICATE' as const;
+ const lease=await claimJob(db,id,options.budgetKey,options.environment);if(!lease)return 'DUPLICATE' as const;
  try{
   for(const step of executionCheck.steps){
    if(await startStep(db,lease,step.key)==='DONE')continue;

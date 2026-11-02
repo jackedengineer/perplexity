@@ -6,9 +6,10 @@ import {durableJobs,jobReservations} from '../src/db/schema';
 import {workerDatabase,workerBudgetKey} from '../src/server/jobs/connection';
 import {consumeJob} from '../src/server/jobs/consumer';
 import {automaticDispatch} from '../src/server/jobs/transport';
+import {jobConfiguration} from '../src/server/jobs/configuration';
 const payload=z.strictObject({jobId:z.uuid()});
 export const executeJob=task({id:'execute-job-v1',maxDuration:900,retry:{maxAttempts:1},queue:{name:'durable-jobs-v1',concurrencyLimit:1},
- run:async(raw:unknown)=>{return consumeJob(workerDatabase(),payload.parse(raw).jobId,{budgetKey:workerBudgetKey()});}});
+ run:async(raw:unknown)=>{return consumeJob(workerDatabase(),payload.parse(raw).jobId,{budgetKey:workerBudgetKey(),environment:jobConfiguration().mode});}});
 export const watchJob=task({id:'watch-job-v1',maxDuration:30,retry:{maxAttempts:1},queue:{name:'job-watch-v1',concurrencyLimit:1},
  run:async(raw:unknown)=>{
   const {jobId}=payload.parse(raw),db=workerDatabase(),key=workerBudgetKey();
