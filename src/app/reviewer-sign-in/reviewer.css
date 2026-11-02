@@ -1,0 +1,15 @@
+.reviewer-page { width: min(100% - 40px, 760px); min-height: 100svh; margin: auto; padding: 32px 0; }
+.reviewer-page header { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.reviewer-page section { width: min(100%, 440px); margin: 64px auto; }
+.reviewer-page .eyebrow { margin: 0 0 20px; }
+.reviewer-page h1 { font-size: clamp(36px, 7vw, 52px); }
+.reviewer-page section > p { line-height: 1.7; }
+.reviewer-form { display: flex; flex-direction: column; gap: 20px; margin-top: 28px; }
+.reviewer-form label { display: block; font-size: 13px; margin-bottom: 8px; }
+.reviewer-form input { width: 100%; min-height: 48px; border: 1px solid var(--line); border-radius: 8px; padding: 12px; color: var(--ink); background: var(--surface); font-size: 16px; }
+.reviewer-form input:disabled { opacity: .7; }
+.reviewer-feedback { min-height: 24px; font-size: 13px; line-height: 1.6; color: #943c35; }
+.reviewer-feedback p { margin: 0; }
+.reviewer-note { font-size: 13px; color: var(--muted); }
+.reviewer-note a { text-decoration: underline; text-underline-offset: 4px; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .reviewer-form .spinner { animation: none; } }

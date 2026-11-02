@@ -1,17 +1,18 @@
+import {reviewerSessionAllowed} from './reviewer-policy';
 type AuthSession = {
   session: { id: string; token: string; createdAt: Date; expiresAt: Date };
-  user: { id: string; name: string; email: string; emailVerified: boolean; isAnonymous?: boolean | null };
+  user: { id: string; name: string; email: string; emailVerified: boolean; isAnonymous?: boolean | null;createdAt?:Date };
 };
 type SessionStore = {
   getSession: (headers: Headers) => Promise<AuthSession | null>;
   revokeSession: (token: string) => Promise<void>;
 };
 
-export async function loadApplicationSession(store: SessionStore, headers: Headers, now = Date.now()) {
+export async function loadApplicationSession(store: SessionStore, headers: Headers, now = Date.now(),reviewerRaw=process.env.REVIEWER_LOGIN_CONFIG,origin=process.env.BETTER_AUTH_URL) {
   const result = await store.getSession(headers);
   if (!result) return null;
   if (now >= result.session.createdAt.getTime() + 30 * 86_400_000 ||
-      now >= result.session.expiresAt.getTime()) {
+      now >= result.session.expiresAt.getTime()||!reviewerSessionAllowed(result.user,reviewerRaw,origin,now)) {
     await store.revokeSession(result.session.token);
     return null;
   }

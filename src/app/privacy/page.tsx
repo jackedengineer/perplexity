@@ -3,6 +3,11 @@ import {PublicPolicy} from '@/components/public-policy';
 export const metadata={title:'Privacy policy'};
 export default function PrivacyPage(){
   return <PublicPolicy title="Privacy policy">
+    <p>Review-account update: 2 November 2026. An operator-provisioned temporary review account additionally
+      uses an application password stored as a salted password hash. This is separate from Google sign-in;
+      we do not receive a Google password. Review access expires within seven days. Account/security records
+      and saved test content are retained under the policies below until removed through the relevant support
+      or deletion process; expiry does not promise immediate data erasure.</p>
     <p>This notice describes the independent perplexity research application at
       perplexity-gold-alpha.vercel.app. Contact the project operator at
       {' '}<a href="mailto:trainwithchirag@gmail.com">trainwithchirag@gmail.com</a> about privacy or your data.</p>
