@@ -8,6 +8,7 @@ const databaseUrl = z.url().refine((value) => {
 });
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  DEPLOYMENT_PLATFORM:z.enum(['node','vercel','cloudflare']).optional(),
   DATABASE_URL: databaseUrl,
   BETTER_AUTH_URL: z.url().refine((value) => {
     const url = new URL(value);

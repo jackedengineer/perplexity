@@ -10,6 +10,7 @@ export const GUEST_COOKIE='perplex_trial';
 export const guestAuthorization=(secret:string)=>createHmac('sha256',secret).update('perplex:guest-admission:v1').digest('hex');
 const digest=(secret:string,value:string)=>createHmac('sha256',secret).update('perplex:trial:'+value).digest('hex');
 export function trustedGuestAddress(request:Request,env:Record<string,string|undefined>) {
+ if(env.DEPLOYMENT_PLATFORM==='cloudflare') {const ip=request.headers.get('cf-connecting-ip')?.trim();if(ip&&isIP(ip))return ip;throw new AdmissionError('CONFIGURATION_UNAVAILABLE');}
  if(env.VERCEL==='1') {const ip=request.headers.get('x-vercel-forwarded-for')?.trim();if(ip&&isIP(ip))return ip;throw new AdmissionError('CONFIGURATION_UNAVAILABLE');}
  const origin=new URL(env.BETTER_AUTH_URL??'https://invalid');
  if(env.NODE_ENV!=='production'&&['localhost','127.0.0.1'].includes(origin.hostname))return 'local-development';

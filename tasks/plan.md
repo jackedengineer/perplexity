@@ -1,5 +1,11 @@
 # Implementation plan
 
+Current work (2 November 2026): [free Cloudflare compatibility proof](../docs/cloudflare-compatibility.md).
+Preserve the existing app and $2 provider cap, validate workerd/browser behavior in
+an isolated environment, then open a focused PR. `perplexity.jacked.dev` is the
+eventual production hostname; DNS, paid upgrades and production cutover are outside
+the initial proof. Full paid activation requires the separate gates in that record.
+
 Current work (1 November 2026): [bounded Deep Research](../docs/deep-research.md) on the [durable paid-job foundation](durable-jobs-and-billing.md),
 with job/step accounting, replay, cancellation/recovery and Razorpay test-mode access.
 The following earlier status is historical; the release checklist and current work

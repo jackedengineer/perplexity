@@ -37,7 +37,9 @@
     "test:completion:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/completion-neon.test.ts",
     "jobs:worker": "tsx scripts/jobs-worker.ts",
     "jobs:dev": "node tools/trigger-cli/node_modules/trigger.dev/dist/esm/index.js dev start --env-file .env.jobs.local --max-concurrent-runs 1 --skip-update-check --skip-telemetry",
-    "jobs:dispatch": "tsx scripts/jobs-dispatch.ts"
+    "jobs:dispatch": "tsx scripts/jobs-dispatch.ts",
+    "cf:build": "opennextjs-cloudflare build && node scripts/verify-cloudflare-static-cache.mjs && opennextjs-cloudflare populateCache local",
+    "cf:preview": "wrangler dev --local --port 8787"
   },
   "dependencies": {
     "@ai-sdk/react": "4.0.152",
@@ -60,6 +62,7 @@
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
     "@electric-sql/pglite": "0.5.11",
+    "@opennextjs/cloudflare": "1.20.15",
     "@playwright/test": "1.64.1",
     "@types/node": "24",
     "@types/pg": "^8.23.1",
@@ -71,13 +74,15 @@
     "eslint-config-next": "16.4.2",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "wrangler": "4.156.1"
   },
   "pnpm": {
     "overrides": {
       "tar@6.2.1": "7.5.22",
       "deepmerge-ts@7.1.5": "8.0.2",
-      "zod@4.5.4": "4.6.7"
+      "zod@4.5.4": "4.6.7",
+      "glob@10.3.3": "10.5.0"
     }
   }
 }
