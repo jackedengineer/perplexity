@@ -27,6 +27,46 @@
   proposal, not authorization to buy plans or raise the current $2 cap. The
   [proposed first paid month](live-billing-activation.md) is not activated.
 
+## Cloudflare CPU follow-up — November 2
+
+- [x] Cookieless fast denial and read-only public prerender cache implemented;
+  private responses, verification, budgets and cancellation remain intact.
+- [x] Exact build/population command, lint/types and 771 offline tests pass.
+- [x] 42 browser checks pass: 12 local workerd, eight development-Neon,
+  12 isolated hosted public and ten Node desktop/mobile cases.
+- [x] Measured gains, reverted experiments, raw-analytics units and incomplete
+  windows are recorded in [the CPU report](cloudflare-cpu.md).
+- [ ] **Free production acceptance:** hosted tail estimates still exceed 10 ms;
+  controlled analytics windows are incomplete, and authenticated hosted CPU,
+  fresh research/worker and financial acceptance remain unverified.
+
+Decision: **HOLD production cutover.** The isolated preview is updated; production
+DNS, payments, credentials, migrations and the $2 combined cap are unchanged.
+This follow-up supersedes the initial proof's counts below, without clearing any
+of its open production gates.
+
+
+## Cloudflare compatibility proof — November 2
+
+- [x] Pinned adapter/CLI; OpenNext build, lint/types and 757 offline tests pass.
+- [x] Local workerd: 10 public browser cases and eight development-Neon browser
+  cases cover sessions, concurrency, ownership, saved citations, approved SSE
+  replay, progress recovery and durable cancellation. Provider fixtures are synthetic.
+- [x] Isolated Workers Free public preview: ten desktop/mobile browser cases pass;
+  no working DB/OAuth/provider/payment credentials, schedule or custom domain installed.
+- [x] Hosted size/startup and first CPU/wall-time sample recorded in the
+  [proof report](cloudflare-compatibility.md#november-2-proof-results).
+- [ ] **Free CPU acceptance:** first P50 14.871 ms/P99 258.282 ms exceed the
+  documented 10 ms allowance. No sustained Free production fit is established.
+- [ ] Real hosted Google/Neon isolation, fresh research delivery, worker recovery,
+  payment acceptance and adequately funded monthly delivery remain cutover gates.
+- [ ] Final domain migration: owner authorized replacing old Railway after checks;
+  `perplexity.jacked.dev` remains unchanged while the CPU/hosted gates are open.
+
+Decision: **HOLD Cloudflare production cutover and paid activation.** No paid
+upgrade, provider call, real payment or $2-cap change occurred in this proof.
+The following records describe earlier work and do not supersede these gates.
+
 
 ## Temporary reviewer login — November 2 follow-up
 

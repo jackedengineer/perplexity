@@ -15,3 +15,9 @@ test-results/
 
 # Trigger local build/session artifacts (may contain copied environment settings).
 .trigger/
+
+# Cloudflare local state, generated bundles and runtime secrets.
+.open-next/
+.wrangler/
+.dev.vars*
+!.dev.vars.example

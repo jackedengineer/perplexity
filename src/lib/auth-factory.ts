@@ -77,8 +77,8 @@ export function createAuth(
       disableCSRFCheck: false,
       cookiePrefix: "perplex",
       useSecureCookies: env.BETTER_AUTH_URL.startsWith("https:"),
-      // Vercel overwrites this header. Reconfigure the trust boundary on other hosts.
-      ipAddress: { ipAddressHeaders: ["x-vercel-forwarded-for"] },
+      // Select only the configured host's overwritten header, never arbitrary XFF.
+      ipAddress: { ipAddressHeaders: [env.DEPLOYMENT_PLATFORM==='cloudflare'?'cf-connecting-ip':'x-vercel-forwarded-for'] },
       defaultCookieAttributes: { httpOnly: true, sameSite: "lax", path: "/" },
     },
     logger: {
