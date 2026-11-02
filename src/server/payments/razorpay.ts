@@ -1,12 +1,14 @@
 import {createHmac,timingSafeEqual} from 'node:crypto';
 import {z} from 'zod';
 import {JobError} from '@/server/jobs/contracts';
+import {liveOffer,offerFor,paymentMode,testOffer} from './offer';
 export const proPlan={priceKey:'pro-monthly-inr-v1',amountPaise:99900,currency:'INR',sandboxChecks:10} as const;
 const reference=(prefix:string)=>z.string().regex(new RegExp('^'+prefix+'_[A-Za-z0-9]{1,64}$'));
 export const subscriptionId=reference('sub'),paymentId=reference('pay'),invoiceId=reference('inv'),planId=reference('plan');
-export const checkoutInput=z.strictObject({requestId:z.uuid(),priceKey:z.literal(proPlan.priceKey)});
+const priceKey=z.enum([testOffer.priceKey,liveOffer.priceKey]);
+export const checkoutInput=z.strictObject({requestId:z.uuid(),priceKey});
 export const confirmationInput=z.strictObject({checkoutId:z.uuid(),razorpay_payment_id:paymentId,razorpay_subscription_id:subscriptionId,razorpay_signature:z.string().regex(/^[a-f0-9]{64}$/u)});
-export const subscriptionSchema=z.object({id:subscriptionId,plan_id:planId,status:z.enum(['created','authenticated','active','pending','halted','cancelled','completed','expired']),quantity:z.literal(1),notes:z.object({checkoutId:z.uuid(),priceKey:z.literal(proPlan.priceKey)})});
+export const subscriptionSchema=z.object({id:subscriptionId,plan_id:planId,status:z.enum(['created','authenticated','active','pending','halted','cancelled','completed','expired']),quantity:z.literal(1),notes:z.object({checkoutId:z.uuid(),priceKey})});
 export const invoiceSchema=z.object({id:invoiceId,payment_id:paymentId,status:z.literal('paid'),amount:z.literal(proPlan.amountPaise),amount_paid:z.literal(proPlan.amountPaise),currency:z.literal('INR'),billing_start:z.int().positive(),billing_end:z.int().positive()});
 export const paymentSchema=z.object({id:paymentId,invoice_id:invoiceId,status:z.literal('captured'),amount:z.literal(proPlan.amountPaise),currency:z.literal('INR'),amount_refunded:z.literal(0)});
 // Polling uses the same linked invoice/payment identity as grants. A refund is
@@ -36,8 +38,9 @@ export function normalizeWebhook(raw:unknown){
  return {kind:envelope.event,subscriptionId:payload.subscription?.entity.id??null,paymentId:payment??null};
 }
 export type RazorpayApi=ReturnType<typeof createRazorpay>;
-export function createRazorpay(config:{keyId:string;keySecret:string},fetcher:typeof fetch=fetch){
- if(!/^rzp_test_[A-Za-z0-9]+$/u.test(config.keyId)||!config.keySecret)throw new JobError('DISABLED');
+export function createRazorpay(config:{keyId:string;keySecret:string;allowLive?:boolean},fetcher:typeof fetch=fetch){
+ const mode=paymentMode(config.keyId),offer=offerFor(mode);
+ if(!config.keySecret||mode==='LIVE'&&config.allowLive!==true)throw new JobError('DISABLED');
  async function request(path:string,body?:unknown){
   const response=await fetcher('https://api.razorpay.com/v1/'+path,{method:body===undefined?'GET':'POST',headers:{Authorization:'Basic '+Buffer.from(config.keyId+':'+config.keySecret).toString('base64'),'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(5000),redirect:'error',cache:'no-store'});
   if(!response.ok){await response.body?.cancel();throw new JobError('UNAVAILABLE');}
@@ -49,7 +52,7 @@ export function createRazorpay(config:{keyId:string;keySecret:string},fetcher:ty
  return {
   keyId:config.keyId,
   plan:async(id:string)=>{const result=await request('plans/'+ref(id,planId));return z.object({id:planId,period:z.literal('monthly'),interval:z.literal(1),item:z.object({amount:z.literal(99900),currency:z.literal('INR')})}).parse(result);},
-  create:async(checkoutId:string,id:string)=>subscriptionSchema.parse(await request('subscriptions',{plan_id:ref(id,planId),total_count:12,quantity:1,customer_notify:0,expire_by:Math.floor(Date.now()/1000)+3600,notes:{checkoutId:z.uuid().parse(checkoutId),priceKey:proPlan.priceKey}})),
+  create:async(checkoutId:string,id:string)=>subscriptionSchema.parse(await request('subscriptions',{plan_id:ref(id,planId),total_count:12,quantity:1,customer_notify:0,expire_by:Math.floor(Date.now()/1000)+3600,notes:{checkoutId:z.uuid().parse(checkoutId),priceKey:offer.priceKey}})),
   subscription:async(id:string)=>subscriptionSchema.parse(await request('subscriptions/'+ref(id,subscriptionId))),
   subscriptions:async()=>z.object({items:z.array(z.unknown()).max(100)}).parse(await request('subscriptions?count=100')).items.flatMap(item=>{const parsed=subscriptionSchema.safeParse(item);return parsed.success?[parsed.data]:[];}),
   invoices:async(id:string)=>z.object({items:z.array(z.unknown()).max(100)}).parse(await request('invoices?subscription_id='+ref(id,subscriptionId)+'&count=100')).items,
