@@ -36,3 +36,24 @@ Cloudflare scheduled work has a 15-minute wall-time limit; constrain this runner
 with a 14-minute abort window, retaining the job's earlier absolute deadline.
 The existing pipeline remains private until citation/output approval and atomic
 persistence. Browser Tasks remain unavailable.
+
+## November 2 implementation evidence
+
+- Four focused implementation commits add delivery/activity, dedicated-key wake-up,
+  native cron, and narrowly scoped late-socket handling. Trigger TEST/local paths
+  remain available; the production external-dispatch endpoint is disabled.
+- Full lint/types and 848 offline tests pass. Dedicated keys, activity failures,
+  crash-before-claim recovery, pause recovery, independent financial maintenance,
+  connection ownership and terminal delivery are covered.
+- Native workerd plus isolated development Neon completes/replays/cancels only the
+  zero-cost system manifest; no production entitlement or fake LIVE receipt was
+  created. Hosted boundary/browser checks pass on the custom domain. This is not
+  evidence of funded paid-report quality or live payment lifecycle completion.
+- Native production version `7d7d0bac-4138-4a0c-9c88-8b1a20bca475` is deployed with
+  minute cron and PAID_ACTIVITY KV. Admission/execution/checkout switches remain
+  disabled. Cron propagation, dedicated OpenRouter funding and funded acceptance
+  are still required before opening checkout.
+
+Sources: [scheduled duration/CPU limits](https://developers.cloudflare.com/workers/platform/limits/),
+[cron propagation and local testing](https://developers.cloudflare.com/workers/configuration/cron-triggers/),
+[KV read consistency/cache](https://developers.cloudflare.com/kv/api/read-key-value-pairs/).

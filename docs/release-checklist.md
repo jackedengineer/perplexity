@@ -1,4 +1,65 @@
-# Current release checks — 1 November 2026
+# Current release checks — 2 November 2026
+
+## Cloudflare native jobs checkpoint
+
+- [x] Custom domain `https://perplexity.jacked.dev` is live on Workers Paid,
+  explicitly placed near Singapore Neon. Existing Railway wildcard and Vercel
+  fallback are retained. Production migrations 0025–0030 and runtime grants pass.
+- [x] Google/reviewer sign-in and approved source rendering were exercised in the
+  real hosted browser. A bounded real rainbow answer produced five citations;
+  saved answer/citation rendering still passes after the worker deployment.
+- [x] Razorpay now explicitly reports the custom-domain website successfully
+  verified. The independent signed LIVE webhook is enabled with eight supported
+  events; unsigned delivery returns 400. No real charge/mandate/refund was made.
+- [x] Trigger rejected both production build backends despite its displayed Free
+  support. The owner selected Cloudflare execution; no Trigger upgrade was made.
+- [x] Native minute cron preserves Postgres outbox claims, delivery-before-consume,
+  fenced leases, per-step receipts, cancellation, deadline recovery and private
+  atomic publication. Per-invocation database pools close after execution. No
+  public execution endpoint or cross-invocation provider-key mutation is added.
+- [x] Dedicated paid provider bindings cannot fall back to the $2 verification key.
+  New paid admission requires a bounded metadata-only activity marker before its
+  transaction commits. Idle minutes skip Neon; hourly recovery remains independent.
+- [x] Lint/types and 848 tests in 128 files pass. OpenNext build passes; 1,775
+  generated files contain zero matches for 13 configured credential values.
+  Existing upstream Better Auth duplicate-key build warnings remain visible.
+- [x] Native workerd with isolated restricted development Neon completes the
+  zero-provider-cost manifest, does not repeat completed delivery, and preserves
+  cancellation. Final clean run has no pool warnings. One source-reload-interrupted
+  attempt is retained and does not count as acceptance.
+- [x] Deployed native worker version `7d7d0bac-4138-4a0c-9c88-8b1a20bca475`,
+  73 ms startup, 3,725 KiB gzip. Ten public/private/unsigned-webhook probes pass;
+  local scheduler URLs are 404 in production. Browser shows saved reports accessible
+  and new paid admission/checkout paused.
+- [ ] Observe the native production cron after propagation, including its wake-up
+  path and subsequent idle skip; hourly ordinary recovery is separately retained.
+- [ ] Complete OpenRouter email verification, create/verify the already-approved
+  $5 non-resetting inference key, then revoke the temporary management key.
+  Neither key has been created yet. Provision the isolated approved $5 period only
+  after key metadata verifies its total cap and delivery window.
+- [ ] Funded hosted Deep Research acceptance: approved report/citations, replay,
+  progress, Stop, deadline/crash recovery and financial settlement; signed merchant
+  payment lifecycle and actual checkout remain pending. Never substitute the
+  zero-cost system manifest or ordinary rainbow answer for a LIVE paid report.
+- [ ] Final exact-head Quality CI and fresh code/security reviews for PR #21.
+
+**Current access:** public pages/sign-in/saved private content are live. Guests,
+new paid jobs and real checkout remain disabled. Tasks are not offered. The current
+ordinary-research period has $0.049921 unreserved, below its $0.05 admission reserve;
+unknown-cost holds remain intact, so new ordinary research is temporarily paused.
+The later cancellation smoke failed in input safety before cancellation could be
+confirmed (zero answer credits charged, unknown exposure retained); hosted live
+cancellation acceptance remains pending. The existing key remains $1.80 total plus
+the retained $0.20 retired-key allowance: the $2 envelope is unchanged. The separate
+$5 one-customer pilot is approved but not activated. The owner explicitly deferred
+LIVE Razorpay key rotation; it is not represented as completed.
+
+Evidence is in ignored owner-only `.artifacts/cloudflare-jobs-release-check.log`,
+`cloudflare-native-neon-proof-final.log`, `cloudflare-native-hosted-boundaries.json`,
+`cloudflare-native-production-deploy.log` and `cloudflare-ordinary-final-state.json`.
+Never publish credential files, raw live tail request headers or database backups.
+
+## Earlier preparation checkpoints (superseded by the checkpoint above)
 
 ## Cloudflare production pilot — November 2 follow-up
 

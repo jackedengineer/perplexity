@@ -27,7 +27,9 @@
     "binding": "ASSETS"
   },
   "triggers": {
-    "crons": []
+    "crons": [
+      "* * * * *"
+    ]
   },
   "vars": {
     "APPLICATION_ENV": "production",
