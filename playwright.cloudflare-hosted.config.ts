@@ -5,7 +5,7 @@ import {defineConfig,devices} from '@playwright/test';
 if(process.env.CF_HOSTED_PUBLIC_PROOF!=='1')throw new Error('Explicit hosted proof opt-in required');
 export default defineConfig({
  outputDir:'.artifacts/cloudflare-hosted-results',
- testDir:'./tests/e2e',testMatch:'foundation.spec.ts',workers:1,retries:0,
+ testDir:'./tests/e2e',testMatch:['foundation.spec.ts','cloudflare-cache.spec.ts'],workers:1,retries:0,
  forbidOnly:!!process.env.CI,
  use:{baseURL:'https://perplex-compatibility-proof.ichiragbhugra.workers.dev',trace:'retain-on-failure'},
  projects:[

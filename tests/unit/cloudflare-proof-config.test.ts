@@ -13,7 +13,9 @@ it('keeps the compatibility worker separate from the custom domain, billing and 
 });
 it('keeps database caching out of the initial OpenNext proof and secrets out of git',async()=>{
  const config=await readFile('open-next.config.ts','utf8');
- expect(config).toContain('defineCloudflareConfig({})');
+ expect(config).toContain('incrementalCache:staticAssetsIncrementalCache');
+ expect(config).toContain('enableCacheInterception:true');
+ expect(config).not.toMatch(/incremental-cache\/(?:r2|kv)-/);
  const ignore=await readFile('.gitignore','utf8');
  expect(ignore).toContain('.open-next/');expect(ignore).toContain('.wrangler/');expect(ignore).toContain('.dev.vars*');
 });
