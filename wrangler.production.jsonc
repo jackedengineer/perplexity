@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "perplexity-production",
+  "account_id": "afc0353bdd89b39c334efd3db0311ec3",
+  "main": "custom-worker.mjs",
+  "compatibility_date": "2026-11-02",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "limits": {"cpu_ms": 30000},
+  "assets": {"directory": ".open-next/assets", "binding": "ASSETS"},
+  "triggers": {"crons": []},
+  "vars": {
+    "APPLICATION_ENV": "production",
+    "DEPLOYMENT_PLATFORM": "cloudflare",
+    "NEXTJS_ENV": "production",
+    "BETTER_AUTH_URL": "https://perplexity.jacked.dev",
+    "ENABLE_GUEST_TRIALS": "false",
+    "ENABLE_DURABLE_JOB_SANDBOX": "false",
+    "JOB_ENVIRONMENT": "LIVE",
+    "JOB_OPERATOR_BUDGET_KEY": "live-pilot-20261102",
+    "ENABLE_PRODUCTION_JOBS": "false",
+    "ENABLE_EXTERNAL_JOB_DISPATCH": "false",
+    "ENABLE_RAZORPAY_TEST_CHECKOUT": "false",
+    "ENABLE_RAZORPAY_LIVE_BILLING": "false",
+    "ENABLE_RAZORPAY_LIVE_CHECKOUT": "false",
+    "ENABLE_DEEP_RESEARCH": "false",
+    "ENABLE_JOB_SCHEDULE": "false"
+  }
+}

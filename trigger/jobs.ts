@@ -7,7 +7,7 @@ import {workerDatabase,workerBudgetKey} from '../src/server/jobs/connection';
 import {consumeJob} from '../src/server/jobs/consumer';
 import {automaticDispatch} from '../src/server/jobs/transport';
 import {jobConfiguration} from '../src/server/jobs/configuration';
-import {recordJobMaintenance} from '../src/server/jobs/maintenance';
+import {recordJobMaintenance,recoverWorkerServices} from '../src/server/jobs/maintenance';
 import {paymentConfiguration} from '../src/server/payments/config';
 import {configuredResearchModels} from '../src/server/deep-research/configuration';
 import {pruneJobEvidence} from '../src/server/jobs/privacy';
@@ -29,7 +29,7 @@ export const maintainJobs=schedules.task({id:'maintain-jobs-v1',
  ...(process.env.ENABLE_JOB_SCHEDULE==='true'?{cron:{pattern:'* * * * *',environments:['PRODUCTION','STAGING'] as ['PRODUCTION','STAGING']}}:{}),
  maxDuration:60,retry:{maxAttempts:1},queue:{name:'job-maintenance-v1',concurrencyLimit:1},
  run:async()=>{const db=workerDatabase(),key=workerBudgetKey(),mode=jobConfiguration().mode;
-  return recordJobMaintenance(db,key,async()=>{
-   if(mode==='LIVE'){paymentConfiguration();configuredResearchModels();}
-   const sent=await automaticDispatch(db,key);await maintainBilling(db);await pruneJobEvidence(db);return sent;
-  });}});
+  return recordJobMaintenance(db,key,()=>recoverWorkerServices({
+   dispatch:()=>automaticDispatch(db,key),billing:()=>maintainBilling(db),cleanup:()=>pruneJobEvidence(db),
+   ready:()=>{if(mode==='LIVE'){paymentConfiguration();configuredResearchModels();}},
+  }));}});
