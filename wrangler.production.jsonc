@@ -9,6 +9,7 @@
   "preview_urls": false,
   "routes": [{"pattern": "perplexity.jacked.dev", "custom_domain": true}],
   "limits": {"cpu_ms": 30000},
+  "placement": {"region": "aws:ap-southeast-1"},
   "assets": {"directory": ".open-next/assets", "binding": "ASSETS"},
   "triggers": {"crons": []},
   "vars": {
