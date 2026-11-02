@@ -2,6 +2,14 @@ import {expect,it,vi} from 'vitest';
 import {createJobsHttp} from '@/server/jobs/http';
 const backend={list:vi.fn(async()=>[]),admit:vi.fn(async()=>crypto.randomUUID()),read:vi.fn(async()=>({state:'QUEUED'})),events:vi.fn(async()=>[]),cancel:vi.fn(async()=>{}),remove:vi.fn(async()=>{})};
 const make=(subject:string|null='owner',enabled=true)=>createJobsHttp({enabled:()=>enabled,subject:async()=>subject,origin:()=> 'http://localhost:3000',consume:async()=>{},backend:()=>backend});
+it('keeps owned read, progress, Stop and deletion available while submissions are paused',async()=>{
+ const http=createJobsHttp({enabled:()=>true,admissionsEnabled:()=>false,subject:async()=> 'owner',origin:()=> 'http://localhost:3000',consume:async()=>{},backend:()=>backend});
+ const id=crypto.randomUUID(),url='http://localhost:3000/api/jobs';
+ expect((await http.submit(new Request(url,{method:'POST',headers:{origin:'http://localhost:3000','Content-Type':'application/json'},body:JSON.stringify({version:1,workflow:'execution-check-v1',requestId:crypto.randomUUID()})}))).status).toBe(404);
+ expect((await http.list(new Request(url))).status).toBe(200);
+ expect((await http.read(new Request(url+'/'+id),id)).status).toBe(200);
+ for(const action of [http.cancel,http.remove])expect((await action(new Request(url+'/'+id,{method:'POST',headers:{origin:'http://localhost:3000'}}),id)).status).toBe(200);
+});
 it('requires current identity and default-off availability before all operations',async()=>{
  expect((await make(null).list(new Request('http://localhost:3000/api/jobs'))).status).toBe(401);
  expect((await make('owner',false).list(new Request('http://localhost:3000/api/jobs'))).status).toBe(404);

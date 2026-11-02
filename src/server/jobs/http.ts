@@ -3,7 +3,7 @@ import {JobError,jobId,jobCursor,jobSubmission} from './contracts';
 import {requireEmptyBody} from '@/server/runs/recovery-http';
 import {AdmissionError} from '@/server/runs/errors';
 type Backend={list:(subject:string)=>Promise<unknown>;admit:(subject:string,body:unknown)=>Promise<string>;read:(subject:string,id:string)=>Promise<unknown>;events:(subject:string,id:string,cursor:number)=>Promise<unknown>;cancel:(subject:string,id:string)=>Promise<void>;remove?:(subject:string,id:string)=>Promise<void>};
-type Dependencies={enabled:()=>boolean;subject:()=>Promise<string|null>;origin:()=>string;consume:(subject:string)=>Promise<void>;backend:()=>Backend};
+type Dependencies={enabled:()=>boolean;admissionsEnabled?:()=>boolean;subject:()=>Promise<string|null>;origin:()=>string;consume:(subject:string)=>Promise<void>;backend:()=>Backend};
 export const privateHeaders={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
 export async function readBoundedBytes(request:Request,max=2048){
  if(request.headers.get('content-type')?.split(';')[0].trim().toLowerCase()!=='application/json')throw new JobError('INVALID_INPUT');
@@ -37,7 +37,7 @@ export function createJobsHttp(d:Dependencies){
  async function respond(work:()=>Promise<Response>){try{return await work();}catch(error){return jobFailure(error);}}
  return {
   list:(request:Request)=>respond(async()=>{const {subject,backend}=await context();if(request.method!=='GET'||new URL(request.url).search)throw new JobError('INVALID_INPUT');return Response.json({jobs:await backend.list(subject)},{headers:privateHeaders});}),
-  submit:(request:Request)=>respond(async()=>{const {subject,backend}=await context();sameOrigin(request,d.origin());let raw:unknown;try{raw=JSON.parse(await readBoundedBody(request,8192));}catch(error){if(error instanceof AdmissionError)throw error;throw new JobError('INVALID_INPUT');}
+  submit:(request:Request)=>respond(async()=>{const {subject,backend}=await context();sameOrigin(request,d.origin());if(d.admissionsEnabled&&!d.admissionsEnabled())throw new JobError('DISABLED');let raw:unknown;try{raw=JSON.parse(await readBoundedBody(request,8192));}catch(error){if(error instanceof AdmissionError)throw error;throw new JobError('INVALID_INPUT');}
    const parsed=jobSubmission.safeParse(raw);if(!parsed.success)throw new JobError('INVALID_INPUT');
    return Response.json({id:await backend.admit(subject,parsed.data)},{status:202,headers:privateHeaders});}),
   read:(request:Request,id:string)=>respond(async()=>{const {subject,backend}=await context();const url=new URL(request.url),cursor=jobCursor.safeParse(url.searchParams.get('after')??'0');

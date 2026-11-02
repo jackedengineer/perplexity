@@ -20,14 +20,19 @@ export function workerBudgetKey(env:Environment=process.env){
  if(!key||!key.startsWith(prefix)||!/^(?:live|test)-[A-Za-z0-9-]{1,55}$/u.test(key))throw new Error('Mode-bound job namespace required');
  return key;
 }
-export function jobConfiguration(env:Environment=process.env){
+export function jobAccessConfiguration(env:Environment=process.env){
  const mode=env.JOB_ENVIRONMENT??'TEST';
  if(mode!=='TEST'&&mode!=='LIVE')throw new Error('Unknown job environment');
- if(mode==='LIVE'&&(env.ENABLE_PRODUCTION_JOBS!=='true'||env.ENABLE_DURABLE_JOB_SANDBOX==='true'))throw new Error('Production jobs are disabled');
+ if(mode==='LIVE'&&env.ENABLE_DURABLE_JOB_SANDBOX==='true')throw new Error('Production sandbox is forbidden');
  return {mode:mode as JobEnvironment,databaseUrl:mode==='LIVE'?cloudflareProductionDatabase(env):sandboxDatabaseUrl(env),budgetKey:workerBudgetKey(env)};
+}
+export function jobConfiguration(env:Environment=process.env){
+ const config=jobAccessConfiguration(env);
+ if(config.mode==='LIVE'&&env.ENABLE_PRODUCTION_JOBS!=='true')throw new Error('Production jobs are disabled');
+ return config;
 }
 export function jobMaintenanceConfiguration(env:Environment=process.env){
  if(env.JOB_ENVIRONMENT!=='LIVE')return jobConfiguration(env);
  if(env.ENABLE_DURABLE_JOB_SANDBOX==='true'||env.ENABLE_RAZORPAY_LIVE_BILLING!=='true'&&env.ENABLE_PRODUCTION_JOBS!=='true')throw new Error('Production maintenance is disabled');
- return {mode:'LIVE' as const,databaseUrl:cloudflareProductionDatabase(env),budgetKey:workerBudgetKey(env)};
+ return jobAccessConfiguration(env);
 }

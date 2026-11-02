@@ -1,5 +1,5 @@
 import {expect,it} from 'vitest';
-import {jobConfiguration,jobMaintenanceConfiguration} from '@/server/jobs/configuration';
+import {jobAccessConfiguration,jobConfiguration,jobMaintenanceConfiguration} from '@/server/jobs/configuration';
 import {paymentConfiguration} from '@/server/payments/config';
 
 const database='postgresql://perplex_web:synthetic@ep-small-bread-b3we4v54-pooler.c-4.ap-southeast-1.aws.neon.tech/perplex?sslmode=verify-full';
@@ -8,6 +8,7 @@ const production={APPLICATION_ENV:'production',DEPLOYMENT_PLATFORM:'cloudflare',
 it('keeps authenticated financial recovery configured while new research is paused',()=>{
  const paused={...production,ENABLE_PRODUCTION_JOBS:'false',ENABLE_RAZORPAY_LIVE_BILLING:'true'};
  expect(()=>jobConfiguration(paused)).toThrow();
+ expect(jobAccessConfiguration(paused)).toEqual({mode:'LIVE',databaseUrl:database,budgetKey:'live-pilot-20261102'});
  expect(jobMaintenanceConfiguration(paused)).toEqual({mode:'LIVE',databaseUrl:database,budgetKey:'live-pilot-20261102'});
  for(const patch of [{ENABLE_RAZORPAY_LIVE_BILLING:'false'},{DATABASE_URL:database.replace('perplex_web','perplex_owner')},
   {BETTER_AUTH_URL:'https://untrusted.test'},{ENABLE_DURABLE_JOB_SANDBOX:'true'},{JOB_OPERATOR_BUDGET_KEY:'test-fixture'}]){
