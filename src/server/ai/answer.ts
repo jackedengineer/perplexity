@@ -10,7 +10,7 @@ import { citedDraftSchema,renderCitedDraft } from "./cited-draft";
 export type DraftInput = { question: string;interpretation?:string;answerLanguage?:string;evidence: EvidencePackage };
 export type PrivateDraft = { text: string;usage: ProviderUsage };
 export interface AnswerProvider { readonly modelId?: string;prepare?(input:DraftInput):DraftInput;generate(input: DraftInput,options: ExecutionOptions): Promise<PrivateDraft>; usage?(): ProviderUsage | undefined }
-export function createAnswerProvider(config: SafetyModelConfig,request: typeof fetch = fetch,maxOutputTokens:600|1200=1200): AnswerProvider {
+export function createAnswerProvider(config: SafetyModelConfig,request: typeof fetch = fetch,maxOutputTokens:600|1200=1200,maxDurationMs:12000|45000=12000): AnswerProvider {
   let usage: ProviderUsage | undefined;
   const boundedFetch = boundedModelFetch(request);
   const router = createOpenRouter({ apiKey: config.apiKey,compatibility: "strict",fetch: async(url,init)=>{
@@ -28,14 +28,14 @@ export function createAnswerProvider(config: SafetyModelConfig,request: typeof f
     async generate(input,options) {
       usage = undefined;
       input=prepareDraftInput(input);const evidence=input.evidence;
-      return boundedWork(options,12000,async(signal)=>{
+      return boundedWork(options,maxDurationMs,async(signal)=>{
         const result = await generateText({ model: router.chat(config.modelId,{
           provider: { only: [config.provider],allow_fallbacks: false,require_parameters: true,data_collection: "deny",zdr: true,
             max_price: { prompt: 0.5,completion: 2,request: 0 } },
           ...(!isVerifiedNonReasoningModel(config.modelId) ? {reasoning: { enabled: false as const,exclude: true as const,effort: "none" as const }} : {}),
           usage: { include: true },extraBody: { plugins: [] },
         }),output: Output.object({schema:citedDraftSchema(evidence)}),system: ANSWER_PROMPT,prompt: draftPrompt(input),
-          maxOutputTokens,maxRetries: 0,abortSignal: signal,timeout: 12000,tools: {},toolChoice: "none",
+          maxOutputTokens,maxRetries: 0,abortSignal: signal,timeout: maxDurationMs,tools: {},toolChoice: "none",
           experimental_telemetry: { isEnabled: false,recordInputs: false,recordOutputs: false },
         });
         const meta = result.providerMetadata?.openrouter?.usage;
