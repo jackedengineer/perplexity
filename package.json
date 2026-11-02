@@ -39,7 +39,7 @@
     "jobs:dev": "node tools/trigger-cli/node_modules/trigger.dev/dist/esm/index.js dev start --env-file .env.jobs.local --max-concurrent-runs 1 --skip-update-check --skip-telemetry",
     "jobs:dispatch": "tsx scripts/jobs-dispatch.ts",
     "billing:verify": "tsx scripts/verify-live-billing.ts",
-    "cf:build": "opennextjs-cloudflare build && node scripts/verify-cloudflare-static-cache.mjs && opennextjs-cloudflare populateCache local",
+    "cf:build": "node scripts/verify-cloudflare-build-env.mjs && opennextjs-cloudflare build && node scripts/verify-cloudflare-static-cache.mjs && opennextjs-cloudflare populateCache local",
     "cf:preview": "wrangler dev --local --port 8787"
   },
   "dependencies": {
