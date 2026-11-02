@@ -1,4 +1,4 @@
-import {configuredResearchModels} from '@/server/deep-research/configuration';
+import {configuredJobResearchModels} from '@/server/jobs/cloudflare-configuration';
 import {billingEnabled} from '@/server/payments/service';
 import {notFound} from 'next/navigation';
 import {getCurrentSession} from '@/lib/current-session';
@@ -13,6 +13,6 @@ export default async function JobsPage({searchParams}:{searchParams:Promise<{job
  const params=await searchParams,parsed=jobId.safeParse(params.job);
  const initial=await listJobs(getDb(),session.user.id);
  const selected=parsed.success?parsed.data:initial.find(j=>['QUEUED','RUNNING'].includes(j.state))?.id??null;
- let deepAvailable=false;try{configuredResearchModels();deepAvailable=jobsEnabled();}catch{/* Default off until providers are configured. */}
+ let deepAvailable=false;try{configuredJobResearchModels();deepAvailable=jobsEnabled();}catch{/* Default off until providers are configured. */}
  return <JobConsole key={selected??'new'} initialJobs={initial.map(j=>({...j,createdAt:j.createdAt.toISOString()}))} initialId={selected} deepAvailable={deepAvailable} billingAvailable={billingEnabled()} environment={jobAccessConfiguration().mode}/>;
 }
