@@ -1,3 +1,4 @@
+import {PRO_OFFER} from '@/lib/pro-offer';
 import {and,eq,gt,inArray,lte,or,sql} from 'drizzle-orm';
 import {billingCheckouts,jobPeriods,maintenanceStatus,operatorUsageBuckets} from '@/db/schema';
 import {jobConfiguration} from '@/server/jobs/configuration';
@@ -8,7 +9,7 @@ import {databaseNow,type JobTransaction} from '@/server/jobs/store';
 export type LivePilot={budgetKey:string;providerExpiresAt:Date};
 const deliveryWindowMs=35*86400000;
 // Seven reports plus one full reserved retry each. Unknown spend is never released.
-const minimumCapacity=14n*deepResearch.steps.reduce((n,s)=>n+s.capMicroUsd,0n);
+const minimumCapacity=BigInt(PRO_OFFER.maxStartedAttempts)*deepResearch.steps.reduce((n,s)=>n+s.capMicroUsd,0n);
 export function livePilotConfiguration(env:Record<string,string|undefined>=process.env):LivePilot{
  const config=jobConfiguration(env),expiry=env.PAID_PILOT_PROVIDER_EXPIRES_AT;
  if(config.mode!=='LIVE'||env.ENABLE_RAZORPAY_LIVE_CHECKOUT!=='true'||!expiry||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(expiry))throw new JobError('DISABLED');

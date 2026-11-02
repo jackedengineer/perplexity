@@ -31,7 +31,7 @@ export default async function PricingPage(){
       and private research belong to your account. A run becomes available only after the server verifies a
       captured subscription payment. Approving a payment mandate alone does not grant access.</p>
     <p>A completed report uses one run. Failed or cancelled work does not consume a completed-run allowance.
-      Only one research job can run at a time. The service may temporarily pause new work during provider
+      To prevent repeated cancellations from exhausting shared capacity, the paid month includes at most {PRO_OFFER.maxStartedAttempts} started attempts, including failed or cancelled work. Cancelling before execution starts does not use an attempt. Only one research job can run at a time. The service may temporarily pause new work during provider
       outages or budget exhaustion; an allowance is not a guarantee of immediate availability.</p>
     <h2>Cancellation and refunds</h2>
     <p>This pilot does not renew automatically. Access already paid for

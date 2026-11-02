@@ -6,6 +6,7 @@ export const PRO_OFFER = {
   currency: 'INR',
   interval: 'month',
   deepResearchRuns: 7,
+  maxStartedAttempts: 14,
   status: 'COMING_SOON',
 } as const;
 

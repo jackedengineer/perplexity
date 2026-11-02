@@ -1,3 +1,4 @@
+import {PRO_OFFER} from '@/lib/pro-offer';
 import {createHash,randomUUID} from 'node:crypto';
 import {and,eq,gt,inArray,isNull,lte,or,sql} from 'drizzle-orm';
 import {appUsers,durableJobs as jobs,jobPeriods as periods,jobReservations as reservations,jobSteps as steps,jobOutbox as outbox,jobEvents as events,operatorUsageBuckets as budgets,jobResearchInputs,jobCheckpoints} from '@/db/schema';
@@ -30,6 +31,13 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
    .orderBy(periods.endsAt,periods.id).limit(1).for('update');
   if(!period)throw new JobError('PAYMENT_REQUIRED');
   if(period.reservedJobs+period.spentJobs>=period.jobLimit)throw new JobError('QUOTA');
+  // Financial step rows survive content deletion. Bound billable starts under
+  // the existing owner/period locks, separately from delivered report credits.
+  if(environment==='LIVE'){
+   const attempts=await tx.select({id:jobs.id}).from(jobs).where(and(eq(jobs.periodId,period.id),
+    sql`EXISTS (SELECT 1 FROM ${steps} WHERE ${steps.jobId}=${jobs.id} AND ${steps.capMicroUsd}>0 AND ${steps.startedAt} IS NOT NULL)`)).limit(PRO_OFFER.maxStartedAttempts);
+   if(attempts.length>=PRO_OFFER.maxStartedAttempts)throw new JobError('QUOTA');
+  }
   await tx.execute(sql`SELECT ensure_operator_day(${budgetKey})`);
   // Same ascending UUID operator lock order as FAST and the reviewed renewal function.
   const windows=await tx.select().from(budgets).where(and(eq(budgets.budgetKey,budgetKey),lte(budgets.startsAt,now),gt(budgets.endsAt,now))).orderBy(budgets.id).limit(3).for('update');

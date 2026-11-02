@@ -36,3 +36,18 @@ it('charges exactly one completed LIVE report and preserves the historical TEST 
  expect(periods.find(p=>p.environment==='TEST')).toMatchObject({reservedJobs:0,spentJobs:0,jobLimit:10});
  expect((await readJob(f.db,f.subject,id)).report?.sections).toHaveLength(3);
 });
+
+it('bounds billable LIVE attempts even when cancelled content is deleted',async()=>{
+ const {removeJobContent}=await import('@/server/jobs/privacy');
+ // Two billable attempts already exist above: one stopped and one delivered.
+ // Pre-dispatch cancellation stays free; deletion cannot reset paid activity.
+ const queued=await submit();await cancelJob(f.db,f.subject,queued);
+ for(let i=2;i<14;i++){
+  const id=await submit(),lease=(await claimJob(f.db,id,f.key,'LIVE'))!;
+  await startStep(f.db,lease,'input');await cancelJob(f.db,f.subject,id);
+  await removeJobContent(f.db,f.subject,id);
+ }
+ await expect(submit()).rejects.toMatchObject({code:'QUOTA'});
+ const [period]=await f.db.select().from(jobPeriods).where(eq(jobPeriods.environment,'LIVE'));
+ expect(period).toMatchObject({spentJobs:1,reservedJobs:0});
+});

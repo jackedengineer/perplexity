@@ -1,3 +1,4 @@
+import {PRO_OFFER} from '@/lib/pro-offer';
 import {PublicPolicy} from '@/components/public-policy';
 
 export const metadata={title:'Terms of use'};
@@ -38,7 +39,7 @@ export default function TermsPage(){
     <p>Purchases are available only when a funded pilot seat is available in Billing. The Pro offer is ₹999 for one month and seven completed Deep
       Research reports in each verified paid month. Browser Tasks are excluded. Unused reports expire at
       the end of the paid period without rollover. Failed or cancelled research does not spend a completed
-      report allowance. A subscription is not active merely because a payment mandate was authenticated.</p>
+      report allowance. The paid month permits at most {PRO_OFFER.maxStartedAttempts} attempts that begin provider work, including failed or cancelled attempts; cancellation before execution is excluded. A subscription is not active merely because a payment mandate was authenticated.</p>
     <p>Razorpay handles payment authorization for one monthly billing cycle. This pilot does not renew
       automatically; further paid periods require a separately available, funded offer. Verified access
       already paid for continues until its displayed end. Closing checkout, signing out or deleting a
