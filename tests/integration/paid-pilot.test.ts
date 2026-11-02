@@ -42,7 +42,7 @@ it('releases a natively expired unpaid checkout but retains an active paid-throu
  await expect(check()).rejects.toMatchObject({code:'QUOTA'});
  const unexpected=async()=>{throw new Error('Unexpected provider mutation');};
  const api:RazorpayApi={keyId:'rzp_live_fixture',create:unexpected,plan:unexpected,cancel:unexpected,payment:unexpected,subscriptions:unexpected,
-  subscription:async()=>({id:'sub_pilotexpiry',plan_id:row.planId,status:'expired',quantity:1,notes:{checkoutId:row.id,priceKey:row.priceKey}}),invoices:async()=>[]};
+  subscription:async()=>({id:'sub_pilotexpiry',plan_id:row.planId,status:'expired',quantity:1,notes:{checkoutId:row.id,priceKey:'pro-live-monthly-inr-v1'}}),invoices:async()=>[]};
  await reconcileCheckout(f.db,row.id,api);
  expect((await f.db.select().from(billingCheckouts).where(eq(billingCheckouts.id,row.id)))[0].state).toBe('CANCELLED');
  await expect(check()).resolves.toBeUndefined();
