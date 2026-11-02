@@ -9,7 +9,7 @@ import {researchModels,researchReport} from '@/server/deep-research/contracts';
 import {readCheckpoint} from '@/server/deep-research/checkpoints';
 import {appendEvent,databaseNow,ownerFor,type JobDatabase} from './store';
 import type {JobEnvironment} from './configuration';
-export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetKey:string,models?:import('zod').infer<typeof researchModels>,environment:JobEnvironment='TEST'){
+export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetKey:string,models?:import('zod').infer<typeof researchModels>,environment:JobEnvironment='TEST',beforeCommit?:()=>Promise<void>){
  const parsed=jobSubmission.safeParse(raw);if(!parsed.success||!budgetKey)throw new JobError('INVALID_INPUT');
  const input=parsed.data,manifest=manifestFor(input.workflow);
  if(environment==='LIVE'&&(input.workflow!=='deep-research-v1'||!budgetKey.startsWith('live-')))throw new JobError('INVALID_INPUT');
@@ -23,7 +23,7 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
   const owner=await ownerFor(tx,subject);
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'job-admission:'+owner},0))`);
   const [prior]=await tx.select().from(jobs).where(and(eq(jobs.userId,owner),eq(jobs.requestId,input.requestId)));
-  if(prior){if(prior.deletedAt)throw new JobError('NOT_FOUND');if(prior.fingerprint!==fingerprint)throw new JobError('CONFLICT');return prior.id;}
+  if(prior){if(prior.deletedAt)throw new JobError('NOT_FOUND');if(prior.fingerprint!==fingerprint)throw new JobError('CONFLICT');if(['QUEUED','RUNNING'].includes(prior.state))await beforeCommit?.();return prior.id;}
   if((await tx.select({id:jobs.id}).from(jobs).where(and(eq(jobs.userId,owner),inArray(jobs.state,['QUEUED','RUNNING']))).limit(1)).length)throw new JobError('CONFLICT');
   const now=await databaseNow(tx);
   const [period]=await tx.select().from(periods).where(and(eq(periods.userId,owner),eq(periods.environment,environment),eq(periods.state,'ACTIVE'),lte(periods.startsAt,now),gt(periods.endsAt,now)))
@@ -44,6 +44,9 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
   await tx.insert(steps).values(manifest.steps.map(s=>({jobId:job.id,...s})));
   if(input.workflow==='deep-research-v1')await tx.insert(jobResearchInputs).values({jobId:job.id,snapshot:{question:input.question,locale:input.locale,models:researchModels.parse(models),policy:'v1',version:'deep-research-v1'}});
   await tx.insert(outbox).values({jobId:job.id});await appendEvent(tx,job.id,'QUEUED');
+  // A failed external wake-up rolls back the whole admission, rather than
+  // accepting work whose dispatch hint was never durably recorded.
+  await beforeCommit?.();
   return job.id;
  });
 }
