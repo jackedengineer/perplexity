@@ -81,3 +81,21 @@ it('reconciles due checkouts only for the configured provider mode',async()=>{
  expect(subscriptions).not.toHaveBeenCalled();
  expect(await f.db.select().from(billingCheckouts).where(and(eq(billingCheckouts.id,checkoutId),eq(billingCheckouts.environment,'LIVE')))).toHaveLength(1);
 });
+it('limits each owner to one new LIVE pilot reservation per rolling day, even after unpaid expiry',async()=>{
+ // A terminal, unpaid attempt releases global capacity but cannot immediately
+ // reserve the only seat again with another request UUID.
+ const {appUsers}=await import('@/db/schema');
+ const subject='pilot-repeat-'+crypto.randomUUID(),owner=crypto.randomUUID();
+ await f.pg.query('INSERT INTO "user"(id,name,email,email_verified) VALUES ($1,$1,$2,true)',[subject,subject+'@example.test']);
+ await f.db.insert(appUsers).values({id:owner,authSubject:subject});
+ const [prior]=await f.db.insert(billingCheckouts).values({userId:owner,requestId:crypto.randomUUID(),planId:'plan_liveflow',priceKey:liveOffer.priceKey,environment:'LIVE',state:'CANCELLED',providerState:'expired'}).returning();
+ const noCreate=vi.fn(async(id:string)=>({...subscription(),id:'sub_cooldown',notes:{checkoutId:id,priceKey:liveOffer.priceKey}})),request={requestId:crypto.randomUUID(),priceKey:liveOffer.priceKey};
+ await expect(startCheckout(f.db,subject,request,'plan_liveflow',{...api,create:noCreate},pilot)).rejects.toMatchObject({code:'QUOTA'});
+ expect(noCreate).not.toHaveBeenCalled();
+ // Idempotent reads of the original terminal intent remain available.
+ expect(await startCheckout(f.db,subject,{...request,requestId:prior.requestId},'plan_liveflow',{...api,create:noCreate},pilot)).toMatchObject({state:'CANCELLED'});
+ await f.db.update(billingCheckouts).set({createdAt:new Date(Date.now()-25*3600000)}).where(eq(billingCheckouts.id,prior.id));
+ await f.db.update(maintenanceStatus).set({completedAt:new Date()});
+ expect(await startCheckout(f.db,subject,request,'plan_liveflow',{...api,create:noCreate},pilot)).toMatchObject({state:'READY'});
+ expect(noCreate).toHaveBeenCalledTimes(1);
+});

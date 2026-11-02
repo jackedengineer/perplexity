@@ -27,6 +27,13 @@ export async function startCheckout(db:JobDatabase,subject:string,raw:unknown,pl
   if(open)throw new JobError('CONFLICT');
   const [active]=await tx.select({id:periods.id}).from(periods).where(and(eq(periods.userId,owner),eq(periods.environment,mode),eq(periods.state,'ACTIVE'),gt(periods.endsAt,sql`clock_timestamp()`))).limit(1);
   if(active)throw new JobError('CONFLICT');
+  if(mode==='LIVE'){
+   // The owner lock above serializes new UUIDs from the same account. Releasing
+   // an unpaid global seat must not let its owner monopolize it every hour.
+   const now=await databaseNow(tx);
+   const [recent]=await tx.select({id:checkouts.id}).from(checkouts).where(and(eq(checkouts.userId,owner),eq(checkouts.environment,'LIVE'),gt(checkouts.createdAt,new Date(now.getTime()-86400000)))).limit(1);
+   if(recent)throw new JobError('QUOTA');
+  }
   if(mode==='LIVE')await assertPilotCapacity(tx,pilot!);
   const [row]=await tx.insert(checkouts).values({userId:owner,requestId:input.requestId,priceKey:input.priceKey,environment:mode,planId,state:'CREATING'}).returning();return {row,create:true};
  });
