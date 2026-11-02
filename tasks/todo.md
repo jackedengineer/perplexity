@@ -361,3 +361,14 @@ renewal/dispute delivery and production financial restore acceptance remain open
 - [ ] Session and guest identity boundaries, catalog authorization and credit ledger invariants pass.
 - [ ] Merchant activation, recurring payment-method availability and commercial/tax treatment are confirmed for the actual business; all experiments can be demonstrated in sandbox before live approval.
 - [ ] Duplicate/out-of-order billing, renewals, refunds, cancellation and unknown outcomes have recovery evidence. No scale infrastructure is added without a measured reason.
+# Cloudflare compatibility — November 2, 2026
+
+- [ ] CF01: Pin OpenNext/Wrangler; public app and disabled APIs build/run in workerd.
+- [ ] CF02: Preserve Neon transactions and auth isolation with request-safe clients;
+  verify repeated/concurrent requests and trusted Cloudflare IP handling.
+- [ ] CF03: Browser-check sign-in, private ownership, approved rendering, progress
+  and cancellation; run regressions without paid AI calls.
+- [ ] CF04: Verify an isolated hosted Free deployment and actual resource use;
+  record limits honestly, push focused commits and open a PR.
+- [ ] Later activation: reviewed production worker/billing, adequate operating
+  funding, final domain/OAuth/Turnstile/Razorpay, migrations and hosted acceptance.
