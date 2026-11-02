@@ -39,8 +39,13 @@ test("unknown routes show an actionable 404", async ({ page }) => {
   await expect(page).toHaveURL("/");
 });
 
-test('unfinished paid job and checkout boundaries stay off on the default deployment',async({request})=>{
- expect((await request.get('/reviewer-sign-in')).status()).toBe(404);
+test('unfinished paid job and checkout boundaries stay off on the default deployment',async({request,page})=>{
+ // Dynamic notFound() may stream with HTTP 200 after the layout has started.
+ // Assert that access is denied in the rendered UI, not the shell's status.
+ await page.goto('/reviewer-sign-in');
+ await expect(page.getByRole('heading',{name:'This page wandered off.'})).toBeVisible();
+ await expect(page.getByRole('textbox')).toHaveCount(0);
+ await expect(page.locator('meta[name="robots"]').last()).toHaveAttribute('content',/noindex/);
  for(const path of ['/api/jobs','/api/billing'])expect((await request.get(path)).status()).toBe(404);
  expect((await request.post('/api/jobs',{data:{version:1,workflow:'execution-check-v1',requestId:crypto.randomUUID()}})).status()).toBe(404);
  expect((await request.post('/api/webhooks/razorpay',{data:{event:'subscription.charged'}})).status()).toBe(404);
