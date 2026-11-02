@@ -26,3 +26,8 @@ export function jobConfiguration(env:Environment=process.env){
  if(mode==='LIVE'&&(env.ENABLE_PRODUCTION_JOBS!=='true'||env.ENABLE_DURABLE_JOB_SANDBOX==='true'))throw new Error('Production jobs are disabled');
  return {mode:mode as JobEnvironment,databaseUrl:mode==='LIVE'?cloudflareProductionDatabase(env):sandboxDatabaseUrl(env),budgetKey:workerBudgetKey(env)};
 }
+export function jobMaintenanceConfiguration(env:Environment=process.env){
+ if(env.JOB_ENVIRONMENT!=='LIVE')return jobConfiguration(env);
+ if(env.ENABLE_DURABLE_JOB_SANDBOX==='true'||env.ENABLE_RAZORPAY_LIVE_BILLING!=='true'&&env.ENABLE_PRODUCTION_JOBS!=='true')throw new Error('Production maintenance is disabled');
+ return {mode:'LIVE' as const,databaseUrl:cloudflareProductionDatabase(env),budgetKey:workerBudgetKey(env)};
+}

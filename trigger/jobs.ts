@@ -3,10 +3,10 @@ import {task,schedules,tasks} from '@trigger.dev/sdk';
 import {z} from 'zod';
 import {eq,and} from 'drizzle-orm';
 import {durableJobs,jobReservations} from '../src/db/schema';
-import {workerDatabase,workerBudgetKey} from '../src/server/jobs/connection';
+import {workerDatabase,maintenanceDatabase,workerBudgetKey} from '../src/server/jobs/connection';
 import {consumeJob} from '../src/server/jobs/consumer';
 import {automaticDispatch} from '../src/server/jobs/transport';
-import {jobConfiguration} from '../src/server/jobs/configuration';
+import {jobConfiguration,jobMaintenanceConfiguration} from '../src/server/jobs/configuration';
 import {recordJobMaintenance,recoverWorkerServices} from '../src/server/jobs/maintenance';
 import {paymentConfiguration} from '../src/server/payments/config';
 import {configuredResearchModels} from '../src/server/deep-research/configuration';
@@ -28,8 +28,8 @@ export const watchJob=task({id:'watch-job-v1',maxDuration:30,retry:{maxAttempts:
 export const maintainJobs=schedules.task({id:'maintain-jobs-v1',
  ...(process.env.ENABLE_JOB_SCHEDULE==='true'?{cron:{pattern:'* * * * *',environments:['PRODUCTION','STAGING'] as ['PRODUCTION','STAGING']}}:{}),
  maxDuration:60,retry:{maxAttempts:1},queue:{name:'job-maintenance-v1',concurrencyLimit:1},
- run:async()=>{const db=workerDatabase(),key=workerBudgetKey(),mode=jobConfiguration().mode;
+ run:async()=>{const db=maintenanceDatabase(),key=workerBudgetKey(),mode=jobMaintenanceConfiguration().mode;
   return recordJobMaintenance(db,key,()=>recoverWorkerServices({
-   dispatch:()=>automaticDispatch(db,key),billing:()=>maintainBilling(db),cleanup:()=>pruneJobEvidence(db),
-   ready:()=>{if(mode==='LIVE'){paymentConfiguration();configuredResearchModels();}},
+   dispatch:async()=>{if(mode==='LIVE'&&process.env.ENABLE_PRODUCTION_JOBS!=='true')return 0;return automaticDispatch(db,key);},billing:()=>maintainBilling(db),cleanup:()=>pruneJobEvidence(db),
+   ready:()=>{if(mode==='LIVE'){jobConfiguration();paymentConfiguration();configuredResearchModels();}},
   }));}});
