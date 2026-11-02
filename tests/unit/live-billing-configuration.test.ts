@@ -8,6 +8,7 @@ const live={ENABLE_RAZORPAY_LIVE_BILLING:'true',VERCEL_ENV:'production',BETTER_A
  RAZORPAY_KEY_ID:'rzp_live_synthetic',RAZORPAY_KEY_SECRET:'s'.repeat(32),RAZORPAY_PRO_PLAN_ID:'plan_synthetic',RAZORPAY_WEBHOOK_SECRET:'w'.repeat(32)};
 it('requires explicit production billing, canonical origin, live key and isolated runtime database',()=>{
  expect(paymentConfiguration(live)).toMatchObject({mode:'LIVE',planId:'plan_synthetic',purchasesEnabled:false});
+ expect(paymentConfiguration({...live,ENABLE_RAZORPAY_LIVE_CHECKOUT:'true'}).purchasesEnabled).toBe(false);
  for(const patch of [{VERCEL_ENV:'preview'},{ENABLE_RAZORPAY_LIVE_BILLING:'false'},{ENABLE_RAZORPAY_TEST_CHECKOUT:'true'},
   {RAZORPAY_KEY_ID:'rzp_test_synthetic'},{BETTER_AUTH_URL:'https://attacker.test'},
   {DATABASE_URL:database.replace('ep-small-bread','ep-other')},{DATABASE_URL:database.replace('perplex_web','perplex_owner')},

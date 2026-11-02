@@ -15,5 +15,5 @@ export function paymentConfiguration(env:Record<string,string|undefined>=process
  }
  // Billing reads, cancellation and signed recovery remain available with purchases paused.
  // Live purchases require a separate fulfillment readiness check in the HTTP service.
- return {mode,purchasesEnabled:mode==='TEST'||env.ENABLE_RAZORPAY_LIVE_CHECKOUT==='true',api:createRazorpay({keyId:keys.data.RAZORPAY_KEY_ID,keySecret:keys.data.RAZORPAY_KEY_SECRET,allowLive:mode==='LIVE'}),planId:keys.data.RAZORPAY_PRO_PLAN_ID,keySecret:keys.data.RAZORPAY_KEY_SECRET,webhookSecret:keys.data.RAZORPAY_WEBHOOK_SECRET};
+ return {mode,purchasesEnabled:mode==='TEST',api:createRazorpay({keyId:keys.data.RAZORPAY_KEY_ID,keySecret:keys.data.RAZORPAY_KEY_SECRET,allowLive:mode==='LIVE'}),planId:keys.data.RAZORPAY_PRO_PLAN_ID,keySecret:keys.data.RAZORPAY_KEY_SECRET,webhookSecret:keys.data.RAZORPAY_WEBHOOK_SECRET};
 }
