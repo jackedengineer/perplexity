@@ -1,5 +1,31 @@
 # Current release checks — 1 November 2026
 
+## Temporary reviewer login — November 2 follow-up
+
+- [x] Owner explicitly authorized one seven-day reviewer-only password login.
+  Native salted password hashing, exact subject/email/origin binding, account
+  creation-time binding, capped session expiry/renewal and fail-closed application
+  session validation are implemented. Public registration/recovery/password
+  changes and reviewer profile/social linking are denied. Guest history is not
+  transferred to the shared reviewer. No admin or paid-access bypass is granted.
+- [x] **750/750** offline tests, lint/types/production build; **2/2** actual
+  development Neon desktop/mobile login, ownership and expiry browser cases;
+  **10/10** default-off production-build cases including reviewer-route 404.
+  Synthetic client IPs isolate test attempts; the five/minute limit is unchanged.
+- [x] Real in-app reviewer login reaches a fresh development workspace with no
+  owner conversations or captured console warnings/errors. Provider keys are
+  deliberately absent in that fixture; this is login verification, not AI testing.
+- [x] Production operator utility created the requested fresh reviewer identity
+  transactionally, with a native password hash and no subscription/budget writes.
+  The ignored receipt contains no plaintext password. Existing emails/subjects
+  are never adopted or overwritten. [Operations and revocation](reviewer-access.md).
+- [ ] Exact-candidate CI and code/security reviews; production deployment,
+  reviewer setting activation and actual hosted sign-in/ownership acceptance.
+  Database creation alone does not mean credentials are already usable online.
+
+The combined **$2** cap, account/operator ceilings and existing financial holds
+remain unchanged. No paid AI calls or financial transactions ran in this follow-up.
+
 Decision: **HOLD full release acceptance.** The public site and guest entry are
 already deployed. This section supersedes historical status below. The original
 record is also retained in [the October 23 checklist](release-checklist-20261023.md).
