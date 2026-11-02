@@ -8,7 +8,7 @@ vi.mock('pg',()=>({Pool:class extends EventEmitter{
 vi.mock('drizzle-orm/node-postgres',()=>({drizzle:(pool:unknown)=>({pool})}));
 vi.mock('@/lib/env',()=>({getServerEnv:()=>({DATABASE_URL:'postgresql://localhost/lifetime'})}));
 vi.mock('@/lib/auth-factory',()=>({createAuth:()=>{const auth={};mocks.auth(auth);return auth;}}));
-beforeEach(()=>{vi.resetModules();mocks.instances.length=0;});
+beforeEach(()=>{vi.resetModules();vi.clearAllMocks();mocks.instances.length=0;});
 afterEach(()=>{vi.unstubAllEnvs();vi.restoreAllMocks();});
 it('keeps database and auth instances separate between Workers requests',async()=>{
  vi.stubEnv('DEPLOYMENT_PLATFORM','cloudflare');

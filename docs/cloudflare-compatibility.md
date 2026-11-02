@@ -4,6 +4,16 @@ Current follow-up: [CPU optimizations and acceptance limits](cloudflare-cpu.md).
 The optimized public preview passes 42 combined browser checks and 771 offline
 tests. Production cutover remains on hold; historical initial-proof evidence follows.
 
+November 2 review follow-up: the lifetime suite now explicitly clears mock call
+histories between cases, separately from module resets and spy restoration. The
+reported singleton failure did not reproduce in the pinned Vitest 5 baseline
+(three cases passed before this change); the explicit cleanup makes test isolation
+independent of that behavior. Fresh exact-head CI and reviews are still required.
+The owner has authorized merging and eventual production/payment launch after
+verification and is upgrading Workers separately. That changes the intended next
+phase; it does not establish an active subscription or clear the hosted identity,
+job fulfillment and financial acceptance gates recorded below.
+
 Authorized November 2, 2026: preserve the $2 combined OpenRouter cap, use free
 Cloudflare resources, verify the application in the browser, push focused commits
 and open a PR. Intended eventual hostname: `perplexity.jacked.dev` (owner's domain,
