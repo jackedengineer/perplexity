@@ -20,8 +20,8 @@ it('accepts only immutable public build output',async()=>{
 it.each(['/workspace','/search/private-id','/reviewer-sign-in','/api/auth/get-session','/api/conversations','/pricing','/billing','/jobs'])('rejects accidentally prerendered private/runtime routes: %s',async path=>{
  await expect(verify({...publicRoutes(),[path]:{initialRevalidateSeconds:false}})).rejects.toThrow('Unexpected prerendered routes');
 });
-it('permits only a default-disabled reviewer 404, never a cached login form',async()=>{
- expect((await verify({...publicRoutes(),'/reviewer-sign-in':{initialStatus:404,initialRevalidateSeconds:false}})).stdout).toContain('excluded');
+it('rejects even a disabled reviewer 404 so later runtime activation can work',async()=>{
+ await expect(verify({...publicRoutes(),'/reviewer-sign-in':{initialStatus:404,initialRevalidateSeconds:false}})).rejects.toThrow('Unexpected prerendered routes');
 });
 it('rejects dynamic route prerenders and revalidation that the read-only cache cannot support',async()=>{
  await expect(verify(publicRoutes(),{'/search/[id]':{}})).rejects.toThrow('Unexpected prerendered routes');
