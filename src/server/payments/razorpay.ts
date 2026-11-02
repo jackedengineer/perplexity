@@ -42,7 +42,7 @@ export function createRazorpay(config:{keyId:string;keySecret:string;allowLive?:
  const mode=paymentMode(config.keyId),offer=offerFor(mode);
  if(!config.keySecret||mode==='LIVE'&&config.allowLive!==true)throw new JobError('DISABLED');
  async function request(path:string,body?:unknown){
-  const response=await fetcher('https://api.razorpay.com/v1/'+path,{method:body===undefined?'GET':'POST',headers:{Authorization:'Basic '+Buffer.from(config.keyId+':'+config.keySecret).toString('base64'),'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(5000),redirect:'error',cache:'no-store'});
+  const response=await fetcher('https://api.razorpay.com/v1/'+path,{method:body===undefined?'GET':'POST',headers:{Authorization:'Basic '+Buffer.from(config.keyId+':'+config.keySecret).toString('base64'),'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(5000),redirect:'manual',cache:'no-store'});
   if(!response.ok){await response.body?.cancel();throw new JobError('UNAVAILABLE');}
   const reader=response.body?.getReader();if(!reader)throw new JobError('UNAVAILABLE');const chunks:Uint8Array[]=[];let total=0;
   try{for(;;){const next=await reader.read();if(next.done)break;total+=next.value.byteLength;if(total>512000)throw new JobError('UNAVAILABLE');chunks.push(next.value);}return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;}

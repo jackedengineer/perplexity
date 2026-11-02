@@ -63,7 +63,7 @@ export function createOpenRouterSafetyProvider(config: SafetyModelConfig, reques
       try {
         response = await request("https://openrouter.ai/api/v1/chat/completions",{
           method: "POST", headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
-          cache: "no-store", redirect: "error", credentials: "omit", signal,
+          cache: "no-store", redirect: "manual", credentials: "omit", signal,
           body,
         });
       } catch(error) {

@@ -44,7 +44,7 @@ it("uses one isolated, tool-free, nonstreaming strict-schema request with fixed 
   expect(await provider.classify(input,new AbortController().signal)).toEqual({ decision: "ALLOW", categoryCodes: [], policyVersion: "v1" });
   const [url,options] = fetcher.mock.calls[0];
   expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
-  expect(options).toMatchObject({ method: "POST", cache: "no-store", redirect: "error", credentials: "omit" });
+  expect(options).toMatchObject({ method: "POST", cache: "no-store", redirect: "manual", credentials: "omit" });
   const body = JSON.parse(options!.body as string);
   expect(body).toMatchObject({ model: "test/classifier-v1", stream: false, temperature: 0, max_completion_tokens: 384, tools: [], tool_choice: "none",
     provider: { only: ["test-provider"], allow_fallbacks: false, require_parameters: true, data_collection: "deny", zdr: true },
