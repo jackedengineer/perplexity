@@ -4,20 +4,44 @@
   "account_id": "afc0353bdd89b39c334efd3db0311ec3",
   "main": "custom-worker.mjs",
   "compatibility_date": "2026-11-02",
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "compatibility_flags": [
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
   "workers_dev": true,
   "preview_urls": false,
-  "routes": [{"pattern": "perplexity.jacked.dev", "custom_domain": true}],
-  "limits": {"cpu_ms": 30000},
-  "placement": {"region": "aws:ap-southeast-1"},
-  "assets": {"directory": ".open-next/assets", "binding": "ASSETS"},
-  "triggers": {"crons": []},
+  "routes": [
+    {
+      "pattern": "perplexity.jacked.dev",
+      "custom_domain": true
+    }
+  ],
+  "limits": {
+    "cpu_ms": 30000
+  },
+  "placement": {
+    "region": "aws:ap-southeast-1"
+  },
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "triggers": {
+    "crons": []
+  },
   "vars": {
     "APPLICATION_ENV": "production",
     "DEPLOYMENT_PLATFORM": "cloudflare",
     "NEXTJS_ENV": "production",
     "BETTER_AUTH_URL": "https://perplexity.jacked.dev",
     "JOB_ENVIRONMENT": "LIVE",
-    "JOB_OPERATOR_BUDGET_KEY": "live-pilot-20261102"
-  }
+    "JOB_OPERATOR_BUDGET_KEY": "live-pilot-20261102",
+    "JOB_EXECUTION_BACKEND": "cloudflare"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "PAID_ACTIVITY",
+      "id": "bc132e64da304ad2ac1974e165cbe74b"
+    }
+  ]
 }

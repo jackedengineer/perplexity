@@ -18,3 +18,18 @@ it('fails closed on other environments, malformed credentials and unsuccessful m
  expect(fetcher).not.toHaveBeenCalled();
  await expect(runCloudflareMaintenance(env,Date.now(),async()=>new Response('{}',{status:503}))).rejects.toThrow('Maintenance unavailable');
 });
+it('runs native paid maintenance directly and keeps hourly recovery independent of worker failure',async()=>{
+ const fetcher=vi.fn(async(request:Request)=>{void request;return new Response('{}');}),paid=vi.fn(async(force:boolean)=>{void force;}),native={...env,JOB_EXECUTION_BACKEND:'cloudflare',JOBS_CRON_SECRET:undefined};
+ await runCloudflareMaintenance(native,Date.UTC(2026,10,2,10,1),fetcher,paid);
+ expect(paid).toHaveBeenCalledWith(false);expect(fetcher).not.toHaveBeenCalled();
+ paid.mockRejectedValueOnce(new Error('Native job unavailable'));
+ await expect(runCloudflareMaintenance(native,Date.UTC(2026,10,2,11,0),fetcher,paid)).rejects.toThrow('Native job unavailable');
+ expect(paid).toHaveBeenLastCalledWith(true);expect(fetcher).toHaveBeenCalledOnce();
+ expect(new URL(fetcher.mock.calls[0][0].url).pathname).toBe('/api/internal/recovery');
+ expect(fetcher.mock.calls[0][0].headers.get('authorization')).toBe('Bearer '+env.CRON_SECRET);
+});
+it('does not silently fall back to Trigger when native maintenance was selected',async()=>{
+ const fetcher=vi.fn(async()=>new Response('{}'));
+ await expect(runCloudflareMaintenance({...env,JOB_EXECUTION_BACKEND:'cloudflare'},Date.now(),fetcher)).rejects.toThrow('Native maintenance unavailable');
+ expect(fetcher).not.toHaveBeenCalled();
+});

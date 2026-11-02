@@ -1,5 +1,6 @@
 import handler from './.open-next/worker.js';
 import {runCloudflareMaintenance} from './src/server/operations/cloudflare-scheduled.ts';
+import {runCloudflarePaidTick} from './src/server/jobs/cloudflare-runtime.ts';
 
 const worker={
  fetch:handler.fetch,
@@ -7,7 +8,7 @@ const worker={
   if(event.cron!=='* * * * *')throw new Error('Unknown maintenance schedule');
   // Invoke the generated handler directly. No public self-fetch, arbitrary
   // target, database credential or provider request is exposed by this wrapper.
-  await runCloudflareMaintenance(env,event.scheduledTime,request=>handler.fetch(request,env,ctx));
+  await runCloudflareMaintenance(env,event.scheduledTime,request=>handler.fetch(request,env,ctx),force=>runCloudflarePaidTick(env,env.PAID_ACTIVITY,force));
  },
 };
 export default worker;
