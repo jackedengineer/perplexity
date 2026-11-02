@@ -27,7 +27,7 @@ export function createRecoveryHttp(dependencies:Dependencies) {
     const supplied=request.headers.get('authorization')??'';
     if(supplied.length>512||!timingSafeEqual(createHash('sha256').update(supplied).digest(),createHash('sha256').update('Bearer '+secret).digest()))throw new AdmissionError('UNAUTHENTICATED');
     if(request.method!=='GET'||request.body!==null||new URL(request.url).search)throw new AdmissionError('INVALID_INPUT');
-    const result=await dependencies.sweep(request.headers.get('user-agent')==='vercel-cron/1.0');
+    const result=await dependencies.sweep(['vercel-cron/1.0','perplex-cloudflare-cron/1.0'].includes(request.headers.get('user-agent')??''));
     dependencies.log({event:'runs.recovery',requestId,outcome:'COMPLETED',durationMs:Math.round(performance.now()-started)});
     return Response.json(result,{headers:{...headers,'X-Request-Id':requestId}});
    }catch(error){dependencies.log({event:'runs.recovery',requestId,outcome:error instanceof AdmissionError?error.code:'UNAVAILABLE',durationMs:Math.round(performance.now()-started)});return failure(error,requestId);}

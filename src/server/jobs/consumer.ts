@@ -31,12 +31,12 @@ export async function consumeJob(db:JobDatabase,rawId:string,options:{stepMs?:nu
   throw error;
  }
 }
-export async function dispatchJobs(db:JobDatabase,send:(claim:DispatchClaim)=>Promise<void>,limit=10,budgetKey?:string){
+export async function dispatchJobs(db:JobDatabase,send:(claim:DispatchClaim)=>Promise<void>,limit=10,budgetKey?:string,strict=false){
  await recoverJobs(db,20,budgetKey);let sent=0;
  for(let i=0;i<Math.min(20,Math.max(1,limit));i++){
   const claim=await claimDispatch(db,budgetKey);if(!claim)break;
   try{await send(claim);await finishDispatch(db,claim,true);sent++;}
-  catch{await finishDispatch(db,claim,false);break;}
+  catch(error){await finishDispatch(db,claim,false);if(strict)throw error;break;}
  }
  return sent;
 }

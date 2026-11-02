@@ -10,6 +10,9 @@ it('keeps the outbox pending when watchdog delivery fails before execution',asyn
  const id=await admitJob(f.db,f.subject,{version:1,workflow:'execution-check-v1',requestId:crypto.randomUUID()},f.key);let executed=false;
  expect(await maintainJobDispatch(f.db,f.key,{watch:async()=>{throw new Error('Transport unavailable');},execute:async()=>{executed=true;}})).toBe(0);
  expect(executed).toBe(false);const [row]=await f.db.select().from(jobOutbox).where(eq(jobOutbox.jobId,id));expect(row.state).toBe('PENDING');expect(row.attempts).toBe(1);
+ await f.db.update(jobOutbox).set({availableAt:new Date(Date.now()-1000)});
+ await expect(maintainJobDispatch(f.db,f.key,{watch:async()=>{throw new Error('Transport unavailable');},execute:async()=>{executed=true;}},true)).rejects.toThrow('Transport unavailable');
+ expect((await f.db.select().from(jobOutbox))[0].state).toBe('PENDING');
 });
 it('redelivers stable keys after an ambiguous execution acknowledgement',async()=>{
  await f.db.update(jobOutbox).set({availableAt:new Date(Date.now()-1000)});

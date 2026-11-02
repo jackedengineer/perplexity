@@ -7,6 +7,9 @@ import {workerDatabase,workerBudgetKey} from '../src/server/jobs/connection';
 import {consumeJob} from '../src/server/jobs/consumer';
 import {automaticDispatch} from '../src/server/jobs/transport';
 import {jobConfiguration} from '../src/server/jobs/configuration';
+import {recordJobMaintenance} from '../src/server/jobs/maintenance';
+import {paymentConfiguration} from '../src/server/payments/config';
+import {configuredResearchModels} from '../src/server/deep-research/configuration';
 const payload=z.strictObject({jobId:z.uuid()});
 export const executeJob=task({id:'execute-job-v1',maxDuration:900,retry:{maxAttempts:1},queue:{name:'durable-jobs-v1',concurrencyLimit:1},
  run:async(raw:unknown)=>{return consumeJob(workerDatabase(),payload.parse(raw).jobId,{budgetKey:workerBudgetKey(),environment:jobConfiguration().mode});}});
@@ -24,5 +27,8 @@ export const watchJob=task({id:'watch-job-v1',maxDuration:30,retry:{maxAttempts:
 export const maintainJobs=schedules.task({id:'maintain-jobs-v1',
  ...(process.env.ENABLE_JOB_SCHEDULE==='true'?{cron:{pattern:'* * * * *',environments:['PRODUCTION','STAGING'] as ['PRODUCTION','STAGING']}}:{}),
  maxDuration:60,retry:{maxAttempts:1},queue:{name:'job-maintenance-v1',concurrencyLimit:1},
- run:async()=>{const db=workerDatabase(),sent=await automaticDispatch(db,workerBudgetKey());
-  try{await maintainBilling(db);}catch{console.warn(JSON.stringify({event:'billing.maintenance',outcome:'UNAVAILABLE'}));}return sent;}});
+ run:async()=>{const db=workerDatabase(),key=workerBudgetKey(),mode=jobConfiguration().mode;
+  return recordJobMaintenance(db,key,async()=>{
+   if(mode==='LIVE'){paymentConfiguration();configuredResearchModels();}
+   const sent=await automaticDispatch(db,key);await maintainBilling(db);return sent;
+  });}});
