@@ -8,7 +8,10 @@ const worker={
   if(event.cron!=='* * * * *')throw new Error('Unknown maintenance schedule');
   // Invoke the generated handler directly. No public self-fetch, arbitrary
   // target, database credential or provider request is exposed by this wrapper.
-  await runCloudflareMaintenance(env,event.scheduledTime,request=>handler.fetch(request,env,ctx),force=>runCloudflarePaidTick(env,env.PAID_ACTIVITY,force));
+  await runCloudflareMaintenance(env,event.scheduledTime,request=>handler.fetch(request,env,ctx),async force=>{
+   const started=performance.now(),outcome=await runCloudflarePaidTick(env,env.PAID_ACTIVITY,force);
+   console.info(JSON.stringify({event:'jobs.cloudflare_tick',outcome,durationMs:Math.round(performance.now()-started)}));
+  });
  },
 };
 export default worker;

@@ -1,4 +1,4 @@
-import {Pool} from 'pg';
+import {Pool,type PoolClient} from 'pg';
 import {drizzle} from 'drizzle-orm/node-postgres';
 import * as schema from '@/db/schema';
 import {jobMaintenanceConfiguration} from './configuration';
@@ -16,7 +16,13 @@ type Environment=Record<string,string|undefined>;
 // No module-level sockets: each scheduled invocation owns and closes its pool.
 export function openCloudflareJobDatabase(databaseUrl:string){
  const pool=new Pool({connectionString:databaseUrl,max:2,connectionTimeoutMillis:5000,query_timeout:10000,statement_timeout:10000,idleTimeoutMillis:10000,application_name:'perplex-cloudflare-jobs'});
- pool.on('error',()=>console.warn(JSON.stringify({event:'jobs.database_pool',outcome:'UNAVAILABLE'})));
+ const removed=new WeakSet<PoolClient>();pool.on('remove',client=>removed.add(client));
+ pool.on('error',(error,client)=>{
+  // workerd may notify TLS close after pg has already removed the client.
+  // Active-query failures and every other socket error remain observable.
+  if(client&&removed.has(client)&&error.message==='This socket has been closed.')return;
+  console.warn(JSON.stringify({event:'jobs.database_pool',outcome:'UNAVAILABLE'}));
+ });
  return {db:drizzle(pool,{schema}) as JobDatabase,close:()=>pool.end()};
 }
 export async function runCloudflarePaidTick(env:Environment,activity:PaidActivityStore|undefined,force=false,open=openCloudflareJobDatabase){
