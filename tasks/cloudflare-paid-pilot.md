@@ -68,3 +68,29 @@ provider events plus native payment/invoice verification; durable worker deliver
 and fenced leases; fixed-target authenticated cron; independently capped provider
 keys and operator reservations. No browser callback grants access, caller-selected
 budget/mode, automatic paid retry or fabricated provider receipt is permitted.
+
+## November 2 active release follow-up
+
+The current state supersedes the initial preparation checklist above. Custom-domain
+DNS, Google/Turnstile and merchant approval are complete. Ordinary research and
+public guest trials pass in the production browser. The explicitly approved
+ordinary period ceiling is $1.70; daily $0.40, November 5 expiry and old $2 envelope
+are unchanged. The separate $5 non-resetting December-12 pilot key and operator
+period exist; the one-hour management credential was revoked. Actual production
+minute cron has completed maintenance and demonstrated idle skip.
+
+Paid checkout remains paused while real hosted Deep Research acceptance finishes.
+The first isolated run completed retrieval but hit the ordinary 12-second draft
+timeout; its unknown cost hold remains. A dedicated bounded 45-second draft window
+keeps the same tokens, provider privacy, cancellation and no-retry controls.
+A reviewed abuse regression now bounds LIVE billable starts to 14 per paid period,
+including failed/stopped work, separately from seven completed report credits.
+Deletion preserves the financial rows used to enforce the bound. See the current
+release checklist for final verification and outstanding gates.
+
+Final functional evidence: 854 offline tests, lint/types, OpenNext and credential
+scan pass. The corrected hosted report completes in approximately 68 seconds,
+with 111,034 microUSD settled and zero hold; the earlier failed attempt retains
+14,000 microUSD unknown exposure. Browser report replay/copy and a separate hosted
+zero-cost running cancellation pass. These are isolated TEST entitlement checks,
+not fabricated LIVE receipts or a comprehensive factual-quality evaluation.

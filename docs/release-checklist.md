@@ -1,63 +1,77 @@
 # Current release checks — 2 November 2026
 
-## Cloudflare native jobs checkpoint
+## Cloudflare public launch and bounded paid pilot
 
-- [x] Custom domain `https://perplexity.jacked.dev` is live on Workers Paid,
-  explicitly placed near Singapore Neon. Existing Railway wildcard and Vercel
-  fallback are retained. Production migrations 0025–0030 and runtime grants pass.
-- [x] Google/reviewer sign-in and approved source rendering were exercised in the
-  real hosted browser. A bounded real rainbow answer produced five citations;
-  saved answer/citation rendering still passes after the worker deployment.
-- [x] Razorpay now explicitly reports the custom-domain website successfully
-  verified. The independent signed LIVE webhook is enabled with eight supported
-  events; unsigned delivery returns 400. No real charge/mandate/refund was made.
-- [x] Trigger rejected both production build backends despite its displayed Free
-  support. The owner selected Cloudflare execution; no Trigger upgrade was made.
-- [x] Native minute cron preserves Postgres outbox claims, delivery-before-consume,
-  fenced leases, per-step receipts, cancellation, deadline recovery and private
-  atomic publication. Per-invocation database pools close after execution. No
-  public execution endpoint or cross-invocation provider-key mutation is added.
-- [x] Dedicated paid provider bindings cannot fall back to the $2 verification key.
-  New paid admission requires a bounded metadata-only activity marker before its
-  transaction commits. Idle minutes skip Neon; hourly recovery remains independent.
-- [x] Lint/types and 848 tests in 128 files pass. OpenNext build passes; 1,775
-  generated files contain zero matches for 13 configured credential values.
-  Existing upstream Better Auth duplicate-key build warnings remain visible.
-- [x] Native workerd with isolated restricted development Neon completes the
-  zero-provider-cost manifest, does not repeat completed delivery, and preserves
-  cancellation. Final clean run has no pool warnings. One source-reload-interrupted
-  attempt is retained and does not count as acceptance.
-- [x] Deployed native worker version `7d7d0bac-4138-4a0c-9c88-8b1a20bca475`,
-  73 ms startup, 3,725 KiB gzip. Ten public/private/unsigned-webhook probes pass;
-  local scheduler URLs are 404 in production. Browser shows saved reports accessible
-  and new paid admission/checkout paused.
-- [ ] Observe the native production cron after propagation, including its wake-up
-  path and subsequent idle skip; hourly ordinary recovery is separately retained.
-- [ ] Complete OpenRouter email verification, create/verify the already-approved
-  $5 non-resetting inference key, then revoke the temporary management key.
-  Neither key has been created yet. Provision the isolated approved $5 period only
-  after key metadata verifies its total cap and delivery window.
-- [ ] Funded hosted Deep Research acceptance: approved report/citations, replay,
-  progress, Stop, deadline/crash recovery and financial settlement; signed merchant
-  payment lifecycle and actual checkout remain pending. Never substitute the
-  zero-cost system manifest or ordinary rainbow answer for a LIVE paid report.
-- [ ] Final exact-head Quality CI and fresh code/security reviews for PR #21.
+- [x] `https://perplexity.jacked.dev` is live on Workers Paid near Singapore Neon.
+  Production migrations 0025–0030 and restricted runtime grants pass. Google and
+  temporary reviewer sign-in were exercised; the retired Vercel entry remains.
+- [x] Public guests are enabled behind Turnstile. A fresh guest answer about bee
+  pollination rendered citations, consumed two of six trial credits, and survived
+  reload. That guest cannot read the separate reviewer's private conversation.
+- [x] Fresh signed-in Moon-phases research completed in approximately 22 seconds
+  with five citations. The following solar-panel request was stopped in the real
+  production browser; database state is CANCELLED and no answer credits were spent.
+- [x] Ordinary operator PERIOD ceiling changed only with explicit owner approval
+  from $1 to $1.70. Daily $0.40, November 5 expiry, spend and unknown holds remain.
+  The ordinary provider envelope remains $2 including the retired-key allowance.
+- [x] Approved dedicated OpenRouter pilot key exists: $5 TOTAL, non-resetting,
+  December 12 expiry. The approved account maximum lifetime is now 90 days;
+  existing keys were not extended. Temporary management key disabled and its
+  management API access independently rejected; local temporary secret removed.
+- [x] Isolated `live-pilot-20261102` operator period funded at $5 through December 12,
+  daily ceiling $0.40; dedicated Tavily key permits 150 free monthly credits with
+  pay-as-you-go off. No credit purchase, automatic top-up or new plan upgrade.
+  Combined authorized provider exposure is at most $7, not an unbounded budget.
+- [x] Actual native production minute cron observed idle skip and wake-up. A real
+  maintenance cycle completed at 13:14:28 UTC; readiness is not a fabricated row.
+  Dedicated paid keys, invocation-owned database pools, fenced Postgres claims and
+  independent billing/recovery remain enforced. No public production runner route.
+- [x] Razorpay explicitly approved the custom domain. Independent signed LIVE
+  webhook enabled for eight supported events; unsigned deliveries rejected.
+  No real customer charge, mandate, refund or fabricated LIVE receipt was created.
+- [x] Three earlier review findings fixed: paid-model admission parity, billing
+  reads/cancellation during KV failure, and durable per-account checkout cooldown.
+- [x] New cancellation-abuse regression reproduced and fixed. A LIVE paid period
+  permits 14 billable started attempts, separately from seven delivered reports.
+  Deletion cannot reset this count; cancellation before dispatch is excluded.
+  Public pricing, terms and Billing disclose this limit.
+- [x] First hosted real Deep Research attempt reached all six searches and evidence
+  approval, then hit the shared 12-second answer timeout. Unknown cost remains held.
+  Deep Research now has a bounded 45-second drafting window; ordinary answers retain
+  12 seconds. Tokens, pinned providers, no retries, Stop and job deadline unchanged.
+  Synthetic delayed-response and cancellation/deadline regressions pass.
+- [x] Before those final two fixes: lint/types, 851 offline tests, 12 Cloudflare and
+  10 Next.js desktop/mobile checks pass. OpenNext build and credential scan pass
+  (1,776 files, 14 values, zero matches). Upstream Better Auth warnings remain visible.
+- [x] Final lint/types, 854 tests in 129 files and OpenNext build pass. Final
+  credential scan: 1,776 files, 14 values, zero matches.
+- [ ] Exact-head CI and fresh code/security reviews after these fixes.
+- [x] Hosted Deep Research produced a three-section cited report in about 68 seconds;
+  browser reload recovered saved progress/report and Copy report confirmed success.
+  Settled exposure is 111,034 microUSD, including conservative search accounting,
+  with zero unknown hold. The earlier failed attempt retains its 14,000 microUSD
+  hold; neither failure nor spend was erased. This is one functional live sample,
+  not a comprehensive factual-quality evaluation.
+- [x] A separate zero-AI hosted execution was stopped while RUNNING in the browser;
+  terminal CANCELLED persisted. Isolated development Neon/TEST entitlements only;
+  this does not claim a real LIVE payment or customer report grant.
+- [ ] Final live checkout UI and native payment lifecycle acceptance. Checkout stays
+  paused until funded fulfillment checks pass; do not complete a real payment
+  autonomously. Browser Tasks remain excluded. Razorpay LIVE key rotation was
+  explicitly deferred by the owner and is not represented as completed.
 
-**Current access:** public pages/sign-in/saved private content are live. Guests,
-new paid jobs and real checkout remain disabled. Tasks are not offered. The current
-ordinary-research period has $0.049921 unreserved, below its $0.05 admission reserve;
-unknown-cost holds remain intact, so new ordinary research is temporarily paused.
-The later cancellation smoke failed in input safety before cancellation could be
-confirmed (zero answer credits charged, unknown exposure retained); hosted live
-cancellation acceptance remains pending. The existing key remains $1.80 total plus
-the retained $0.20 retired-key allowance: the $2 envelope is unchanged. The separate
-$5 one-customer pilot is approved but not activated. The owner explicitly deferred
-LIVE Razorpay key rotation; it is not represented as completed.
+**Current access:** public site, Google/reviewer sign-in, ordinary AI research and
+Turnstile guest trials are live. Deep Research worker/admission is configured but
+requires a verified paid period; real checkout remains OFF. The pilot offers one
+customer one ₹999 monthly cycle, seven completed reports, at most 14 started
+attempts and no automatic renewal. Ordinary funding expires November 5; pilot
+funding expires December 12. Neither is a promise of unlimited public capacity.
 
-Evidence is in ignored owner-only `.artifacts/cloudflare-jobs-release-check.log`,
-`cloudflare-native-neon-proof-final.log`, `cloudflare-native-hosted-boundaries.json`,
-`cloudflare-native-production-deploy.log` and `cloudflare-ordinary-final-state.json`.
-Never publish credential files, raw live tail request headers or database backups.
+Private evidence: `.artifacts/production-answer-stop-verified.json`,
+`production-guest-answer.png`, `ordinary-period-170-approved.json`,
+`openrouter-pilot-verified.json`, `openrouter-management-revoked.json`,
+`pilot-budget-provisioned.json`, and the hosted proof/test logs. Never publish
+credential files, raw request-tail headers/cookies or database backups.
 
 ## Earlier preparation checkpoints (superseded by the checkpoint above)
 
