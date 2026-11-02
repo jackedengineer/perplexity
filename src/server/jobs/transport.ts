@@ -7,7 +7,7 @@ export function jobTransport(){return {
  watch:async(claim:DispatchClaim)=>{await tasks.trigger('watch-job-v1',{jobId:claim.jobId},{...delivery,delay:'45s',idempotencyKey:claim.key+':watch'},{retry:{maxAttempts:1}});},
  execute:async(claim:DispatchClaim)=>{await tasks.trigger('execute-job-v1',{jobId:claim.jobId},{...delivery,idempotencyKey:claim.key},{retry:{maxAttempts:1}});},
  };}
-export function automaticDispatch(db:JobDatabase,budgetKey:string){return maintainJobDispatch(db,budgetKey,jobTransport(),budgetKey.startsWith('live-'));}
+export function automaticDispatch(db:JobDatabase,budgetKey:string,dispatchEnabled=true){return maintainJobDispatch(db,budgetKey,jobTransport(),budgetKey.startsWith('live-'),dispatchEnabled);}
 export async function kickJobs(id:string){
  // Acceleration only. A failed kick never rolls back accepted work; independently
  // scheduled maintenance/supervised dispatch still drains the durable outbox.
