@@ -1,5 +1,35 @@
 # Current release checks — 2 November 2026
 
+## Launch acceptance update — 13:43 UTC
+
+- [x] PR #21 merged as `d5fd5e010834fc36e9fcc7c7ad5de97e11e25c4d` after
+  Quality CI and both exact-head code/security reviews passed; all threads resolved.
+- [x] Reviewed fixes deployed as Worker version `2cbd8e42-4a84-48c8-b121-4519eb59295c`.
+  Production live checkout is enabled. The browser opened the real Razorpay ₹999
+  payment screen; provider readback confirms LIVE mode, one cycle and zero payments.
+- [x] Guest-to-Google transfer preserved the guest conversation on the custom
+  domain. Public pages, private API denials and unsigned webhook rejection pass.
+- [x] The verification checkout was cancelled with no payment, mandate, refund or
+  paid grant. Native reconciliation observed provider CANCELLED and released the
+  sole pilot seat. The test account's 24-hour new-checkout cooldown stays intact.
+- [x] Opening and abandoning checkout exposed a timing bug: Razorpay rejects
+  cycle-end cancellation for CREATED subscriptions. Immediate cancellation was
+  verified on that exact unpaid subscription. The follow-up adapter reads current
+  state, uses immediate cancellation only for CREATED, preserves cycle-end timing
+  for paid states and treats terminal states idempotently. Regression tests cover
+  these states and reject failed/mismatched reads before mutation.
+- [ ] Follow-up cancellation fix CI/review and deployment acceptance.
+- [ ] A customer-completed real payment and captured-invoice entitlement remain
+  untested. Do not confuse opening LIVE checkout or cancelling an unpaid intent
+  with a captured payment. No agent-created LIVE entitlement exists.
+
+The application is public and the one-customer paid pilot is open; the older
+checkpoint below describes its pre-activation state. Ordinary research still has
+its November 5 expiry and daily $0.40 bound. The independent paid pilot remains
+$5 total through December 12, one month and no automatic renewal. Browser Tasks
+remain unavailable. Temporary hosted acceptance worker was removed; financial
+usage and unknown holds were retained.
+
 ## Cloudflare public launch and bounded paid pilot
 
 - [x] `https://perplexity.jacked.dev` is live on Workers Paid near Singapore Neon.

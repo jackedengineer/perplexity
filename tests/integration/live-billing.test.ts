@@ -99,3 +99,9 @@ it('limits each owner to one new LIVE pilot reservation per rolling day, even af
  expect(await startCheckout(f.db,subject,request,'plan_liveflow',{...api,create:noCreate},pilot)).toMatchObject({state:'READY'});
  expect(noCreate).toHaveBeenCalledTimes(1);
 });
+
+it.each([['expired','CANCELLED'],['completed','COMPLETED'],['cancelled','CANCELLED']] as const)('persists provider terminal %s during cancellation',async(providerState,state)=>{
+ const [row]=await f.db.insert(billingCheckouts).values({userId:f.owner,requestId:crypto.randomUUID(),planId:'plan_terminal',priceKey:liveOffer.priceKey,environment:'LIVE',subscriptionId:'sub_'+crypto.randomUUID().replaceAll('-',''),state:'READY'}).returning();
+ await cancelSubscription(f.db,f.subject,row.id,{...api,cancel:async()=>({...subscription(),id:row.subscriptionId!,plan_id:row.planId,status:providerState,notes:{checkoutId:row.id,priceKey:liveOffer.priceKey}})});
+ expect((await f.db.select().from(billingCheckouts).where(eq(billingCheckouts.id,row.id)))[0]).toMatchObject({state,providerState,cancelAtCycleEnd:true});
+});

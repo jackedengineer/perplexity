@@ -108,7 +108,7 @@ export async function cancelSubscription(db:JobDatabase,subject:string,id:string
  if(row.cancelAtCycleEnd)return;
  const sub=await api.cancel(row.subscriptionId);
  if(sub.id!==row.subscriptionId||sub.notes.checkoutId!==row.id||sub.plan_id!==row.planId||sub.notes.priceKey!==row.priceKey)throw new JobError('CONFLICT');
- await db.update(checkouts).set({cancelAtCycleEnd:true,providerState:sub.status,state:sub.status==='cancelled'?'CANCELLED':row.state,updatedAt:sql`clock_timestamp()`}).where(eq(checkouts.id,row.id));
+ await db.update(checkouts).set({cancelAtCycleEnd:true,providerState:sub.status,state:sub.status==='cancelled'||sub.status==='expired'?'CANCELLED':sub.status==='completed'?'COMPLETED':row.state,updatedAt:sql`clock_timestamp()`}).where(eq(checkouts.id,row.id));
  // The verified invoice retains its own paid-through timestamp; no new grant.
 }
 export async function ingestWebhook(db:JobDatabase,eventId:string,bytes:Uint8Array,signature:string,secret:string,mode:PaymentMode='TEST'){

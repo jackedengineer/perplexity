@@ -57,6 +57,14 @@ export function createRazorpay(config:{keyId:string;keySecret:string;allowLive?:
   subscriptions:async()=>z.object({items:z.array(z.unknown()).max(100)}).parse(await request('subscriptions?count=100')).items.flatMap(item=>{const parsed=subscriptionSchema.safeParse(item);return parsed.success?[parsed.data]:[];}),
   invoices:async(id:string)=>z.object({items:z.array(z.unknown()).max(100)}).parse(await request('invoices?subscription_id='+ref(id,subscriptionId)+'&count=100')).items,
   payment:async(id:string)=>request('payments/'+ref(id,paymentId)),
-  cancel:async(id:string)=>subscriptionSchema.parse(await request('subscriptions/'+ref(id,subscriptionId)+'/cancel',{cancel_at_cycle_end:1})),
+  cancel:async(id:string)=>{
+   const path='subscriptions/'+ref(id,subscriptionId);
+   const current=subscriptionSchema.parse(await request(path));
+   if(current.id!==id)throw new JobError('UNAVAILABLE');
+   if(['cancelled','completed','expired'].includes(current.status))return current;
+   // An unpaid created subscription has no billing cycle to finish. Razorpay
+   // rejects cycle-end cancellation there; paid cycles retain the existing path.
+   return subscriptionSchema.parse(await request(path+'/cancel',{cancel_at_cycle_end:current.status==='created'?0:1}));
+  },
  };
 }
