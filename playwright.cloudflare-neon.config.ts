@@ -4,7 +4,8 @@ import {config} from 'dotenv';
 config({path:'.env.cf-proof.local',quiet:true});
 if(process.env.LIVE_NEON_ADMISSION!=='1')throw new Error('Explicit development Neon proof required');
 export default defineConfig({
- testDir:'./tests/e2e',testMatch:'cloudflare-database.spec.ts',workers:1,retries:0,
+ outputDir:'.artifacts/cloudflare-neon-results',
+ testDir:'./tests/e2e',testMatch:['cloudflare-database.spec.ts','cloudflare-delivery.spec.ts'],workers:1,retries:0,
  forbidOnly:!!process.env.CI,timeout:60000,
  use:{baseURL:'http://localhost:8787',trace:'retain-on-failure'},
  projects:[

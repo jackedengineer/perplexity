@@ -32,7 +32,8 @@ jobs:
         if: failure()
         with:
           name: cloudflare-browser-failures
-          path: test-results/
+          path: .artifacts/cloudflare-public-results/
+          include-hidden-files: true
           retention-days: 7
   verify:
     runs-on: ubuntu-latest
