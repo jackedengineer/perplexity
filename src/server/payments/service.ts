@@ -24,8 +24,12 @@ export function billingEnabled(){try{
 export function purchasesEnabled(){try{return paymentConfiguration().purchasesEnabled&&jobsEnabled();}catch{return false;}}
 export async function currentBillingStatus(subject:string){
  const c=paymentConfiguration();let enabled=purchasesEnabled();
- if(enabled&&c.mode==='LIVE'){try{await getDb().transaction(tx=>assertPilotCapacity(tx,c.pilot!));}catch{enabled=false;}}
- return {...await billingStatus(getDb(),subject,c.mode),purchasesEnabled:enabled};
+ const status=await billingStatus(getDb(),subject,c.mode);
+ // An owned READY intent can resume its existing seat, without creating a
+ // second subscription. Other owners only see purchases paused.
+ const resumable=status.checkouts.find(row=>row.state==='READY'&&row.subscriptionId)?.id;
+ if(enabled&&c.mode==='LIVE'){try{await getDb().transaction(tx=>assertPilotCapacity(tx,c.pilot!,resumable));}catch{enabled=false;}}
+ return {...status,purchasesEnabled:enabled};
 }
 async function identity(){
  if(!billingEnabled())throw new JobError('DISABLED');const session=await getCurrentSession();if(!session||session.user.isAnonymous||!session.user.emailVerified)throw new AdmissionError('UNAUTHENTICATED');

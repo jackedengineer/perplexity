@@ -26,6 +26,10 @@ it('rejects expired delivery windows, an excessive ceiling and spend/unknown hol
  await expect(f.db.transaction(tx=>assertPilotCapacity(tx,{...policy,providerExpiresAt:new Date(Date.now()+30*86400000)}))).rejects.toMatchObject({code:'UNAVAILABLE'});
 });
 it('holds the sole pilot seat for uncertain/unfinished checkout instead of selling duplicate capacity',async()=>{
- await f.db.insert(billingCheckouts).values({userId:f.owner,requestId:crypto.randomUUID(),planId:'plan_pilot',priceKey:'pro-live-monthly-inr-v1',environment:'LIVE',state:'UNKNOWN'});
+ const [row]=await f.db.insert(billingCheckouts).values({userId:f.owner,requestId:crypto.randomUUID(),planId:'plan_pilot',priceKey:'pro-live-monthly-inr-v1',environment:'LIVE',state:'UNKNOWN'}).returning();
  await expect(check()).rejects.toMatchObject({code:'QUOTA'});
+ await expect(f.db.transaction(tx=>assertPilotCapacity(tx,policy,row.id))).rejects.toMatchObject({code:'QUOTA'});
+ await f.db.update(billingCheckouts).set({state:'READY'}).where(eq(billingCheckouts.id,row.id));
+ await expect(f.db.transaction(tx=>assertPilotCapacity(tx,policy,row.id))).resolves.toBeUndefined();
+ await expect(f.db.transaction(tx=>assertPilotCapacity(tx,policy,crypto.randomUUID()))).rejects.toMatchObject({code:'QUOTA'});
 });

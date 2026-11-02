@@ -14,14 +14,14 @@ export function livePilotConfiguration(env:Record<string,string|undefined>=proce
  const providerExpiresAt=new Date(expiry);if(!Number.isFinite(providerExpiresAt.getTime()))throw new JobError('DISABLED');
  return {budgetKey:config.budgetKey,providerExpiresAt};
 }
-export async function assertPilotCapacity(tx:JobTransaction,policy:LivePilot){
+export async function assertPilotCapacity(tx:JobTransaction,policy:LivePilot,resumeCheckoutId?:string){
  await tx.execute(sql`SET LOCAL lock_timeout='2s'`);
  // Serializes the entire LIVE pilot, including different owners. An UNKNOWN
  // create retains the sole seat; provider uncertainty is not free capacity.
  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended('live-pilot-checkout',0))`);
  const now=await databaseNow(tx);
- const existing=await tx.select({id:billingCheckouts.id}).from(billingCheckouts).where(eq(billingCheckouts.environment,'LIVE')).limit(1);
- if(existing.length)throw new JobError('QUOTA');
+ const existing=await tx.select({id:billingCheckouts.id,state:billingCheckouts.state}).from(billingCheckouts).where(eq(billingCheckouts.environment,'LIVE')).limit(2);
+ if(existing.length&&!(existing.length===1&&existing[0].id===resumeCheckoutId&&existing[0].state==='READY'))throw new JobError('QUOTA');
  const [health]=await tx.select().from(maintenanceStatus).where(eq(maintenanceStatus.name,'paid-worker:'+policy.budgetKey));
  if(!health||health.outcome!=='COMPLETED'||!health.completedAt||health.completedAt>now||health.completedAt.getTime()<now.getTime()-5*60000)throw new JobError('UNAVAILABLE');
  const [period]=await tx.select().from(operatorUsageBuckets).where(and(eq(operatorUsageBuckets.budgetKey,policy.budgetKey),eq(operatorUsageBuckets.kind,'PERIOD'),lte(operatorUsageBuckets.startsAt,now),gt(operatorUsageBuckets.endsAt,now))).orderBy(operatorUsageBuckets.id).limit(1).for('update');
