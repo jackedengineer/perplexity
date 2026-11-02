@@ -34,13 +34,14 @@ at 1440px and 320px, checking public navigation, WCAG accessibility, overflow,
 the no-purchase state and default-off job/checkout API boundaries. The in-app
 browser also verified pricing, refund-policy navigation and operator details.
 
-Razorpay SMS verification succeeded. The Live website application is open with
-the correct homepage and the truthful login-required answer. It now requires a
-test-account username/password; the app uses Google-only sign-in. Do not supply a
-Google password, falsely say login is unnecessary, or add a reviewer bypass.
-Arrange a supported Google-login review procedure with Razorpay. Its dashboard
-states website verification takes 24–48 hours; Live keys are unavailable until
-approval. Leave the shared QuickBus TEST key/webhook untouched.
+Razorpay has approved the production website. The temporary reviewer-only login
+was implemented, deployed and verified in PR #22, with no admin or paid bypass.
+The first Live key and monthly plan have now been created; API credentials are
+staged as Production-only Vercel secrets. Checkout is still closed. See the
+[current Live billing activation record](live-billing-activation.md) for the
+mode-isolation implementation, evidence, operating-budget proposal and remaining
+production worker/financial activation gates. QuickBus TEST credentials remain
+unchanged. No real subscription or payment was created.
 
 Official requirements and policy references checked November 1, 2026:
 
@@ -55,8 +56,8 @@ Official requirements and policy references checked November 1, 2026:
 
 ## Production implementation and activation gates
 
-1. Add an explicit server-selected LIVE billing/job environment. Current code and
-   database constraints deliberately accept TEST only and reject Vercel production.
+1. Add an explicit server-selected LIVE billing/job environment. The staged implementation now binds billing mode to credentials and includes
+   mode-aware database constraints; new LIVE purchases remain closed.
    Never remove those checks without their replacement. Separate TEST/LIVE plan
    identifiers, API credentials, signed webhook secrets and immutable allowance
    versions. Bind period owner **and environment** to the originating checkout.

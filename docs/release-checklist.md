@@ -1,5 +1,33 @@
 # Current release checks — 1 November 2026
 
+## Live Razorpay preparation — November 2 follow-up
+
+- [x] Approved merchant website visibly verified in Razorpay. Owner-approved first
+  Live key created after SMS handoff; read-only API authentication passes. ₹999 INR
+  monthly plan created once and independently read back. No subscription/mandate,
+  charge/refund, paid AI request, plan upgrade or budget increase was performed.
+- [x] API credentials saved only in ignored owner-only local configuration and
+  Vercel Production Secret settings. Existing TEST preview/QuickBus configuration
+  is unchanged. Rotate the secret supplied in chat before accepting payments.
+- [x] Explicit TEST/LIVE offers, mode-bound checkout/period FK and ledger identities,
+  server-verified seven-run grant, isolated reversals, replay-safe reconciliation
+  and cancellation with paid-through retention. Billing recovery stays usable
+  with inference/new-purchase admission off; LIVE purchases remain closed in code.
+- [x] Migration 0029 applied to development only; synthetic restricted Neon checks
+  pass 2/2. Offline suite passes 765/765 plus the later migration-upgrade regression;
+  public browser cases pass 4/4. Real browser checks of BillingConsole pass at
+  desktop and 320px with no overflow or captured console warnings/errors. The
+  disposable local UI route was removed. Build/lint/types and high/critical audit pass.
+- [ ] Exact-head CI/code/security reviews and merge for this billing candidate.
+- [ ] Reviewed production 0025–0029 migrations/grants, rotated secrets, production
+  worker/automatic dispatch and minute recovery, signed merchant webhook, hosted
+  payment lifecycle and paid-content/rollback/latency acceptance.
+- [ ] Commercial hosting and funded delivery window/capacity/renewal controls.
+  Vercel currently reports Hobby. The owner requested a monthly operating-budget
+  proposal, not authorization to buy plans or raise the current $2 cap. The
+  [proposed first paid month](live-billing-activation.md) is not activated.
+
+
 ## Temporary reviewer login — November 2 follow-up
 
 - [x] Owner explicitly authorized one seven-day reviewer-only password login.
@@ -52,7 +80,7 @@ record is also retained in [the October 23 checklist](release-checklist-20261023
   and disabled job/checkout boundaries. Drafts remain on a separate launch branch.
 - [ ] Publish final reviewed merchant pages and arrange Google-only reviewer
   access. Razorpay SMS verification completed; website approval and Live keys
-  remain pending. Seven-run LIVE entitlement is not implemented by changing
+  are now confirmed in the November 2 follow-up above; paid activation is pending. Seven-run LIVE entitlement is not implemented by changing
   the existing ten-job TEST allowance. [Activation record](paid-research-launch.md).
 
 - [x] Versioned strict submission and immutable private snapshots/checkpoints;

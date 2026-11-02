@@ -37,7 +37,8 @@
     "test:completion:neon": "LIVE_NEON_ADMISSION=1 vitest run --config vitest.neon.config.ts tests/live/completion-neon.test.ts",
     "jobs:worker": "tsx scripts/jobs-worker.ts",
     "jobs:dev": "node tools/trigger-cli/node_modules/trigger.dev/dist/esm/index.js dev start --env-file .env.jobs.local --max-concurrent-runs 1 --skip-update-check --skip-telemetry",
-    "jobs:dispatch": "tsx scripts/jobs-dispatch.ts"
+    "jobs:dispatch": "tsx scripts/jobs-dispatch.ts",
+    "billing:verify": "tsx scripts/verify-live-billing.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "4.0.152",
