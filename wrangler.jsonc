@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "perplex-compatibility-proof",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-02",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "DEPLOYMENT_PLATFORM": "cloudflare",
+    "ENABLE_GUEST_TRIALS": "false",
+    "ENABLE_DURABLE_JOB_SANDBOX": "false",
+    "ENABLE_RAZORPAY_TEST_CHECKOUT": "false",
+    "ENABLE_DEEP_RESEARCH": "false",
+    "ENABLE_JOB_SCHEDULE": "false",
+    "ENABLE_RAZORPAY_LIVE_BILLING": "false"
+  }
+}
