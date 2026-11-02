@@ -13,6 +13,10 @@
   LIVE period. The regression failed before the fix and then passed: delayed
   invoices cannot release capacity or fabricate access; native reconciliation
   grants the real seven-report period and holds capacity until paid-through ends.
+- [x] Both early-refund and early-dispute regressions failed before their fix.
+  Reconciliation now records verified reversed invoices as REVOKED periods,
+  releasing their seat without ever granting access. An unlinked reversal alone
+  still cannot release capacity. Repeated reconciliation preserves revocation.
 - [ ] Final CI and fresh code/security reviews for this capacity fix.
 - [ ] Deploy and verify the capacity fix, then restore the approved live checkout.
 - [ ] A real customer must complete the first captured payment; no agent-created

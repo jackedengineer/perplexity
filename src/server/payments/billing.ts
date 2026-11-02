@@ -78,9 +78,15 @@ async function reconcileCycles(db:JobDatabase,row:Checkout,api:RazorpayApi,onlyP
   const payment=await api.payment(parsed.data.payment_id);let cycle:ReturnType<typeof verifyCycle>;
   const refund=verifiedRefund(parsed.data,payment);
   if(refund){
+   const invoice=parsed.data;
+   if(invoice.billing_end<=invoice.billing_start||invoice.billing_end-invoice.billing_start>32*86400)throw new JobError('INVALID_INPUT');
    await db.transaction(async tx=>{
     const current=await lockedCheckout(tx,row.id);if(current.subscriptionId!==sub.id||current.environment!==mode)throw new JobError('CONFLICT');
     await recordReversal(tx,refund.paymentId,'reconciliation.refund',mode,{userId:row.userId,subscriptionId:sub.id,invoiceId:refund.invoiceId});
+    // Persist linked, non-entitling evidence even when reversal arrived first.
+    // A completed checkout can then release its seat without treating a missing
+    // invoice (or an unlinked webhook tombstone) as proof of no obligation.
+    await tx.insert(periods).values({userId:row.userId,subscriptionId:sub.id,environment:mode,paymentId:refund.paymentId,invoiceId:refund.invoiceId,startsAt:new Date(invoice.billing_start*1000),endsAt:new Date(invoice.billing_end*1000),jobLimit:offer.jobLimit,state:'REVOKED'}).onConflictDoNothing();
    });
    continue;
   }
@@ -89,8 +95,8 @@ async function reconcileCycles(db:JobDatabase,row:Checkout,api:RazorpayApi,onlyP
    const current=await lockedCheckout(tx,row.id);if(current.subscriptionId!==sub.id||current.environment!==mode)throw new JobError('CONFLICT');
    // Serialize against signed refunds/disputes before inspecting their tombstone.
    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'payment:'+mode+':'+cycle.paymentId},0))`);
-   if((await tx.select().from(reversals).where(and(eq(reversals.paymentId,cycle.paymentId),eq(reversals.environment,mode)))).length)return;
-   await tx.insert(periods).values({...cycle,userId:row.userId,subscriptionId:sub.id,environment:mode,jobLimit:offer.jobLimit}).onConflictDoNothing();
+   const reversed=(await tx.select().from(reversals).where(and(eq(reversals.paymentId,cycle.paymentId),eq(reversals.environment,mode)))).length>0;
+   await tx.insert(periods).values({...cycle,userId:row.userId,subscriptionId:sub.id,environment:mode,jobLimit:offer.jobLimit,state:reversed?'REVOKED':'ACTIVE'}).onConflictDoNothing();
    const [saved]=await tx.select().from(periods).where(eq(periods.paymentId,cycle.paymentId));
    if(!saved||saved.userId!==row.userId||saved.subscriptionId!==sub.id||saved.invoiceId!==cycle.invoiceId)throw new JobError('CONFLICT');
   });
