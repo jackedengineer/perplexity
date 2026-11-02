@@ -9,6 +9,7 @@ export function jobTransport(){return {
  };}
 export function automaticDispatch(db:JobDatabase,budgetKey:string,dispatchEnabled=true){return maintainJobDispatch(db,budgetKey,jobTransport(),budgetKey.startsWith('live-'),dispatchEnabled);}
 export async function kickJobs(id:string){
+ if(process.env.JOB_EXECUTION_BACKEND==='cloudflare')return;
  // Acceleration only. A failed kick never rolls back accepted work; independently
  // scheduled maintenance/supervised dispatch still drains the durable outbox.
  await tasks.trigger('maintain-jobs-v1',{}, {...delivery,idempotencyKey:'job-kick:'+id},{retry:{maxAttempts:1}});

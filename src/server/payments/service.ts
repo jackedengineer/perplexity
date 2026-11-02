@@ -6,6 +6,7 @@ import {getDb} from '@/db';
 import {getCurrentSession} from '@/lib/current-session';
 import {getServerEnv} from '@/lib/env';
 import {jobsEnabled} from '@/server/jobs/service';
+import {wakeCloudflareJobs} from '@/server/jobs/cloudflare-wake';
 import {sandboxDatabaseUrl} from '@/server/jobs/connection';
 import {privateHeaders,jobFailure,readBoundedBody,readBoundedBytes,sameOrigin} from '@/server/jobs/http';
 import {JobError} from '@/server/jobs/contracts';
@@ -24,6 +25,7 @@ export function billingEnabled(){try{
 export function purchasesEnabled(){try{return paymentConfiguration().purchasesEnabled&&jobsEnabled();}catch{return false;}}
 export async function currentBillingStatus(subject:string){
  const c=paymentConfiguration();let enabled=purchasesEnabled();
+ if(enabled&&c.mode==='LIVE')await wakeCloudflareJobs();
  const status=await billingStatus(getDb(),subject,c.mode);
  // An owned READY intent can resume its existing seat, without creating a
  // second subscription. Other owners only see purchases paused.
@@ -57,6 +59,9 @@ export const paymentsHttp={
   if(!billingEnabled())throw new JobError('DISABLED');if(request.method!=='POST'||new URL(request.url).search)throw new JobError('INVALID_INPUT');const c=paymentConfiguration();
   const raw=await readBoundedBytes(request,65536);
   await ingestWebhook(getDb(),request.headers.get('x-razorpay-event-id')??'',raw,request.headers.get('x-razorpay-signature')??'',c.webhookSecret,c.mode);
+  // Wake only after signature validation and durable ingestion. A failed marker
+  // yields a retryable response; repeated provider events remain idempotent.
+  await wakeCloudflareJobs();
   // Acceleration only: the durable inbox is also drained by worker maintenance.
   after(async()=>{try{await processBillingInbox(getDb(),c.api,1);}catch{console.warn(JSON.stringify({event:'billing.inbox',outcome:'PENDING'}));}});
   return Response.json({accepted:true},{status:202,headers:privateHeaders});

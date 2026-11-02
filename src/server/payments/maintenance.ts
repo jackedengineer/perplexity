@@ -5,8 +5,8 @@ import {type RazorpayApi} from './razorpay';
 import {paymentConfiguration} from './config';
 import {paymentMode} from './offer';
 import {processBillingInbox,reconcileCheckout} from './billing';
-export async function maintainBilling(db:JobDatabase){
- let api:RazorpayApi;try{api=paymentConfiguration().api;}catch{return;}
+export async function maintainBilling(db:JobDatabase,env:Record<string,string|undefined>=process.env){
+ let api:RazorpayApi;try{api=paymentConfiguration(env).api;}catch{return;}
  const deadline=performance.now()+15000;await processBillingInbox(db,api,5,deadline);
  await reconcileDueCheckouts(db,api,deadline);
 }

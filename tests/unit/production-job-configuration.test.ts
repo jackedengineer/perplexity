@@ -33,8 +33,11 @@ it('does not reinterpret TEST configuration or accept missing mode as production
  expect(jobConfiguration(development)).toMatchObject({mode:'TEST',budgetKey:'test-fixture'});
 });
 it('supports LIVE billing recovery on the production Cloudflare origin without opening purchases',()=>{
+ const worker={JOB_EXECUTION_BACKEND:'cloudflare',ENABLE_CLOUDFLARE_JOB_WORKER:'true',ENABLE_DEEP_RESEARCH:'true',JOB_OPENROUTER_API_KEY:'sk-or-v1-synthetic-pilot-key',JOB_TAVILY_API_KEY:'tvly-synthetic-pilot-key',MODEL_SAFETY:'test/safety',SAFETY_OPENROUTER_PROVIDER:'test',MODEL_PLANNER:'test/planner',PLANNER_OPENROUTER_PROVIDER:'test',MODEL_ANSWER:'test/answer',ANSWER_OPENROUTER_PROVIDER:'test'};
  const keys={RAZORPAY_KEY_ID:'rzp_live_synthetic',RAZORPAY_KEY_SECRET:'s'.repeat(32),RAZORPAY_PRO_PLAN_ID:'plan_synthetic',RAZORPAY_WEBHOOK_SECRET:'w'.repeat(32)};
  expect(paymentConfiguration({...production,...keys,ENABLE_RAZORPAY_LIVE_BILLING:'true'})).toMatchObject({mode:'LIVE',purchasesEnabled:false});
- expect(paymentConfiguration({...production,...keys,ENABLE_RAZORPAY_LIVE_BILLING:'true',ENABLE_RAZORPAY_LIVE_CHECKOUT:'true',PAID_PILOT_PROVIDER_EXPIRES_AT:'2026-12-12T00:00:00Z'})).toMatchObject({mode:'LIVE',purchasesEnabled:true});
+ const enabled={...production,...keys,...worker,ENABLE_RAZORPAY_LIVE_BILLING:'true',ENABLE_RAZORPAY_LIVE_CHECKOUT:'true',PAID_PILOT_PROVIDER_EXPIRES_AT:'2026-12-12T00:00:00Z'};
+ expect(paymentConfiguration(enabled)).toMatchObject({mode:'LIVE',purchasesEnabled:true});
+ for(const patch of [{JOB_OPENROUTER_API_KEY:undefined},{JOB_TAVILY_API_KEY:undefined},{ENABLE_CLOUDFLARE_JOB_WORKER:'false'},{JOB_EXECUTION_BACKEND:'trigger'}])expect(paymentConfiguration({...enabled,...patch}).purchasesEnabled).toBe(false);
  expect(()=>paymentConfiguration({...production,...keys,ENABLE_RAZORPAY_LIVE_BILLING:'true',BETTER_AUTH_URL:'https://preview.example.test'})).toThrow();
 });

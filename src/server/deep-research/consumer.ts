@@ -5,11 +5,11 @@ import {claimJob,startStep,completeStep,completeJob,failJob,heartbeat} from '@/s
 import {readCheckpoint,checkpointStops} from './checkpoints';
 import {deepResearch} from './contracts';
 import {loadResearch,researchExecutor} from './executor';
-import type {DeepProviders} from './providers';
+import {createDeepProviders,type DeepProviders} from './providers';
 import {durableJobs} from '@/db/schema';
 import {eq} from 'drizzle-orm';
 import type {JobEnvironment} from '@/server/jobs/configuration';
-export async function consumeResearch(db:JobDatabase,id:string,options:{signal?:AbortSignal;budgetKey?:string;providers?:DeepProviders;environment?:JobEnvironment}={}){
+export async function consumeResearch(db:JobDatabase,id:string,options:{signal?:AbortSignal;budgetKey?:string;providers?:DeepProviders;environment?:JobEnvironment;providerEnvironment?:Record<string,string|undefined>}={}){
  let currentStep='configuration';
  const lease=await claimJob(db,id,options.budgetKey,options.environment);if(!lease)return 'DUPLICATE' as const;
  const [job]=await db.select().from(durableJobs).where(eq(durableJobs.id,id));
@@ -19,7 +19,9 @@ export async function consumeResearch(db:JobDatabase,id:string,options:{signal?:
   try{await delay(3000,undefined,{signal:stopHeartbeat.signal});await heartbeat(db,lease);}catch{if(!stopHeartbeat.signal.aborted)controller.abort();return;}
  }})();
  try{
-  const execute=researchExecutor(db,id,await loadResearch(db,id),options.providers);
+  const snapshot=await loadResearch(db,id);
+  const providers=options.providers??createDeepProviders(snapshot,options.providerEnvironment);
+  const execute=researchExecutor(db,id,snapshot,providers);
   for(const step of deepResearch.steps){
    if(signal.aborted)throw new JobError('STALE');
    if(await startStep(db,lease,step.key)==='DONE'){
