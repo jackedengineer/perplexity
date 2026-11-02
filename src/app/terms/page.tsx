@@ -34,6 +34,16 @@ export default function TermsPage(){
       capacity, maintenance or exhausted budgets. The service is provided on a best-effort basis without a
       promised uptime or guaranteed answer. We may restrict abusive access or change availability. Any future
       paid offering will need separate pricing and payment terms before a purchase.</p>
+    <h2>Prepared Pro subscription</h2>
+    <p>Live purchases remain closed. The prepared Pro offer is ₹999 per month for seven completed Deep
+      Research reports in each verified paid month. Browser Tasks are excluded. Unused reports expire at
+      the end of the paid period without rollover. Failed or cancelled research does not spend a completed
+      report allowance. A subscription is not active merely because a payment mandate was authenticated.</p>
+    <p>When purchases open, Razorpay handles monthly payment authorization for up to twelve cycles.
+      Cancel renewal through Billing before the next billing date; verified access already paid for
+      continues until its displayed end. Closing checkout, signing out or deleting a conversation does
+      not cancel renewal. The cancellation and refund policy preserves remedies required by law; there
+      are no voluntary refunds for change of mind or unused allowance.</p>
     <h2>Leaving and requesting help</h2>
     <p>You can stop using the service, export saved conversations and delete their content through the application.
       Contact support for account-level requests or to report an incorrect refusal. Deletion and retention are

@@ -43,6 +43,16 @@ export default function PrivacyPage(){
     <p>These services have their own privacy policies and operational obligations. Infrastructure and
       providers may process data outside India; the production database is configured in Singapore.
       This release does not include advertising, paid checkout or sale of user data.</p>
+    <h2>Prepared payments and durable research</h2>
+    <p>Live purchases remain closed. When enabled, Razorpay will collect payment-method and mandate
+      details directly in its checkout. The application will retain subscription, invoice and payment
+      identifiers, payment state, verified paid-through dates, cancellation status, limited signed-event
+      records and usage counters to provide access and reconcile payments. We do not store card numbers,
+      CVVs or payment PINs. Payment and reversal records may remain after content deletion for financial
+      reconciliation and to prevent duplicate grants.</p>
+    <p>Deep Research uses private saved questions, step checkpoints, progress and cited reports.
+      Trigger.dev hosts the configured durable worker and receives job identifiers and execution data;
+      its environment is separate from the browser. Live paid purchases remain closed while production research delivery is being prepared.</p>
     <h2>Cookies and guest sessions</h2>
     <p>Essential cookies keep you signed in and protect account actions. Sessions have a seven-day rolling
       validity and a separate thirty-day absolute limit. A guest-trial marker lasts thirty days to prevent
