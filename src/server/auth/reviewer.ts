@@ -1,5 +1,5 @@
 import {APIError,createAuthMiddleware,getSessionFromCtx} from 'better-auth/api';
-import {isReviewerSubject,reviewerConfiguration} from '@/lib/reviewer-policy';
+import {isReviewerSubject,reviewerConfiguration,reviewerSessionAllowed} from '@/lib/reviewer-policy';
 
 export function reviewerAuthGuard(raw:string|undefined,origin:string){
   return createAuthMiddleware(async ctx=>{
@@ -11,7 +11,7 @@ export function reviewerAuthGuard(raw:string|undefined,origin:string){
       if(!policy||typeof email!=='string'||email.length>254||email.toLowerCase()!==policy.email||
         typeof password!=='string'||password.length<8||password.length>128)throw denied();
       const found=await ctx.context.internalAdapter.findUserByEmail(policy.email);
-      if(found?.user.id!==policy.subject||!found.user.emailVerified)throw denied();
+      if(!found||!reviewerSessionAllowed(found.user,raw,origin))throw denied();
     }
     if(['/update-user','/change-email','/link-social','/unlink-account','/delete-user'].includes(ctx.path)){
       const session=await getSessionFromCtx(ctx,{disableRefresh:true});

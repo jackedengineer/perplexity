@@ -18,8 +18,9 @@ export function reviewerConfiguration(raw:string|undefined,origin:string|undefin
   }catch{return null;}
 }
 
-export function reviewerSessionAllowed(user:{id:string;email:string;emailVerified:boolean},raw:string|undefined,origin:string|undefined,now=Date.now()){
+export function reviewerSessionAllowed(user:{id:string;email:string;emailVerified:boolean;createdAt?:Date},raw:string|undefined,origin:string|undefined,now=Date.now()){
   if(!isReviewerSubject(user.id))return true;
   const policy=reviewerConfiguration(raw,origin,now);
-  return !!policy&&user.id===policy.subject&&user.email.toLowerCase()===policy.email&&user.emailVerified;
+  return !!policy&&user.id===policy.subject&&user.email.toLowerCase()===policy.email&&user.emailVerified&&
+    user.createdAt instanceof Date&&user.createdAt.getTime()===Date.parse(policy.issuedAt);
 }

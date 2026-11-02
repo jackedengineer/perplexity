@@ -1,7 +1,7 @@
 import {reviewerSessionAllowed} from './reviewer-policy';
 type AuthSession = {
   session: { id: string; token: string; createdAt: Date; expiresAt: Date };
-  user: { id: string; name: string; email: string; emailVerified: boolean; isAnonymous?: boolean | null };
+  user: { id: string; name: string; email: string; emailVerified: boolean; isAnonymous?: boolean | null;createdAt?:Date };
 };
 type SessionStore = {
   getSession: (headers: Headers) => Promise<AuthSession | null>;

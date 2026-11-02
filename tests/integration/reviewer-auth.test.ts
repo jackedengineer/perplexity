@@ -26,7 +26,7 @@ beforeAll(async()=>{
   const journal=JSON.parse(await readFile('drizzle/meta/_journal.json','utf8'));
   for(const entry of journal.entries)await pg.exec(await readFile(`drizzle/${entry.tag}.sql`,'utf8'));
   for(const [id,address] of [[subject,email],['ordinary-user','ordinary@example.test']]){
-    await db.insert(schema.user).values({id,name:'Synthetic reviewer test',email:address,emailVerified:true});
+    await db.insert(schema.user).values({id,name:'Synthetic reviewer test',email:address,emailVerified:true,...(id===subject?{createdAt:new Date(issuedAt)}:{})});
     await db.insert(schema.account).values({id:'credential-'+id,providerId:'credential',accountId:id,userId:id,password:await hashPassword(password)});
   }
 },30000);

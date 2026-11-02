@@ -13,11 +13,12 @@ it('fails closed on malformed, missing, future, excessive-duration or wrong-orig
  expect(reviewerConfiguration(JSON.stringify(base),origin,now-1)).toBeNull();
 });
 it('requires the exact verified subject/email and denies reserved reviewer identities after disabling',()=>{
- const user={id:base.subject,email:base.email,emailVerified:true},raw=JSON.stringify(base);
+ const user={id:base.subject,email:base.email,emailVerified:true,createdAt:new Date(base.issuedAt)},raw=JSON.stringify(base);
  expect(reviewerSessionAllowed(user,raw,origin,now)).toBe(true);
  expect(reviewerSessionAllowed({...user,id:'reviewer-other'},raw,origin,now)).toBe(false);
  expect(reviewerSessionAllowed({...user,email:'other@example.test'},raw,origin,now)).toBe(false);
  expect(reviewerSessionAllowed({...user,emailVerified:false},raw,origin,now)).toBe(false);
  expect(reviewerSessionAllowed(user,undefined,origin,now)).toBe(false);
+ expect(reviewerSessionAllowed({...user,createdAt:new Date(now-1000)},raw,origin,now)).toBe(false);
  expect(reviewerSessionAllowed({...user,id:'normal-google-user'},undefined,origin,now)).toBe(true);
 });

@@ -8,7 +8,7 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import * as schema from "@/db/schema";
 import type { parseServerEnv } from "./env-schema";
 import {reviewerAuthGuard} from '@/server/auth/reviewer';
-import {isReviewerSubject,reviewerConfiguration} from './reviewer-policy';
+import {isReviewerSubject,reviewerConfiguration,reviewerSessionAllowed} from './reviewer-policy';
 
 export function createAuth(
   database: Parameters<typeof drizzleAdapter>[0],
@@ -45,6 +45,8 @@ export function createAuth(
           if(!isReviewerSubject(data.userId))return;
           const policy=reviewerConfiguration(env.REVIEWER_LOGIN_CONFIG,env.BETTER_AUTH_URL);
           if(!policy||policy.subject!==data.userId||ctx?.path!=='/sign-in/email')return false;
+          const identity=await ctx.context.internalAdapter.findUserById(data.userId);
+          if(!identity||!reviewerSessionAllowed(identity,env.REVIEWER_LOGIN_CONFIG,env.BETTER_AUTH_URL))return false;
           return {data:{...data,expiresAt:new Date(Math.min(data.expiresAt.getTime(),Date.parse(policy.expiresAt)))}};
         }},
         update:{before:async(data,ctx)=>{
