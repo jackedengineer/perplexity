@@ -1,5 +1,26 @@
 # Current release checks — 1 November 2026
 
+## Cloudflare production pilot — November 2 follow-up
+
+- [x] Workers Paid confirmed active; PR #23 merged after exact-head CI and clean
+  code/security reviews as `42309f5`.
+- [x] Production-mode and funding gates, single-cycle checkout, independent minute
+  dispatch/worker health, and accounting-preserving content lifecycle implemented.
+- [x] 809 offline checks and eight production-build browser cases pass at the
+  preparation checkpoint. Native development-Neon checks use synthetic providers;
+  they are not hosted LIVE payment or AI acceptance.
+- [x] Catch OpenNext's copied local env before upload; add nine build-env guards,
+  rebuild credential-free and verify zero configured credential matches in 1,808
+  generated/static files. Existing adapter warnings remain recorded.
+- [ ] Final candidate CI/reviews, bounded credential grants, production migrations
+  0025–0030/grants, hosted worker/scheduler/payment checks and domain cutover.
+- [ ] Enable real checkout only when the paid worker, fund window and native
+  financial recovery are ready. Tasks remain excluded from the offer.
+
+This checkpoint supersedes older Vercel-only staging statements below. Exact
+evidence, the retained failed development run and pending actions are in
+[the pilot task record](../tasks/cloudflare-paid-pilot.md).
+
 ## Live Razorpay preparation — November 2 follow-up
 
 - [x] Approved merchant website visibly verified in Razorpay. Owner-approved first

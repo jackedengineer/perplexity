@@ -1,7 +1,18 @@
 # Live billing activation — 2 November 2026
 
-Status: **payment integration staged; purchases closed**. This document is not
+Status: **production pilot implementation staged; purchases closed**. This document is not
 authorization to increase spending, buy a hosting plan or enable checkout.
+
+Current execution record: [Cloudflare paid pilot](../tasks/cloudflare-paid-pilot.md).
+PR #23 is merged; Workers Paid is active. Production configuration now supports
+the pinned Cloudflare origin, production job mode, a one-customer funding/worker
+health gate, one monthly cycle without automatic renewal, independent minute
+dispatch, and paid-content deletion/retention. Historical staging notes below
+describe the earlier Vercel-only implementation. Production migration/credential
+installation, hosted acceptance and checkout activation are still pending.
+The owner explicitly deferred rotating the chat-exposed Live secret and selected
+preparation of a separate $5 provider pilot; that selection has not raised a cap
+or created a key. Preserve the existing $2 verification ledger and holds.
 
 ## Implemented contract
 

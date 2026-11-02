@@ -24,8 +24,11 @@ The existing $2 verification ledger, usage counters and unknown holds remain int
   plus one fully reserved retry each. Uncertain checkouts retain the sole seat.
 - [x] Prepare one-cycle LIVE subscription creation. No automatic renewal beyond
   the funded pilot; TEST keeps its historical twelve-cycle setup.
-- [ ] Independent minute dispatch/recovery and worker-health provenance.
-- [ ] Owner-scoped paid-content deletion/export and private checkpoint retention.
+- [x] Independent minute dispatch/recovery and worker-health provenance implemented;
+  hosted scheduled delivery remains to be verified.
+- [x] Owner-scoped paid-content deletion/export and private checkpoint retention.
+  Actual development-Neon browser checks verify export, deletion, ownership and
+  late-worker fencing; unknown costs and paid allowance records remain intact.
 - [ ] Final offer/UI, full tests/build/OpenNext/browser checks and fresh reviews.
 - [ ] Prepare exact $5 key/expiry and runtime credentials for approval; keep
   purchases disabled while installing reviewed production migrations/grants.
@@ -33,6 +36,32 @@ The existing $2 verification ledger, usage counters and unknown holds remain int
   payment receiver/lifecycle and rollback/latency acceptance.
 - [ ] Domain OAuth/Turnstile, Razorpay approved-host/webhook checks, DNS cutover
   and final pilot activation after acceptance. Browser Tasks remain unavailable.
+
+## Verification at the production preparation checkpoint
+
+- 809 offline tests, lint/types, Node production build and four public desktop/
+  320px offer/policy browser cases pass before the later build-env guard.
+- Four desktop/mobile research browser cases pass against the production build:
+  two presentation cases use intercepted transport; two use native development
+  Neon/API/session/ownership/deletion and synthetic providers. No AI or real charge.
+- The initial cold development run had one desktop loading timeout; three other
+  cases passed. Its artifacts remain under `.artifacts/deep-browser-first-run/`.
+  Production rerun: `.artifacts/paid-pilot-browser-production.log` (four passes).
+- OpenNext's env compiler reproduced a local-only packaging leak from `.env.local`
+  into `.open-next/cloudflare/next-env.mjs`. That build was never uploaded. The
+  new preflight rejects all eight auto-loaded Next env filenames; nine targeted
+  regressions pass. The copied development configuration was moved to custom
+  ignored `.env.paid-browser.local`; the user's original file remains untouched.
+- Credential-free rebuild passes. Scan of 1,808 generated/static files against
+  ten configured credential values finds zero matches. The adapter retains its
+  existing duplicate-object-key build warnings. Do not claim a warning-free build.
+
+The production Wrangler base contains no secrets, domain route, schedule or
+activation switches. Feature switches are installed as persistent Workers Secret
+bindings so an ordinary code redeploy cannot reset live financial recovery to an
+off default. Missing switches fail closed. Keep reconciliation enabled once real
+receipts exist; pause new checkout/inference independently. Final domain binding
+and schedule activation remain explicit release steps.
 
 Trust boundaries: cookie identity and server-selected paid environment; signed
 provider events plus native payment/invoice verification; durable worker delivery
