@@ -11,7 +11,9 @@
   domain. Public pages, private API denials and unsigned webhook rejection pass.
 - [x] The verification checkout was cancelled with no payment, mandate, refund or
   paid grant. Native reconciliation observed provider CANCELLED and released the
-  sole pilot seat. The test account's 24-hour new-checkout cooldown stays intact.
+  sole pilot seat. The real signed `subscription.cancelled` webhook was APPLIED
+  after one attempt, without a fabricated event. The test account's 24-hour
+  new-checkout cooldown stays intact.
 - [x] Opening and abandoning checkout exposed a timing bug: Razorpay rejects
   cycle-end cancellation for CREATED subscriptions. Immediate cancellation was
   verified on that exact unpaid subscription. The follow-up adapter reads current
