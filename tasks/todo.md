@@ -363,12 +363,16 @@ renewal/dispute delivery and production financial restore acceptance remain open
 - [ ] Duplicate/out-of-order billing, renewals, refunds, cancellation and unknown outcomes have recovery evidence. No scale infrastructure is added without a measured reason.
 # Cloudflare compatibility — November 2, 2026
 
-- [ ] CF01: Pin OpenNext/Wrangler; public app and disabled APIs build/run in workerd.
-- [ ] CF02: Preserve Neon transactions and auth isolation with request-safe clients;
-  verify repeated/concurrent requests and trusted Cloudflare IP handling.
-- [ ] CF03: Browser-check sign-in, private ownership, approved rendering, progress
-  and cancellation; run regressions without paid AI calls.
-- [ ] CF04: Verify an isolated hosted Free deployment and actual resource use;
-  record limits honestly, push focused commits and open a PR.
-- [ ] Later activation: reviewed production worker/billing, adequate operating
+- [x] CF01: Pin OpenNext/Wrangler; public app and disabled APIs build/run in workerd.
+- [x] CF02: Preserve Neon transactions and auth isolation with request-safe clients;
+  repeated/concurrent requests and trusted Cloudflare IP regressions pass.
+- [x] CF03 local: eight development-Neon browser cases verify native sessions,
+  private ownership, approved rendering/SSE replay, saved progress and cancellation;
+  757 offline tests and ten public workerd browser cases pass, without paid AI calls.
+- [x] CF04 public probe: isolated hosted Free upload; ten public browser cases pass,
+  actual startup/CPU/wall-time evidence recorded. No production credentials or DNS.
+- [ ] Free production fit: CPU P50 14.871 ms/P99 258.282 ms require optimization
+  and retesting or separately approved hosting; full hosted OAuth/DB/AI acceptance
+  remains pending. See [report](../docs/cloudflare-compatibility.md).
+- [ ] Later activation: reviewed production worker/billing, sustainable operating
   funding, final domain/OAuth/Turnstile/Razorpay, migrations and hosted acceptance.

@@ -1,5 +1,27 @@
 # Current release checks — 1 November 2026
 
+## Cloudflare compatibility proof — November 2
+
+- [x] Pinned adapter/CLI; OpenNext build, lint/types and 757 offline tests pass.
+- [x] Local workerd: 10 public browser cases and eight development-Neon browser
+  cases cover sessions, concurrency, ownership, saved citations, approved SSE
+  replay, progress recovery and durable cancellation. Provider fixtures are synthetic.
+- [x] Isolated Workers Free public preview: ten desktop/mobile browser cases pass;
+  no working DB/OAuth/provider/payment credentials, schedule or custom domain installed.
+- [x] Hosted size/startup and first CPU/wall-time sample recorded in the
+  [proof report](cloudflare-compatibility.md#november-2-proof-results).
+- [ ] **Free CPU acceptance:** first P50 14.871 ms/P99 258.282 ms exceed the
+  documented 10 ms allowance. No sustained Free production fit is established.
+- [ ] Real hosted Google/Neon isolation, fresh research delivery, worker recovery,
+  payment acceptance and adequately funded monthly delivery remain cutover gates.
+- [ ] Final domain migration: owner authorized replacing old Railway after checks;
+  `perplexity.jacked.dev` remains unchanged while the CPU/hosted gates are open.
+
+Decision: **HOLD Cloudflare production cutover and paid activation.** No paid
+upgrade, provider call, real payment or $2-cap change occurred in this proof.
+The following records describe earlier work and do not supersede these gates.
+
+
 ## Temporary reviewer login — November 2 follow-up
 
 - [x] Owner explicitly authorized one seven-day reviewer-only password login.
