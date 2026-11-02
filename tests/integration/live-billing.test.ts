@@ -38,6 +38,11 @@ it('rejects caller-selected test price before provider IO and persists one separ
  expect(result).toMatchObject({mode:'LIVE',priceKey:liveOffer.priceKey,state:'READY'});
  expect(await startCheckout(f.db,f.subject,request,'plan_liveflow',api,pilot)).toEqual(result);
  expect(create).toHaveBeenCalledTimes(1);expect(await periods()).toHaveLength(0);
+ await f.db.update(maintenanceStatus).set({completedAt:new Date(Date.now()-6*60000)});
+ await expect(startCheckout(f.db,f.subject,request,'plan_liveflow',api,pilot)).rejects.toMatchObject({code:'UNAVAILABLE'});
+ expect(create).toHaveBeenCalledTimes(1);
+ await f.db.update(maintenanceStatus).set({completedAt:new Date()});
+ expect(await startCheckout(f.db,f.subject,request,'plan_liveflow',api,pilot)).toEqual(result);
 });
 it('grants seven only after linked captured payment and never changes the historical test grant',async()=>{
  await grant();await grant();

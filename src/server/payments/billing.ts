@@ -18,7 +18,11 @@ export async function startCheckout(db:JobDatabase,subject:string,raw:unknown,pl
  const prepared=await db.transaction(async tx=>{
   const owner=await ownerFor(tx,subject);await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'billing:'+owner},0))`);
   const [prior]=await tx.select().from(checkouts).where(and(eq(checkouts.userId,owner),eq(checkouts.requestId,input.requestId),eq(checkouts.environment,mode)));
-  if(prior){if(prior.priceKey!==input.priceKey||prior.planId!==planId)throw new JobError('CONFLICT');return {row:prior,create:false};}
+  if(prior){
+   if(prior.priceKey!==input.priceKey||prior.planId!==planId)throw new JobError('CONFLICT');
+   if(mode==='LIVE'&&prior.state==='READY')await assertPilotCapacity(tx,pilot!,prior.id);
+   return {row:prior,create:false};
+  }
   const [open]=await tx.select().from(checkouts).where(and(eq(checkouts.userId,owner),eq(checkouts.environment,mode),inArray(checkouts.state,['CREATING','READY','UNKNOWN']))).limit(1);
   if(open)throw new JobError('CONFLICT');
   const [active]=await tx.select({id:periods.id}).from(periods).where(and(eq(periods.userId,owner),eq(periods.environment,mode),eq(periods.state,'ACTIVE'),gt(periods.endsAt,sql`clock_timestamp()`))).limit(1);
