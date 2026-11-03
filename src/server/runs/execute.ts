@@ -21,6 +21,7 @@ import { AdmissionError } from "./errors";
 import { startRunMonitor } from "./monitor";
 import type {PlannerProvider} from '@/server/ai/planner-provider';
 import {PLANNING_VERSION} from '@/server/ai/plan';
+import {lockOwnedRun} from './lock';
 import {planRun} from './plan';
 import {clarifyRun} from './clarify';
 type Admitted = Exclude<AdmissionResult,{kind: "DENIED"}>["run"];
@@ -44,6 +45,13 @@ export function createRunExecution(db: AdmissionDatabase,keys: unknown,providers
       const [liveSession] = await db.select({ id: session.id }).from(session).where(and(eq(session.id,identity.sessionId),eq(session.userId,subject),
         sql`${session.expiresAt} > clock_timestamp()`,sql`${session.createdAt} + interval '30 days' > clock_timestamp()`));
       if (!liveSession) throw new AdmissionError("UNAUTHENTICATED");
+      if(input.mode === 'CHAT') {
+        await db.transaction(async tx=>{
+          const {run:current,conversation,now}=await lockOwnedRun(tx,subject,run.id);
+          if(current.mode!=='CHAT'||current.status!=='PLANNING'||conversation.revision!==current.admittedRevision||current.deadlineAt<=now||signal.aborted)throw new AdmissionError('CONFLICT');
+          await tx.update(runs).set({status:'GENERATING',updatedAt:now}).where(eq(runs.id,run.id));
+        });
+      } else {
       onStage('PLANNING');
       const planned=await traceStage('planning',()=>planRun(db,subject,run.id,input,recordPlannerProvider(calls,providers.planner),signal),()=>({promptVersion:PLANNING_VERSION}));
       if(planned.plan.action==='CLARIFY'){
@@ -55,6 +63,7 @@ export function createRunExecution(db: AdmissionDatabase,keys: unknown,providers
         queryGate: createInputGate(recordSafetyProvider(calls,"QUERY_SAFETY",providers.query),"safety.query"),evidenceGate: createEvidenceGate(recordSafetyProvider(calls,"EVIDENCE_SAFETY",providers.evidence)) });
       const retrieved = await traceStage("retrieval",()=>retrieval.retrieve(subject,run.id,signal));
       if (retrieved.kind !== "READY" && retrieved.kind !== "NO_EVIDENCE") throw new AdmissionError(retrieved.kind === "DENIED" ? retrieved.code : "RUN_IN_PROGRESS");
+      }
       onStage("PREPARING_ANSWER");
       const completion = await traceStage("answer.complete",()=>createAnswerCompletion(db,{ answer: providers.answer,output: providers.output }).complete(subject,identity.sessionId,run.id,signal,onStage));
       if (completion.kind === "DENIED") throw new AdmissionError(completion.code);

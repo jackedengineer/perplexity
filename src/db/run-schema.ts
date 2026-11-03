@@ -30,7 +30,7 @@ export const runs = pgTable("runs", {
   index("runs_status_deadline_idx").on(t.status, t.deadlineAt),
   check("run_accounting_version_valid",sql`${t.accountingVersion} IN (0,1,2)`),
   check("runs_hmac_shape", sql`${t.payloadHmac} ~ '^[a-f0-9]{64}$' AND length(${t.payloadHmac}) = 64`),
-  check("runs_snapshot_valid", sql`${t.mode} = 'FAST' AND ${t.payloadVersion} = 1 AND ${t.answerCredits} > 0 AND ${t.providerReserveMicroUsd} > 0 AND ${t.admittedRevision} > 0 AND ${t.attemptVersion} > 0`),
+  check("runs_snapshot_valid", sql`${t.mode} IN ('FAST','CHAT') AND ${t.payloadVersion} = 1 AND ${t.answerCredits} > 0 AND ${t.providerReserveMicroUsd} > 0 AND ${t.admittedRevision} > 0 AND ${t.attemptVersion} > 0`),
   check("runs_versions_nonempty", sql`length(trim(${t.hmacKeyId})) > 0 AND length(trim(${t.catalogVersion})) > 0 AND length(trim(${t.priceVersion})) > 0 AND length(trim(${t.entitlementVersion})) > 0 AND length(trim(${t.operatorBudgetKey})) > 0 AND length(trim(${t.policyVersion})) > 0 AND length(trim(${t.modelKey})) > 0`),
   check("runs_deadline_valid", sql`${t.deadlineAt} > ${t.createdAt}`),
 ]);

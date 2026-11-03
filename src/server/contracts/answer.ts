@@ -3,7 +3,7 @@ import { questionTextSchema } from "./chat";
 import { sourceIdSchema,sourceUrlSchema } from "./pipeline";
 import { SAFETY_POLICY } from "@/server/safety/policy";
 const hash = z.string().regex(/^[a-f0-9]{64}$/u);
-export const answerKindSchema = z.enum(["ANSWER","CLARIFICATION","NO_EVIDENCE"]);
+export const answerKindSchema = z.enum(["ANSWER","CLARIFICATION","NO_EVIDENCE","CHAT"]);
 export const visibleSourceSchema = z.strictObject({
   sourceId: sourceIdSchema,
   number: z.int().min(1).max(5),

@@ -1,0 +1,2 @@
+ALTER TABLE "runs" DROP CONSTRAINT "runs_snapshot_valid";--> statement-breakpoint
+ALTER TABLE "runs" ADD CONSTRAINT "runs_snapshot_valid" CHECK ("runs"."mode" IN ('FAST','CHAT') AND "runs"."payload_version" = 1 AND "runs"."answer_credits" > 0 AND "runs"."provider_reserve_micro_usd" > 0 AND "runs"."admitted_revision" > 0 AND "runs"."attempt_version" > 0);

@@ -1,3 +1,4 @@
+import {loadPlanningContext} from './context';
 import {ANSWER_PROMPT_VERSION} from '@/server/ai/prompts/answer';
 import {traceStage} from '@/server/telemetry/trace';
 import { z } from "zod";
@@ -39,13 +40,14 @@ export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { ans
         const [planning]=await tx.select().from(runPlans).where(eq(runPlans.runId,runId));
         const interpretation=planning?.plan.action==='ANSWER'?planning.plan.standaloneQuestion:undefined;
         const answerLanguage=planning?.plan.action==='ANSWER'?planning.plan.answerLanguage:'en';
-        return { kind: "READY",run,question: question.data,interpretation,answerLanguage } as const;
+        const context=run.mode === "CHAT" ? (await loadPlanningContext(tx,run.conversationId,message.sequence,true)).map(({role,text})=>({role,text})) : undefined;
+        return { kind: "READY",run,context,question: question.data,interpretation,answerLanguage } as const;
       });
       if (loaded.kind === "SAVED") return { kind: "ALREADY_COMMITTED",runId,messageId: loaded.messageId };
-      const evidence = await createRetrieval(db).load(subject,runId);
+      const evidence = loaded.run.mode === "CHAT" ? {runId,sources:[],passages:[]} : await createRetrieval(db).load(subject,runId);
       if (!evidence) throw new AdmissionError("PROVIDER_UNAVAILABLE");
-      const draftInput={question:loaded.question,interpretation:loaded.interpretation,answerLanguage:loaded.answerLanguage,evidence};
-      const prepared=evidence.sources.length&&dependencies.answer?.prepare?dependencies.answer.prepare(draftInput):draftInput;
+      const draftInput={context:loaded.context,question:loaded.question,interpretation:loaded.interpretation,answerLanguage:loaded.answerLanguage,evidence};
+      const prepared=(evidence.sources.length||loaded.run.mode === "CHAT")&&dependencies.answer?.prepare?dependencies.answer.prepare(draftInput):draftInput;
       const calls = createProviderCalls(db,subject,runId);
       // The unique ANSWER record is also the one-time private generation claim.
       let claim:ProviderClaim;
@@ -56,7 +58,7 @@ export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { ans
       let draft;
       try {
         if(budget.signal.aborted){await calls.finish(callId,'SKIPPED',{costMicroUsd:0n,inputTokens:0,outputTokens:0,actualModel:null});throw new AdmissionError('DEADLINE_EXCEEDED');}
-        draft = await traceStage("answer.draft",()=>generatePrivateDraft(prepared,dependencies.answer,{ signal:budget.signal,deadlineAt:claim.deadlineAt }),()=>({promptVersion:ANSWER_PROMPT_VERSION}));
+        draft = await traceStage("answer.draft",()=>generatePrivateDraft(prepared,dependencies.answer,{ signal:budget.signal,deadlineAt:claim.deadlineAt },loaded.run.mode === "CHAT" ? "CHAT" : "FAST"),()=>({promptVersion:ANSWER_PROMPT_VERSION}));
         await calls.finish(callId,draft.kind === "NO_EVIDENCE" ? "SKIPPED" : "SUCCEEDED",draft.usage);
         if(budget.signal.aborted)throw new AdmissionError('DEADLINE_EXCEEDED');
       } catch {

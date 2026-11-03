@@ -18,7 +18,7 @@ const denied = (code: PublicErrorCode): AdmissionResult => ({ kind: "DENIED", co
 const isActive = (status: Run["status"]) => ACTIVE_RUN_STATUSES.some((value)=>value === status);
 
 // Internal API: authSubject comes only from the verified application session, never from a body.
-export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, policyInput: unknown = FREE_ADMISSION_POLICY,assertNewRunAvailable?:(modelKey:string)=>void,entitlements=false) {
+export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, policyInput: unknown = FREE_ADMISSION_POLICY,assertNewRunAvailable?:(modelKey:string,mode:"FAST"|"CHAT")=>void,entitlements=false) {
   const config = parseAdmissionConfig(configInput);
   const parsedPolicy = admissionPolicySchema.safeParse(policyInput);
   if (!parsedPolicy.success) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
@@ -44,7 +44,7 @@ export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, 
         }
         // Synchronous configuration checks only; replay/recovery never needs a provider.
         // Keep this before counters/reservations and never perform network I/O under the lock.
-        try { assertNewRunAvailable?.(request.modelKey); }
+        try { assertNewRunAvailable?.(request.modelKey,request.mode); }
         catch(error) { if(error instanceof AdmissionError)return denied(error.code);throw error; }
         const [{ now }] = await tx.select({ now: sql<string>`clock_timestamp()::text`.mapWith((value) => new Date(value)) }).from(appUsers).where(eq(appUsers.id,owner.id));
         if(entitlements) {

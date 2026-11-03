@@ -7,7 +7,7 @@ import { ANSWER_PROMPT } from "./prompts/answer";
 import { AnswerError, boundedModelFetch, boundedWork, type ExecutionOptions } from "./bounded";
 import { providerUsage, type ProviderUsage } from "./usage";
 import { citedDraftSchema,renderCitedDraft } from "./cited-draft";
-export type DraftInput = { question: string;interpretation?:string;answerLanguage?:string;evidence: EvidencePackage };
+export type DraftInput = { question: string;context?:Array<{role:"USER"|"ASSISTANT";text:string}>;interpretation?:string;answerLanguage?:string;evidence: EvidencePackage };
 export type PrivateDraft = { text: string;usage: ProviderUsage };
 export interface AnswerProvider { readonly modelId?: string;prepare?(input:DraftInput):DraftInput;generate(input: DraftInput,options: ExecutionOptions): Promise<PrivateDraft>; usage?(): ProviderUsage | undefined }
 export function createAnswerProvider(config: SafetyModelConfig,request: typeof fetch = fetch,maxOutputTokens:600|1200=1200,maxDurationMs:12000|45000=12000): AnswerProvider {
