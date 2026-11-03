@@ -130,8 +130,9 @@ for(const mode of ['Chat','Web'] as const)test(`${mode} question survives naviga
  await expect(page.getByRole('button',{name:/Answer model:/})).toBeEnabled();
  await page.getByRole('button',{name:/Answer model:/}).click();
  await page.getByRole('textbox',{name:'Search models'}).fill('Qwen');
- await page.getByRole('textbox',{name:'Search models'}).press('ArrowDown');
- await page.getByRole('textbox',{name:'Search models'}).press('Enter');
+ await page.keyboard.press('ArrowDown');
+ await page.keyboard.press('Enter');
+ await expect(page.getByRole('button',{name:'Answer model: Qwen3 30B',exact:true})).toBeFocused();
  await page.getByRole('button',{name:mode,exact:true}).click();
  await page.getByRole('textbox',{name:'Ask a question',exact:true}).fill('Explain why triangles have three sides.');
  const submitted=page.waitForRequest(request=>new URL(request.url()).pathname==='/api/chat'&&request.method()==='POST');
