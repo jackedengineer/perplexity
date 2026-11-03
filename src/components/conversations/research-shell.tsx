@@ -6,7 +6,7 @@ import {useModelAccess} from "./model-access";
 import {PlanIndicator} from "./plan-indicator";
 import { SessionControls } from "@/components/session-controls";
 import type { Conversation } from "@/server/conversations/contracts";
-import { Icon, ResearchMark, type IconName } from "./icons";
+import { Icon, ResearchMark } from "./icons";
 
 export function ResearchShell({ children, recent, name, initialCollapsed, jobsEnabled = false, deepResearchEnabled = false }: {
   children: React.ReactNode; recent: Conversation[]; name: string; initialCollapsed: boolean; jobsEnabled?: boolean; deepResearchEnabled?: boolean;
@@ -40,21 +40,16 @@ export function ResearchShell({ children, recent, name, initialCollapsed, jobsEn
     const close = () => mobileNav.current?.close();
     return <>
       <div className="sidebar-top">
-        <Link href="/workspace" aria-label="Perplex home" className="research-icon-button" onClick={close}><ResearchMark /></Link>
+        <Link href="/workspace" aria-label="Perplex home" className="workspace-brand" onClick={close}><ResearchMark />{!isCollapsed&&<span>perplexity</span>}</Link>
         {!isCollapsed && <div className="sidebar-top-actions">
-          <button className="research-icon-button" aria-label="Search conversations" onClick={search}><Icon name="search" size={17} /></button>
           <button className="research-icon-button" aria-label={mobile ? "Close navigation" : "Collapse sidebar"} onClick={mobile ? close : toggleSidebar}><Icon name={mobile ? "close" : "panel"} size={17} /></button>
         </div>}
         {isCollapsed && <button className="expand-sidebar" aria-label="Expand sidebar" onClick={toggleSidebar}><Icon name="panel" size={17} /></button>}
       </div>
       <nav className="sidebar-navigation" aria-label={mobile ? "Mobile navigation" : "Primary navigation"}>
-        <Link href="/workspace" className="sidebar-link" aria-label="New conversation" onClick={close}><Icon name="plus" /><span>New</span></Link>
+        <Link href="/workspace" className="sidebar-link" aria-label="New conversation" onClick={close}><Icon name="plus" /><span>New chat</span></Link>
         {jobsEnabled && <Link href="/jobs" aria-label={deepResearchEnabled?'Deep Research':'Execution checks'} className="sidebar-link" onClick={close}><Icon name="automation" /><span>{deepResearchEnabled?'Deep Research':'Execution checks'}</span></Link>}
-        <div className="future-navigation">
-          {([["computer", "Computer"], ["automation", "Automations"], ["artifact", "Artifacts"], ["settings", "Customize"]] as [IconName, string][]).map(([icon, label]) =>
-            <button key={label} className="sidebar-link" disabled title={`${label} is not available yet`} aria-label={`${label} — coming later`}><Icon name={icon} /><span>{label}</span></button>)}
-        </div>
-        <div className="sidebar-section-label projects-label"><Icon name="folder" size={18} /><span>Projects</span><Icon name="chevron" size={14} /></div>
+        <button className="sidebar-link" onClick={search} aria-label="Search conversations"><Icon name="search"/><span>Search chats</span></button>
         <div className={`sidebar-section-label ${pathname === "/library" ? "is-selected" : ""}`}>
           <Link href="/library" aria-label="Recents" onClick={close}><Icon name="clock" size={18} /><span>Recents</span></Link>
           {!isCollapsed && <button className="research-icon-button" aria-label={recentOpen ? "Collapse recents" : "Expand recents"} aria-expanded={recentOpen} onClick={() => setRecentOpen(!recentOpen)}><Icon name={recentOpen ? "down" : "chevron"} size={14} /></button>}

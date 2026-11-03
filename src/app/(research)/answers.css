@@ -6,7 +6,7 @@
 .question-message > p { width: fit-content; max-width: min(90%, 640px); border-radius: 16px; background: rgb(218 223 227 / .03); padding: 12px 16px; font: 400 16px/24px Arial, Helvetica, sans-serif; white-space: pre-wrap; }
 .history-message.answer-message { padding: 0 0 32px; }
 .answer-researched { font: 400 14px/20px Arial, Helvetica, sans-serif; color: #92999e; margin-bottom: 16px; }
-.answer-prose { font: 400 16px/26px Georgia, "Times New Roman", serif; color: #dadfe3; }
+.answer-prose { font: 400 16px/26px Georgia, "Times New Roman", serif; color: #efefed; }
 .answer-prose p { font: inherit; white-space: normal; margin: 0 0 8px; text-wrap: pretty; }
 .answer-prose h2, .answer-prose h3 { font: 600 18px/28px Georgia, "Times New Roman", serif; color: inherit; letter-spacing: -.2px; margin: 16px 0 8px; text-wrap: pretty; }
 .answer-prose h3 { font-size: 16px; }
@@ -16,7 +16,7 @@
 .answer-prose strong { font-weight: 700; }
 .answer-prose blockquote { border-left: 2px solid #52595e; margin: 18px 0; padding-left: 20px; color: #bac2c7; }
 .answer-prose code { font: 400 13px/1.6 ui-monospace, monospace; background: #23282c; padding: 2px 5px; border-radius: 4px; }
-.answer-prose pre { overflow-x: auto; background: #202529; border: 1px solid var(--r-line); border-radius: 10px; padding: 16px; margin: 20px 0; }
+.answer-prose pre { overflow-x: auto; background: #222222; border: 1px solid var(--r-line); border-radius: 10px; padding: 16px; margin: 20px 0; }
 .answer-prose pre code { padding: 0; background: transparent; white-space: pre; }
 .answer-prose hr { border: 0; border-top: 1px solid var(--r-line); margin: 24px 0; }
 .answer-citation { display: inline-flex; align-items: center; vertical-align: baseline; position: relative; gap: 3px; margin: 0 2px; padding: 1px 5px; border-radius: 4px; background: #242a2e; color: #b4bcc1; font: 400 10px/16px Arial, Helvetica, sans-serif; white-space: nowrap; transition: background-color 120ms, color 120ms; }
@@ -115,7 +115,7 @@
 .feedback-buttons button[aria-pressed="true"] { color: #73c8c5; background: #263c3d; }
 .feedback-status { margin-left: 6px; }
 .feedback-reason { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 12px; }
-.feedback-reason select { max-width: 100%; border: 1px solid var(--r-line); border-radius: 8px; padding: 8px; background: #202529; color: #dadfe3; font: inherit; }
+.feedback-reason select { max-width: 100%; border: 1px solid var(--r-line); border-radius: 8px; padding: 8px; background: #222222; color: #efefed; font: inherit; }
 .feedback-error { color: #e0b3a8; margin: 8px 0; }
 .feedback-retry { text-decoration: underline; color: inherit; }
 .feedback-placeholder { width: 76px; min-height: 36px; }

@@ -2,7 +2,7 @@
 import {ModelSelector,UsageSummary,useModelAccess} from "./model-access";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "./icons";
+import { ResearchMark, Icon } from "./icons";
 import { useStartSearch } from "./use-start-search";
 import { ConversationRequestError } from "./client-api";
 export function QuestionComposer({text,onText,onSubmit,pending,onStop,placeholder="Ask anything…"}: {
@@ -35,7 +35,8 @@ export function StartQuestion({compact=false}: {compact?:boolean}) {
       setError("We couldn’t confirm that it was saved. Retry to safely check the same creation request.");setPending(false);}
   }
   return <section className={compact?"next-question":"new-thread"}>
-    {!compact&&<div className="new-thread-heading"><span>Search</span><h1>What do you want to know?</h1></div>}
+    {!compact&&<div className="new-thread-heading"><ResearchMark/><h1>A little space to think.</h1><p>Start a conversation. Follow an idea. Find something worth knowing.</p></div>}
+    {!compact&&<div className="starter-prompts" aria-label="Ideas to get started">{['Explain a complex idea simply','Help me plan my next project','Compare two options before deciding'].map(prompt=><button key={prompt} onClick={()=>setText(prompt)}>{prompt}<span aria-hidden="true">↗</span></button>)}</div>}
     <QuestionComposer text={text} onText={setText} onSubmit={()=>void submit()} pending={pending} placeholder={compact?"Ask another question…":"Ask anything…"}/>
     <div className="composer-feedback" aria-live="polite">{error&&<p role="alert">{error}</p>}</div>
   </section>;

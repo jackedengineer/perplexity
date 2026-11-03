@@ -1,0 +1,61 @@
+/* Graphite: neutral surfaces, one reading column, motion only as feedback. */
+.research-shell { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.workspace-brand { display: flex; align-items: center; gap: 10px; padding: 6px; font-size: 17px; font-weight: 600; letter-spacing: -.5px; }
+.research-sidebar { width: 232px; min-width: 232px; border: 0; }
+.sidebar-top { height: 72px; padding: 12px; }
+.sidebar-navigation { padding: 0 16px; }
+.sidebar-section-label { margin-top: 20px; font-size: 12px; }
+.sidebar-footer { padding: 12px 16px; }
+.sidebar-footer > .plan-indicator { width: 100%; }
+.account-button { border: 0; padding: 12px 0 0; }
+.account-name small { margin-top: 4px; }
+.sidebar-collapsed .sidebar-navigation { padding: 0 8px; }
+.sidebar-collapsed .sidebar-footer { padding: 8px; }
+.sidebar-collapsed .sidebar-top { padding: 8px; }
+.workspace-plan { position: absolute; right: 8px; top: 0; z-index: 2; height: 56px; }
+.plan-indicator,.plan-indicator.is-pro { background: #242424; color: #efefed; border-color: #414141; border-radius: 7px; }
+.plan-indicator:hover { background: #303030; border-color: #666; }
+.plan-indicator.is-upgrade { background: #e8e8e3; color: #202020; border-color: #e8e8e3; }
+.plan-indicator.is-upgrade:hover { background: #fff; }
+.plan-allowance { color: #b8b8b5; font-size: 11px; font-weight: 400; }
+.private-pill { background: transparent; color: var(--r-muted); font-size: 12px; }
+.research-page { display: flex; flex-direction: column; min-height: 0; }
+.new-thread { display: flex; flex-direction: column; flex: 1; min-height: 0; width: min(720px, calc(100% - 64px)); padding-top: clamp(20px,7vh,72px); padding-bottom: 20px; }
+.new-thread-heading { padding: 0; margin-bottom: 24px; }
+.new-thread-heading > svg { width: 36px; height: 36px; margin-bottom: 24px; }
+.new-thread-heading h1 { font-size: 30px; font-weight: 500; letter-spacing: -1px; }
+.new-thread-heading p { margin-top: 12px; color: var(--r-muted); font-size: 15px; }
+.starter-prompts { margin-bottom: 32px; overflow: auto; min-height: 48px; }
+.starter-prompts button { display: flex; justify-content: space-between; gap: 12px; width: 100%; border: 0; border-bottom: 1px solid var(--r-line); background: transparent; color: var(--r-muted); text-align: left; padding: 14px 0; cursor: pointer; }
+.starter-prompts button:hover { color: var(--r-text); }
+.new-thread > .question-composer { margin-top: auto; flex-shrink: 0; }
+.research-composer { border-radius: 14px; background: #222; box-shadow: none; }
+.research-composer:focus-within { border-color: #626262; }
+.research-composer textarea { font-family: inherit; }
+.research-composer textarea::placeholder { color: #aaa; }
+.send-button { border-radius: 8px; }
+.composer-feedback:empty { display: none; }
+.composer-feedback { min-height: 0; padding-top: 8px; }
+.model-popover { background: #222; border-color: #414141; color: #efefed; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.model-row { display: flex; align-items: center; gap: 2px; }
+.model-row .model-option { flex: 1; min-width: 0; }
+.model-option[aria-pressed=true] { background: #ffffff08; }
+.model-option:hover,.model-option:focus-visible { outline-color: #999; background: #333; }
+.model-check { color: #ddd; }
+.model-search { display: flex; align-items: center; gap: 8px; padding: 4px 10px 12px; border-bottom: 1px solid #383838; color: #aaa; }
+.model-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: #eee; font: inherit; font-size: 13px; }
+.model-search:focus-within { border-color: #999; }
+.model-favorite { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 36px; background: transparent; color: #aaa; border: 0; border-radius: 6px; cursor: pointer; }
+.model-favorite:hover { background: #333; }
+.model-favorite[aria-pressed=true] { color: #efefed; }
+.model-favorite[aria-pressed=true] svg { fill: currentColor; }
+.model-menu-note { font-size: 11px; line-height: 1.5; }
+.model-popover .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.usage-summary { margin: 8px 4px 0; }
+.answer-topbar { padding-right: 230px; border: 0; }
+.thread-content > h1 { font-size: 15px; color: var(--r-muted); }
+.question-message { background: #222; border-radius: 12px; padding: 16px 20px; width: fit-content; max-width: 92%; margin-left: auto; }
+.research-progress .answer-skeleton { display: none; }
+@media (max-height: 720px) { .new-thread { padding-top: 20px; } .new-thread-heading > svg { margin-bottom: 12px; } .starter-prompts { margin-bottom: 16px; } }
+@media (max-width: 767px) { .workspace-plan { top: 8px; right: 45px; padding: 0; height: 40px; } .workspace-plan .plan-allowance { display: none; } .research-mobile-header > a[aria-label="Perplex home"] { margin-right: auto; margin-left: 6px; } .new-thread { width: calc(100% - 32px); padding-top: 36px; } .new-thread-heading h1 { font-size: 26px; } .new-thread-heading p { font-size: 14px; } .answer-topbar { padding-right: 12px; } .starter-prompts button { padding: 12px 0; } .model-favorite { min-width: 40px; height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .research-shell *, .model-popover * { animation: none !important; transition: none !important; } }

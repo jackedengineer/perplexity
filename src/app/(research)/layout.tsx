@@ -7,6 +7,7 @@ import { ResearchShell } from "@/components/conversations/research-shell";
 import { getConversationRepository, requireConversationIdentity } from "@/server/conversations/service";
 import "./research.css";
 import "./answers.css";
+import "./graphite.css";
 
 export const metadata = { robots: { index: false, follow: false } };
 export default async function ResearchLayout({ children }: { children: React.ReactNode }) {
@@ -15,5 +16,5 @@ export default async function ResearchLayout({ children }: { children: React.Rea
     getConversationRepository().list(identity.user.id, { limit: 20, q: "" }), cookies(),
   ]);
   let deepResearchEnabled=false;try{configuredResearchModels();deepResearchEnabled=true;}catch{/* Default off. */}
-  return <ModelAccessProvider><QuestionIntentProvider><ResearchShell deepResearchEnabled={deepResearchEnabled} jobsEnabled={jobsEnabled()} name={identity.user.name} recent={recent.items} initialCollapsed={preferences.get("perplex_sidebar")?.value !== "expanded"}>{children}</ResearchShell></QuestionIntentProvider></ModelAccessProvider>;
+  return <ModelAccessProvider preferenceKey={identity.user.id}><QuestionIntentProvider><ResearchShell deepResearchEnabled={deepResearchEnabled} jobsEnabled={jobsEnabled()} name={identity.user.name} recent={recent.items} initialCollapsed={preferences.get("perplex_sidebar")?.value === "collapsed"}>{children}</ResearchShell></QuestionIntentProvider></ModelAccessProvider>;
 }
