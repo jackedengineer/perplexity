@@ -1,5 +1,5 @@
 import {and,eq,isNull,lte,gt,sql} from 'drizzle-orm';
-import {appUsers,user,usageBuckets,guestLinks} from '@/db/schema';
+import {appUsers,user,usageBuckets,guestLinks,jobPeriods} from '@/db/schema';
 import type {AdmissionDatabase} from '@/server/runs/usage';
 import {AdmissionError} from '@/server/runs/errors';
 export async function readUsage(db:AdmissionDatabase,subject:string) {
@@ -17,6 +17,8 @@ export async function readUsage(db:AdmissionDatabase,subject:string) {
    const carry=links.filter(l=>l.linkedAt>=bucket.startsAt&&l.linkedAt<bucket.endsAt).reduce((n,l)=>n+(bucket.kind==='DAY'?l.dayCredits:l.credits),0);
    return {limit:bucket.creditLimit,used:bucket.settledCredits+carry,reserved:bucket.reservedCredits,remaining:Math.max(0,bucket.creditLimit-bucket.settledCredits-bucket.reservedCredits-carry),resetsAt:bucket.endsAt.toISOString()};
   }
-  return {tier:owner.guest?'GUEST' as const:'FREE' as const,period:view(period),day:view(day),paymentsEnabled:false as const};
+  const [paid]=owner.guest?[]:await tx.select({endsAt:jobPeriods.endsAt,limit:jobPeriods.jobLimit,spent:jobPeriods.spentJobs,reserved:jobPeriods.reservedJobs}).from(jobPeriods).where(and(eq(jobPeriods.userId,owner.id),eq(jobPeriods.environment,'LIVE'),eq(jobPeriods.state,'ACTIVE'),lte(jobPeriods.startsAt,now),gt(jobPeriods.endsAt,now))).orderBy(jobPeriods.endsAt).limit(1);
+  const subscription=paid?{plan:'PRO' as const,endsAt:paid.endsAt.toISOString(),reportsRemaining:Math.max(0,paid.limit-paid.spent-paid.reserved)}:null;
+  return {subscription,tier:owner.guest?'GUEST' as const:'FREE' as const,period:view(period),day:view(day),paymentsEnabled:false as const};
  });
 }
