@@ -1,3 +1,15 @@
+# Direct Google sign-in and footer — 3 November 2026
+
+- [x] PR #28 merged after clean code/security reviews and both Quality CI jobs.
+- [x] Direct Google login completed in the live browser without an intermediate
+  marketing sign-in page. Legacy sign-in links return to the workspace.
+- [x] Policy footer reaches the bottom on 390×844 and 390×560 mobile viewports,
+  without overlapping the composer. Unauthenticated private APIs remain denied.
+- [x] Budgets, existing holds and provider usage unchanged; no paid AI calls.
+
+See [production acceptance](workspace-entry.md) for test counts, opt-in test
+limitations, Worker version and rollback.
+
 # Workspace entry release — 3 November 2026
 
 - [x] PR #27 merged after clean current-commit code/security reviews and Quality CI.

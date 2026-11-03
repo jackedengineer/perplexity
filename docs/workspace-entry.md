@@ -66,6 +66,34 @@ composer remained above it, including with the OAuth-error banner visible.
 The local direct sign-in action restored the existing Google user's authenticated
 workspace. Lint/types and credential-free Cloudflare build/cache checks pass.
 Browser regressions cover direct Google navigation with a mocked provider,
-retryable failures, legacy route redirects and mobile footer bounds. Current
-PR CI/reviews and production deployment remain pending for this follow-up.
+retryable failures, legacy route redirects and mobile footer bounds. This follow-up is deployed; production acceptance is recorded below.
 No paid AI requests, budget changes or OAuth credential changes were made.
+
+## Direct sign-in production acceptance — 3 November 2026
+
+PR #28 merged as `0d9c3cf1222f7bf4cde576c77defed043810ac1e` after clean code
+and security reviews on `f8b4420aecd907cea67188875038d694b43760fc`. The review
+finding updated the opt-in guest-trial browser entry, picker and usage assertions.
+The CI failure was an ambiguous alert selector matching Next's route announcer;
+scoping it to the workspace message preserved the assertion without weakening it.
+
+Quality run `41669430459` passed 891 unit/integration tests, 16 foundation browser
+tests, four offer tests and 33 motion/model tests (one desktop-only case skipped
+on mobile). The Cloudflare build/browser job passed too. The separate opt-in
+Neon guest-trial browser suite was updated but not rerun in this release.
+
+Worker `d152529a-2f0f-456d-8cce-dcfbca65c7a4` is live on the custom domain. A
+live Sign up / Log in action returned the existing Google account directly to
+its authenticated workspace. Before login, the footer ended at y=844 on a
+390×844 viewport and y=560 on 390×560; the composer stayed above the footer.
+Private unauthenticated conversation APIs still return 401. The legacy sign-in
+URL renders a streaming redirect to the workspace rather than a marketing page.
+
+The credential scan covered 1,797 generated files with no configured secret
+matches. The application source matches the reviewed commit; the final fix
+changes tests only. Runtime variables, secrets and the maintenance schedule were
+retained. No migration, budget/credential change or paid AI call was made. Provider
+usage readback stayed $0.076405046; all ceilings and existing holds were unchanged.
+Rollback can restore Worker `3798b39e-c89f-4732-a9aa-6f01cc6f23a7` without a
+database change. Earlier paid-account/first-payment and admitted-cancellation
+acceptance limits are unaffected.
