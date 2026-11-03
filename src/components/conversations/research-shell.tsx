@@ -67,7 +67,7 @@ export function ResearchShell({ children, recent, name, initialCollapsed, jobsEn
         </div>}
       </nav>
       <div className="sidebar-footer">
-        <PlanIndicator compact={isCollapsed}/>
+        <PlanIndicator compact={isCollapsed} onNavigate={close}/>
         {!isCollapsed && <div className="private-workspace"><Icon name="lock" size={12} />Private workspace</div>}
         <button className="account-button" aria-label="Open account menu" onClick={() => { close(); account.current?.showModal(); }}>
           <span className="account-avatar"><Icon name="user" size={16} /></span>
@@ -90,7 +90,7 @@ export function ResearchShell({ children, recent, name, initialCollapsed, jobsEn
     <dialog className="mobile-navigation" aria-label="Navigation" ref={mobileNav} onClick={(event) => { if (event.target === event.currentTarget) mobileNav.current?.close(); }}>{sidebar(false, true)}</dialog>
     <dialog className="research-dialog account-dialog" aria-labelledby="account-heading" ref={account} onClick={(event) => { if (event.target === event.currentTarget) account.current?.close(); }}>
       <div className="dialog-heading"><h2 id="account-heading">Your account</h2><button className="research-icon-button" aria-label="Close account menu" onClick={() => account.current?.close()}><Icon name="close" size={17} /></button></div>
-      <p>{name}</p><PlanIndicator/>{data?.usage.subscription&&<p className="research-muted">{data.usage.subscription.reportsRemaining} Deep Research reports remaining · Access until {new Date(data.usage.subscription.endsAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</p>}{data?.usage.tier==="GUEST"&&<Link href="/sign-in">Sign in with Google to save guest history</Link>}<p className="research-muted">Your conversations are private.</p><SessionControls />
+      <p>{name}</p><PlanIndicator onNavigate={()=>account.current?.close()}/>{data?.usage.subscription&&<p className="research-muted">{data.usage.subscription.reportsRemaining} Deep Research reports remaining · Access until {new Date(data.usage.subscription.endsAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</p>}{data?.usage.tier==="GUEST"&&<Link href="/sign-in">Sign in with Google to save guest history</Link>}<p className="research-muted">Your conversations are private.</p><SessionControls />
     </dialog>
   </div>;
 }

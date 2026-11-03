@@ -1,9 +1,10 @@
 import {expect,test} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 const models=[{key:'economy-qwen',name:'Qwen3 30B',credits:2,band:'ECONOMY'},{key:'economy-gemini',name:'Gemini 2.5 Flash Lite',credits:2,band:'ECONOMY'},{key:'standard-deepseek',name:'DeepSeek V3',credits:5,band:'STANDARD'}];
-async function fixture(page:import('@playwright/test').Page,pro=false){
+async function fixture(page:import('@playwright/test').Page,pro=false,path='/'){
  await page.route('**/api/models',async route=>{const response=await route.fetch(),body=await response.json();body.models=models;body.usage.subscription=pro?{plan:'PRO',endsAt:new Date(Date.now()+86400000).toISOString(),reportsRemaining:5}:null;await route.fulfill({json:body});});
- await page.goto('/');
+ await page.goto(path);
+ await expect(page.getByRole('button',{name:'Answer model: Qwen3 30B'})).toBeVisible();
 }
 test('picker selects models, supports keyboard and stays inside the viewport',async({page},info)=>{
  await fixture(page);const trigger=page.getByRole('button',{name:'Answer model: Qwen3 30B'});await trigger.click();
@@ -13,6 +14,7 @@ test('picker selects models, supports keyboard and stays inside the viewport',as
  await expect(page.getByRole('button',{name:'Answer model: Gemini 2.5 Flash Lite'})).toBeFocused();await expect(menu).toHaveCount(0);
  await page.getByRole('button',{name:'Answer model: Gemini 2.5 Flash Lite'}).click();
  const box=await menu.boundingBox();expect(box!.x).toBeGreaterThanOrEqual(0);expect(box!.y).toBeGreaterThanOrEqual(0);expect(box!.x+box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+ await menu.evaluate(async el=>{await Promise.all(el.getAnimations().map(animation=>animation.finished));});
  expect((await new AxeBuilder({page}).include('.model-popover').analyze()).violations).toEqual([]);
  await page.screenshot({path:`.artifacts/model-picker-${info.project.name}.png`});
  await page.keyboard.press('Escape');await expect(menu).toHaveCount(0);
@@ -27,4 +29,21 @@ test('free upgrade stays visible with a collapsed sidebar and reduced motion',as
  await expect(page.locator('.workspace-plan').getByRole('link',{name:'Upgrade to Pro'})).toBeVisible();
  await page.getByRole('button',{name:'Answer model: Qwen3 30B'}).click();
  expect(await page.locator('.model-popover').evaluate(el=>getComputedStyle(el).animationName)).toBe('none');
+});
+
+test('Pro billing links dismiss their dialog even on the billing page',async({page},info)=>{
+ await fixture(page,true,'/billing');
+ if(info.project.name==='mobile'){
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+  const navigation=page.getByRole('dialog',{name:'Navigation',exact:true});
+  await navigation.getByRole('link',{name:'Pro subscription — manage billing'}).click();
+  await expect(navigation).not.toBeVisible();
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+  await navigation.getByRole('button',{name:'Open account menu'}).click();
+ }else await page.getByRole('button',{name:'Open account menu'}).first().click();
+ const account=page.getByRole('dialog',{name:'Your account'});
+ await expect(account).toBeVisible();
+ await account.getByRole('link',{name:'Pro subscription — manage billing'}).click();
+ await expect(account).not.toBeVisible();
+ await expect(page).toHaveURL(/\/billing$/);
 });
