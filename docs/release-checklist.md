@@ -727,3 +727,25 @@ Local-only artifacts: `.artifacts/live-openrouter/third-run/`, repaired-browser
 screenshots/accounting, browser regression logs and DevTools profiles. CI retains
 only the explicit aggregate evaluation report; raw prompts/evidence/answers and
 credentials are not public artifacts.
+
+### Pro UX release candidate — 3 November 2026
+
+- PR #25 closes the containing account/mobile dialog when a plan link is used,
+  including navigation to the current billing URL. The regression failed in
+  desktop and mobile Chromium before the fix; all 20 motion/model-picker browser
+  checks pass afterward. The offline fixture disables the Next development
+  indicator so it cannot cover the account control, and accessibility checks
+  await the menu's real entrance animation.
+- Includes PR #24's deployed billing fixes rather than reverting production.
+  Its cancellation race was reproduced with a real adapter and synthetic
+  provider responses. Both cancellation and reconciliation retain UNKNOWN
+  capacity until an explicit unpaid terminal response or all charged-cycle
+  evidence is present. Missing evidence and delayed webhooks cannot free the
+  funded seat. Targeted billing validation: 47 tests pass; lint/types pass.
+- Fresh code/security reviews and CI must cover the final candidate before
+  merge. Cloudflare deployment and live UX acceptance remain pending.
+- No payment is made and no synthetic LIVE entitlement is created for UI
+  acceptance. The current browser account has no verified active Pro period;
+  a real paid-account badge check requires an existing paid account.
+- Provider keys, budgets, unknown-cost holds and checkout flags are unchanged.
+  Added model routes remain opt-in pending provider acceptance checks.
