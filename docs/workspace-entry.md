@@ -49,3 +49,23 @@ budgets and existing unknown-cost holds were retained. No migrations, purchases,
 provider calls, quota increases or credential changes were made. Rollback can
 restore the previous Worker `81951d40-d983-4808-b104-60be2aa7ba14` without a database
 change.
+
+## Follow-up: direct Google sign-in and policy footer
+
+Workspace Sign up / Log in buttons start the existing Google social sign-in
+action directly. The client SDK loads on demand when clicked. The old `/sign-in`
+marketing screen is removed; bookmarks and existing authentication redirects go
+to the workspace, retaining a safe OAuth error message when needed. Failed
+authorization stays retryable without automatically restarting OAuth.
+
+Visitor policy links now belong to a separate flex footer, outside the message
+composer. It rests at the bottom on mobile without a fixed overlay. Local browser
+checks at 390×844 and 390×560 placed the footer bottom at 844px and 560px; the
+composer remained above it, including with the OAuth-error banner visible.
+
+The local direct sign-in action restored the existing Google user's authenticated
+workspace. Lint/types and credential-free Cloudflare build/cache checks pass.
+Browser regressions cover direct Google navigation with a mocked provider,
+retryable failures, legacy route redirects and mobile footer bounds. Current
+PR CI/reviews and production deployment remain pending for this follow-up.
+No paid AI requests, budget changes or OAuth credential changes were made.
