@@ -83,3 +83,37 @@ test('edit dialog preserves original question and closes with Escape',async({pag
  await page.getByRole('button',{name:'Deep Research Pro'}).click();
  await expect(page.getByRole('link',{name:'Upgrade to Pro ↗',exact:true})).toBeVisible();
 });
+
+test('Sources never cover the answer or composer on desktop',async({page},info)=>{
+ test.skip(info.project.name!=='desktop','Desktop side panel; mobile uses a modal.');
+ await fixture(page,false,'/?saved=1');
+ await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
+ for(const width of [1200,1280,1440]){
+  await page.setViewportSize({width,height:800});
+  await page.getByRole('button',{name:'Sources',exact:true}).click();
+  const panel=await page.locator('.answer-sources').boundingBox();
+  for(const selector of ['.answer-prose','.thread-bottom']){
+   const box=await page.locator(selector).boundingBox();
+   expect(box!.x+box!.width).toBeLessThanOrEqual(panel!.x-16);
+   expect(box!.width).toBeGreaterThan(500);
+  }
+  await page.getByRole('button',{name:'Sources',exact:true}).click();
+  const closed=await page.locator('.answer-prose').boundingBox();
+  expect(closed!.width).toBe(720);
+ }
+});
+
+test('library search, clear and Escape preserve the pinned scope',async({page})=>{
+ for(const pinned of [true,false]){
+  await page.goto(`/library?search=1${pinned?'&pinned=true':''}`);
+  const input=page.getByRole('searchbox',{name:'Search your conversations'});
+  await input.fill('water & clouds');await input.press('Enter');
+  await expect(page).toHaveURL(url=>url.searchParams.get('q')==='water & clouds'&&url.searchParams.has('pinned')===pinned);
+  await expect(page.getByRole('heading',{name:pinned?'Pinned chats':'Chats',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Clear search',exact:true}).click();
+  await expect(page).toHaveURL(url=>!url.searchParams.has('q')&&url.searchParams.has('pinned')===pinned);
+  await input.press('Escape');
+  await expect(page).toHaveURL(url=>!url.searchParams.has('search')&&url.searchParams.has('pinned')===pinned);
+  await expect(page.getByRole('button',{name:'Search conversations',exact:true})).toBeVisible();
+ }
+});

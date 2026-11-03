@@ -34,6 +34,16 @@
 - Local test budget allowed one live Chat run. Subsequent local admissions correctly
   paused below the 50,000-micro-USD reservation. Existing holds and caps untouched.
 
+### Review follow-up
+
+- The initial head passed both Quality CI jobs: 891 unit/integration tests,
+  foundation/offer/browser coverage and the Cloudflare build.
+- Fixed both code-review findings: Sources now reserves a separate desktop column;
+  library submit, clear and Escape preserve the pinned scope. Browser checks at
+  1200/1280/1440 pixels and the mobile Sources modal pass; lint/types pass.
+- Added CI browser regressions for geometry and pinned/unfiltered search navigation.
+  Fresh review and CI on this follow-up remain required before deployment.
+
 ## Deployment order and rollback
 
 1. Pass CI and code/security review; build Cloudflare without Next-recognized local

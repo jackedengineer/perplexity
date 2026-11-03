@@ -112,3 +112,7 @@
 .research-shell { overflow: clip; }
 .answer-sources:not(.sources-open) { display: none; }
 .research-shell .answer-sources,.research-shell .mobile-sources-dialog { background: #222; border-color: #444; }
+@media (min-width:1200px) {
+  .thread-content:has(.sources-open) { padding-right: 360px; }
+  .active-thread:has(.sources-open) .thread-bottom { width: min(720px,calc(100% - 392px)); margin-right: 328px; }
+}
