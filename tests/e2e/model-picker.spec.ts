@@ -123,3 +123,26 @@ test('library search, clear and Escape preserve the pinned scope',async({page},i
   await expect(page.locator('.library-page').getByRole('button',{name:'Search conversations',exact:true})).toBeVisible();
  }
 });
+
+for(const mode of ['Chat','Web'] as const)test(`${mode} question survives navigation between route groups`,async({page})=>{
+ await page.route('**/api/chat',route=>route.fulfill({status:503,json:{error:{message:'The research provider is temporarily unavailable. Please try again later.'}}}));
+ await page.goto('/workspace');
+ await expect(page.getByRole('button',{name:/Answer model:/})).toBeEnabled();
+ await page.getByRole('button',{name:/Answer model:/}).click();
+ await page.getByRole('textbox',{name:'Search models'}).fill('Qwen');
+ await page.keyboard.press('ArrowDown');
+ await page.keyboard.press('Enter');
+ await expect(page.getByRole('button',{name:'Answer model: Qwen3 30B',exact:true})).toBeFocused();
+ await page.getByRole('button',{name:mode,exact:true}).click();
+ await page.getByRole('textbox',{name:'Ask a question',exact:true}).fill('Explain why triangles have three sides.');
+ const submitted=page.waitForRequest(request=>new URL(request.url()).pathname==='/api/chat'&&request.method()==='POST');
+ await page.getByRole('button',{name:'Submit question',exact:true}).click();
+ const body=(await submitted).postDataJSON();
+ expect(body.message.text).toBe('Explain why triangles have three sides.');
+ expect(body.mode).toBe(mode==='Chat'?'CHAT':'FAST');
+ expect(body.modelKey).toBe('economy-qwen');
+ await expect(page).toHaveURL(/\/search\/10000000-0000-4000-8000-000000000002$/);
+ await expect(page.getByRole('article',{name:'Your question'})).toContainText('Explain why triangles have three sides.');
+ await expect(page.getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-pressed','true');
+ await expect(page.getByRole('button',{name:'Answer model: Qwen3 30B',exact:true})).toBeVisible();
+});

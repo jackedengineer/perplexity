@@ -35,12 +35,12 @@ test("authenticated workspace renders, renews, and signs out", async ({ context,
     if (await page.getByRole("button", { name: "Open navigation" }).isVisible()) await page.getByRole("button", { name: "Open navigation" }).click();
     await page.getByRole("button", { name: "Open account menu" }).filter({ visible: true }).click();
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
-    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page).toHaveURL(/\/workspace$/);
     expect((await db.query("SELECT id FROM session WHERE user_id=$1", [id])).rows).toHaveLength(0);
     await page.goto('/operations');
     await expect(page.getByRole('heading',{name:'Private operations',exact:true})).toHaveCount(0);
     await page.goto("/workspace");
-    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page.locator(".workspace-plan").getByRole("link",{name:"Sign up / Log in"})).toBeVisible();
   } finally {
     await db.query('DELETE FROM "user" WHERE id=$1', [id]);
     await db.end();

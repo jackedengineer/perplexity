@@ -3,7 +3,8 @@ import Link from "next/link";
 import {ModePicker} from "./mode-picker";
 import {useStartDeep} from "./use-start-deep";
 import {ModelSelector,UsageSummary,useModelAccess} from "./model-access";
-import { useState } from "react";
+import { useEffect,useState } from "react";
+import {WORKSPACE_DRAFT_KEY} from './workspace-draft';
 import { useRouter } from "next/navigation";
 import { ResearchMark, Icon } from "./icons";
 import { useStartSearch } from "./use-start-search";
@@ -34,6 +35,7 @@ export function QuestionComposer({text,onText,onSubmit,pending,onStop,placeholde
 export function StartQuestion({compact=false}: {compact?:boolean}) {
   const [text,setText]=useState(""),[pending,setPending]=useState(false),[error,setError]=useState("");
   const starting=useStartSearch(),startDeep=useStartDeep(),{mode}=useModelAccess(),router=useRouter();
+  useEffect(()=>{try{const draft=sessionStorage.getItem(WORKSPACE_DRAFT_KEY);if(draft){sessionStorage.removeItem(WORKSPACE_DRAFT_KEY);queueMicrotask(()=>setText(draft.slice(0,4000)));}}catch{/* Storage is optional. */}},[]);
   async function submit() {
     if(pending||!text.trim())return;setPending(true);setError("");
     try {if(mode==='DEEP')await startDeep(text);else await starting(text);}catch(failure){if(failure instanceof ConversationRequestError&&failure.status===401)router.replace("/sign-in");

@@ -15,8 +15,12 @@ test("public pages are accessible and fit the viewport", async ({ page }, testIn
   await page.screenshot({ path: `.artifacts/sign-in-${testInfo.project.name}.png`, fullPage: true });
 });
 
-test("private workspace requires sign-in", async ({ page }) => {
+test("public workspace opens without sign-in and private history stays protected", async ({ page }) => {
   await page.goto("/workspace");
+  await expect(page).toHaveURL(/\/workspace$/);
+  await expect(page.getByRole("textbox",{name:"Ask a question"})).toBeVisible();
+  await expect(page.locator(".workspace-plan").getByRole("link",{name:"Sign up / Log in"})).toBeVisible();
+  await page.goto("/library");
   await expect(page).toHaveURL(/\/sign-in$/);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
 });
@@ -31,12 +35,38 @@ test("OAuth failure restores a usable sign-in button", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeEnabled();
 });
 
+test('visitor entry keeps authentication explicit and supports sidebar motion',async({page},info)=>{
+ await page.goto('/');
+ await expect(page).toHaveURL(/\/workspace$/);
+ const login=page.locator('.workspace-plan').getByRole('link',{name:'Sign up / Log in'});
+ await expect(login).toBeVisible();
+ await page.getByRole('textbox',{name:'Ask a question',exact:true}).fill('A draft to keep through sign-in');
+ // A signed-out visitor must stay here instead of being redirected by session renewal.
+ await expect(page.getByRole('button',{name:'Sign out',exact:true})).toHaveCount(0);
+ if(info.project.name.includes('mobile')){
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+  await expect(page.getByRole('dialog',{name:'Navigation',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Close navigation',exact:true}).click();
+  await expect(page.getByRole('dialog',{name:'Navigation',exact:true})).not.toBeVisible();
+ }else{
+  await page.getByRole('button',{name:'Collapse sidebar',exact:true}).click();
+  await expect(page.locator('.research-sidebar')).toHaveCSS('width','56px');
+  await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
+  await expect(page.locator('.research-sidebar')).toHaveCSS('width','232px');
+ }
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await expect(page.locator('.research-sidebar')).toHaveCSS('transition-duration','0s');
+ await login.click();
+ await expect(page).toHaveURL(/\/sign-in$/);
+ expect(await page.evaluate(()=>sessionStorage.getItem('perplex-workspace-draft'))).toBe('A draft to keep through sign-in');
+});
+
 test("unknown routes show an actionable 404", async ({ page }) => {
   const response = await page.goto("/this-page-does-not-exist");
   expect(response?.status()).toBe(404);
   await expect(page.getByRole("heading", { name: "This page wandered off." })).toBeVisible();
   await page.getByRole("link", { name: "Back to home" }).click();
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL(/\/workspace$/);
 });
 
 test('unfinished paid job and checkout boundaries stay off on the default deployment',async({request,page})=>{

@@ -11,7 +11,7 @@ const accessSchema=z.object({models:z.array(z.object({key:z.enum(['fast-default'
 type Access=z.infer<typeof accessSchema>;
 type ModelKey=Access['models'][number]['key'];
 const AccessContext=createContext<{data:Access|null;key:ModelKey;select:(key:ModelKey)=>void;refresh:()=>void;error:string;mode:ConversationMode;setMode:(mode:ConversationMode)=>void;deepAvailable:boolean;favorites:string[];favorite:(key:ModelKey)=>void}>({data:null,key:'fast-default',select:()=>{},refresh:()=>{},error:'',mode:'FAST',setMode:()=>{},deepAvailable:false,favorites:[],favorite:()=>{}});
-export function ModelAccessProvider({children,preferenceKey="default",deepAvailable=false}:{children:ReactNode;preferenceKey?:string;deepAvailable?:boolean}) {
+export function ModelAccessProvider({children,preferenceKey="default",deepAvailable=false,enabled=true}:{children:ReactNode;preferenceKey?:string;deepAvailable?:boolean;enabled?:boolean}) {
  const [data,setData]=useState<Access|null>(null),[key,select]=useState<ModelKey>('fast-default'),[error,setError]=useState(''),[version,setVersion]=useState(0);
  const [mode,setMode]=useState<ConversationMode>('FAST');
  const storageKey=`graphite-model-favorites:${preferenceKey}`;
@@ -19,12 +19,12 @@ export function ModelAccessProvider({children,preferenceKey="default",deepAvaila
  useEffect(()=>{queueMicrotask(()=>{try{setFavorites(readFavorites(localStorage,storageKey));}catch{setFavorites([]);}});},[storageKey]);
  const favorite=(key:ModelKey)=>setFavorites(current=>{const next=toggleFavorite(current,key);try{localStorage.setItem(storageKey,JSON.stringify(next));}catch{/* In-memory fallback for restricted storage. */}return next;});
  const pathname=usePathname(),refresh=useCallback(()=>setVersion(v=>v+1),[]);
- useEffect(()=>{const abort=new AbortController();void (async()=>{try{
+ useEffect(()=>{if(!enabled)return;const abort=new AbortController();void (async()=>{try{
   const response=await fetch('/api/models',{credentials:'same-origin',cache:'no-store',signal:AbortSignal.any([abort.signal,AbortSignal.timeout(8000)])});
   if(!response.ok)throw new Error();const result=accessSchema.parse(await response.json());if(abort.signal.aborted)return;
   setData(result);select(current=>result.models.some(m=>m.key===current)?current:result.models[0]?.key??'fast-default');setError('');
- }catch{if(!abort.signal.aborted){setData(null);setError('Model and usage information is temporarily unavailable.');}}})();return()=>abort.abort();},[pathname,version]);
- useEffect(()=>{const onFocus=()=>refresh();window.addEventListener('focus',onFocus);const timer=setInterval(refresh,60000);return()=>{window.removeEventListener('focus',onFocus);clearInterval(timer);};},[refresh]);
+ }catch{if(!abort.signal.aborted){setData(null);setError('Model and usage information is temporarily unavailable.');}}})();return()=>abort.abort();},[pathname,version,enabled]);
+ useEffect(()=>{if(!enabled)return;const onFocus=()=>refresh();window.addEventListener('focus',onFocus);const timer=setInterval(refresh,60000);return()=>{window.removeEventListener('focus',onFocus);clearInterval(timer);};},[refresh,enabled]);
  return <AccessContext.Provider value={{data,key,select,refresh,error,favorites,favorite,mode,setMode,deepAvailable}}>{children}</AccessContext.Provider>;
 }
 export const useModelAccess=()=>useContext(AccessContext);
