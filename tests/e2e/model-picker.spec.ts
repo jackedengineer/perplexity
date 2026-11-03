@@ -103,9 +103,15 @@ test('Sources never cover the answer or composer on desktop',async({page},info)=
  }
 });
 
-test('library search, clear and Escape preserve the pinned scope',async({page})=>{
+test('library search, clear and Escape preserve the pinned scope',async({page},info)=>{
  for(const pinned of [true,false]){
   await page.goto(`/library?search=1${pinned?'&pinned=true':''}`);
+  await expect(page.locator('.workspace-plan').getByRole('link',{name:'Upgrade to Pro'})).toBeVisible();
+  if(info.project.name==='desktop'){
+   const plan=await page.locator('.workspace-plan').boundingBox();
+   const create=await page.locator('.library-page').getByRole('link',{name:'New',exact:true}).boundingBox();
+   expect(create!.x+create!.width).toBeLessThanOrEqual(plan!.x);
+  }
   const input=page.getByRole('searchbox',{name:'Search your conversations'});
   await input.fill('water & clouds');await input.press('Enter');
   await expect(page).toHaveURL(url=>url.searchParams.get('q')==='water & clouds'&&url.searchParams.has('pinned')===pinned);
@@ -114,6 +120,6 @@ test('library search, clear and Escape preserve the pinned scope',async({page})=
   await expect(page).toHaveURL(url=>!url.searchParams.has('q')&&url.searchParams.has('pinned')===pinned);
   await input.press('Escape');
   await expect(page).toHaveURL(url=>!url.searchParams.has('search')&&url.searchParams.has('pinned')===pinned);
-  await expect(page.getByRole('button',{name:'Search conversations',exact:true})).toBeVisible();
+  await expect(page.locator('.library-page').getByRole('button',{name:'Search conversations',exact:true})).toBeVisible();
  }
 });
