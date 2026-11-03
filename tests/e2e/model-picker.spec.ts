@@ -8,8 +8,9 @@ async function fixture(page:import('@playwright/test').Page,pro=false,path='/'){
 }
 test('picker selects models, supports keyboard and stays inside the viewport',async({page},info)=>{
  await fixture(page);const trigger=page.getByRole('button',{name:'Answer model: Qwen3 30B'});await trigger.click();
- const menu=page.getByRole('menu',{name:'Answer models'});await expect(menu).toBeVisible();
- await expect(page.getByRole('menuitemradio',{name:/Qwen3/})).toBeFocused();
+ const menu=page.getByRole('dialog',{name:'Answer models'});await expect(menu).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'Search models'})).toBeFocused();
+ await page.getByRole('textbox',{name:'Search models'}).fill('Gemini');
  await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
  await expect(page.getByRole('button',{name:'Answer model: Gemini 2.5 Flash Lite'})).toBeFocused();await expect(menu).toHaveCount(0);
  await page.getByRole('button',{name:'Answer model: Gemini 2.5 Flash Lite'}).click();
@@ -46,4 +47,39 @@ test('Pro billing links dismiss their dialog even on the billing page',async({pa
  await account.getByRole('link',{name:'Pro subscription — manage billing'}).click();
  await expect(account).not.toBeVisible();
  await expect(page).toHaveURL(/\/billing$/);
+});
+
+test('favorites persist and model search has an empty state',async({page})=>{
+ await fixture(page);await page.getByRole('button',{name:'Answer model: Qwen3 30B'}).click();
+ await page.getByRole('button',{name:'Favorite DeepSeek V3',exact:true}).click();
+ await page.keyboard.press('Escape');await page.reload();
+ await page.getByRole('button',{name:'Answer model: Qwen3 30B'}).click();
+ await expect(page.getByRole('button',{name:'Unfavorite DeepSeek V3',exact:true})).toHaveAttribute('aria-pressed','true');
+ await page.getByRole('textbox',{name:'Search models'}).fill('absent-model');
+ await expect(page.getByRole('status')).toContainText('No models match');
+});
+
+test('retry picks another model and keeps the original turn',async({page})=>{
+ await fixture(page,false,'/?saved=1');
+ await page.getByRole('button',{name:'Try another model',exact:true}).click();
+ const revision=page.getByRole('dialog',{name:'Try another model',exact:true});
+ await revision.getByRole('button',{name:'Answer model: Qwen3 30B'}).click();
+ await page.getByRole('textbox',{name:'Search models'}).fill('Gemini');
+ await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
+ await revision.getByRole('button',{name:'Send again'}).click();
+ await expect(page.getByRole('button',{name:'Answer model: Gemini 2.5 Flash Lite'})).toBeVisible();
+ await expect(page.getByRole('article',{name:'Approved answer'})).toHaveCount(2,{timeout:10000});
+ await expect(page.getByRole('article',{name:'Your question'})).toHaveCount(2);
+});
+
+test('edit dialog preserves original question and closes with Escape',async({page})=>{
+ await fixture(page,false,'/?saved=1');
+ await page.getByRole('button',{name:'Edit & resend',exact:true}).click();
+ const revision=page.getByRole('dialog',{name:'Edit your question'});
+ await revision.getByRole('textbox',{name:'Question',exact:true}).fill('Explain evaporation simply.');
+ await page.keyboard.press('Escape');await expect(revision).not.toBeVisible();
+ await expect(page.getByRole('article',{name:'Your question'})).toContainText('How does the water cycle work?');
+ await expect(page.getByRole('article',{name:'Your question'})).toHaveCount(1);
+ await page.getByRole('button',{name:'Deep Research Pro'}).click();
+ await expect(page.getByRole('link',{name:'Upgrade to Pro ↗',exact:true})).toBeVisible();
 });
