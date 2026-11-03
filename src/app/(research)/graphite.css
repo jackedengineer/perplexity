@@ -1,4 +1,8 @@
 /* Graphite: neutral surfaces, one reading column, motion only as feedback. */
+/* Paint the document canvas too: iOS can expose it around the keyboard/overscroll.
+   Scope by rendered shell because route styles persist after client navigation. */
+html:has(.research-shell) { color-scheme: dark; background: #191919; }
+body:has(.research-shell) { background: #191919; }
 .visitor-sign-in { display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; border: 1px solid #d7d7d0; border-radius: 7px; background: #e8e8e3; color: #202020; font-size: 12px; font-weight: 500; white-space: nowrap; transition: background 140ms ease; }
 .visitor-sign-in:hover { background: #fff; }
 .sidebar-collapsed .visitor-sign-in { width: 40px; padding: 8px 2px; font-size: 10px; }

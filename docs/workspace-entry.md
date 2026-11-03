@@ -1,5 +1,24 @@
 # Workspace entry and sidebar motion
 
+## Mobile keyboard canvas fix — 3 November 2026 (release pending)
+
+The Graphite shell painted dark content over the root document's inherited light
+scheme and cream canvas. Both workspace route groups now emit dark color-scheme
+and theme-color metadata. Shell-scoped CSS also paints `html` and `body` dark,
+including areas exposed during keyboard movement or overscroll. No viewport zoom
+restrictions, keyboard listeners or layout scripts were added. Scope follows the
+rendered shell because global CSS can remain loaded after client navigation.
+
+Real-browser checks on the credential-free built Cloudflare worker confirmed the
+dark canvas and metadata at 390px width, focused input without horizontal
+overflow, and the light policy theme after client navigation. Local authenticated
+workspace checks covered 390×844 and 390×390. Lint, type checks and Cloudflare build
+passed. Foundation regressions cover the canvas, focus, metadata and policy
+navigation. An actual iPhone Safari keyboard recheck remains necessary: desktop
+mobile emulation does not display native iOS keyboard accessory controls.
+No AI calls or budget changes were made. Merge and production deployment remain
+pending CI and review.
+
 The homepage redirects to `/workspace`. The workspace is public to view and type
 in; guests still establish their existing bounded, challenged trial before using
 AI. Signed-in users use the existing authenticated workspace frame. Private
