@@ -27,3 +27,7 @@ it('rejects dynamic route prerenders and revalidation that the read-only cache c
  await expect(verify(publicRoutes(),{'/search/[id]':{}})).rejects.toThrow('Unexpected prerendered routes');
  await expect(verify({...publicRoutes(),'/privacy':{initialRevalidateSeconds:60}})).rejects.toThrow('without revalidation');
 });
+
+it('allows the build-time Graphite icon alongside public pages',async()=>{
+ await expect(verify({...publicRoutes(),'/icon.svg':{initialRevalidateSeconds:false}})).resolves.toBeDefined();
+});
