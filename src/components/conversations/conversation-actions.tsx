@@ -36,6 +36,13 @@ export function ConversationActions({ conversation,renameUnavailable=false }: { 
       setError(failure instanceof ConversationRequestError ? failure.message : "We couldn’t save that change. Please try again.");
     } finally { setPending(false); }
   }
+  async function pin() {
+    if (pending) return;
+    setPending(true); setCopyStatus("");
+    try { await mutateConversation(`/api/conversations/${conversation.id}/pin`, "PATCH", {pinned: !conversation.pinnedAt}); menu.current?.hidePopover(); router.refresh(); }
+    catch { setCopyStatus("Couldn’t update the pin. Please try again."); }
+    finally { setPending(false); }
+  }
   async function remove() {
     if (pending) return;
     setPending(true); setError("");
@@ -77,6 +84,7 @@ export function ConversationActions({ conversation,renameUnavailable=false }: { 
         buttons[next]?.focus();
       }}>
       <p className="conversation-menu-title">{conversation.title}</p>
+      <button role="menuitem" onClick={()=>void pin()} disabled={pending}><Icon name="pin" size={16}/>{conversation.pinnedAt?"Unpin chat":"Pin chat"}</button>
       <button role="menuitem" onClick={rename} disabled={renameUnavailable} title={renameUnavailable?"Finish the active research request before renaming.":undefined}>Rename</button>
       <button role="menuitem" onClick={() => void copy()}><Icon name="link" size={16} />Copy private link</button>
       <button role="menuitem" disabled={pending} onClick={() => void exportData()}>Export conversation</button>

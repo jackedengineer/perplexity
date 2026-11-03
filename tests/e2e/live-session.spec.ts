@@ -21,7 +21,7 @@ test("authenticated workspace renders, renews, and signs out", async ({ context,
     await context.addCookies([{ name: "perplex.session_token", value: encodeURIComponent(`${token}.${signature}`),
       domain: "localhost", path: "/", httpOnly: true, sameSite: "Lax" }]);
     await page.goto("/workspace");
-    await expect(page.getByRole("heading", { name: "What do you want to know?" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "A little space to think." })).toBeVisible();
     await page.goto('/operations');
     await expect(page.getByRole('heading',{name:'Private operations',exact:true})).toHaveCount(0);
     await expect(page.getByText('Budget and maintenance status',{exact:true})).toHaveCount(0);

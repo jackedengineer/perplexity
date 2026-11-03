@@ -15,7 +15,7 @@ export const allow = { decision: "ALLOW",categoryCodes: [],policyVersion: "v1" }
 export const knownUsage = { costMicroUsd: 100n,inputTokens: 10,outputTokens: 5,actualModel: "test/safety" };
 export const fakeSafety = () => ({ modelId: "test/safety",classify: async()=>allow,usage: ()=>knownUsage });
 export const keys = { activeKeyId: "test-v1",keys: { "test-v1": "a".repeat(64) } };
-export async function seedCompletion(db: AdmissionDatabase,reserve = 50000n,text="Why do rainbows form?",accountingVersion=1,locale?:string) {
+export async function seedCompletion(db: AdmissionDatabase,reserve = 50000n,text="Why do rainbows form?",accountingVersion=1,locale?:string,mode:"FAST"|"CHAT"="FAST") {
   const subject = randomUUID(),namespace = `completion-${randomUUID()}`;
   await db.insert(schema.user).values({ id: subject,name: "Synthetic completion",email: `${subject}@example.test` });
   const [profile] = await db.insert(schema.appUsers).values({ authSubject: subject }).returning();
@@ -25,7 +25,7 @@ export async function seedCompletion(db: AdmissionDatabase,reserve = 50000n,text
     await db.insert(schema.usageBuckets).values({ userId: profile.id,kind,...window,entitlementVersion: "test-v1",creditLimit: 10,providerLimitMicroUsd: 100000n });
     await db.insert(schema.operatorUsageBuckets).values({ budgetKey: namespace,kind,...window,providerLimitMicroUsd: 100000n });
   }
-  const request = { conversationId: conversation.id,clientRequestId: randomUUID(),expectedRevision: 0,mode: "FAST",modelKey: "fast-default",message: { text },...(locale?{locale}:{}) };
+  const request = { conversationId: conversation.id,clientRequestId: randomUUID(),expectedRevision: 0,mode,modelKey: "fast-default",message: { text },...(locale?{locale}:{}) };
   const admitted = await createRunAdmission(db,keys,{ ...FREE_ADMISSION_POLICY,operatorBudgetKey: namespace,providerReserveMicroUsd: reserve }).admit(subject,request);
   if (admitted.kind !== "ADMITTED") throw new Error("Synthetic admission failed");
   // Existing completion/settlement regression fixtures exercise the historical v1 snapshot.

@@ -218,6 +218,20 @@
       "when": 1793615103281,
       "tag": "0030_paid_job_content",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1793702735258,
+      "tag": "0031_dusty_drax",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793703019544,
+      "tag": "0032_fuzzy_human_cannonball",
+      "breakpoints": true
     }
   ]
 }

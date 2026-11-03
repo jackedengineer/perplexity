@@ -11,9 +11,9 @@ import { SAFETY_RESPONSES,resolveSafetyDecision,type SafetyResponse } from "./re
 import type { ExecutionOptions } from "@/server/ai/bounded";
 export const NO_EVIDENCE_TEXT = "I couldn’t find enough usable evidence to answer this question. Try a more specific question or check back later.";
 const approvalInput = z.strictObject({ runId: z.uuid(),attemptVersion: z.int().positive(),revision: z.int().positive(),
-  kind: z.enum(["ANSWER","CLARIFICATION","NO_EVIDENCE"]),question: questionTextSchema,markdown: questionTextSchema,evidence: evidencePackageSchema });
+  kind: z.enum(["ANSWER","CLARIFICATION","NO_EVIDENCE","CHAT"]),question: questionTextSchema,markdown: questionTextSchema,evidence: evidencePackageSchema });
 export type ApprovedResponse = Readonly<{ runId: string;attemptVersion: number;revision: number;policyVersion: "v1";
-  kind: "ANSWER" | "CLARIFICATION" | "NO_EVIDENCE";markdown: string;sources: readonly Readonly<VisibleSource>[];additionalSources?:readonly Readonly<VisibleSource>[] }>;
+  kind: "ANSWER" | "CLARIFICATION" | "NO_EVIDENCE" | "CHAT";markdown: string;sources: readonly Readonly<VisibleSource>[];additionalSources?:readonly Readonly<VisibleSource>[] }>;
 export type ReleaseResult = { kind: "APPROVED";response: ApprovedResponse }
   | { kind: "DENIED";code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE" | "DEADLINE_EXCEEDED";response: SafetyResponse };
 const approved = new WeakSet<object>();

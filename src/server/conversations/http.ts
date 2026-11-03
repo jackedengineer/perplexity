@@ -1,10 +1,10 @@
 import { requireEmptyBody } from "@/server/runs/recovery-http";
 import { ZodError } from "zod";
-import { conversationId, createInput, historyInput, listInput, renameInput } from "./contracts";
+import { conversationId, createInput, historyInput, listInput, renameInput, pinInput } from "./contracts";
 import { ConversationError } from "./errors";
 import type { ConversationRepository } from "./repository";
 
-type Operation = "create" | "list" | "get" | "history" | "rename" | "remove" | "export";
+type Operation = "create" | "list" | "get" | "history" | "rename" | "remove" | "export" | "pin";
 type Dependencies = {
   repository: () => ConversationRepository;
   origin: () => string;
@@ -48,7 +48,7 @@ export function createConversationHttp(dependencies: Dependencies) {
       const start = performance.now();
       let response: Response;
       try {
-        if (["create", "rename", "remove"].includes(operation) && request.headers.get("origin") !== new URL(dependencies.origin()).origin) {
+        if (["create", "rename", "remove", "pin"].includes(operation) && request.headers.get("origin") !== new URL(dependencies.origin()).origin) {
           throw new ConversationError("INVALID_ORIGIN");
         }
         const identity = await dependencies.identity(request);
@@ -71,6 +71,9 @@ export function createConversationHttp(dependencies: Dependencies) {
           } else if (operation === "export") {
             if (new URL(request.url).search) throw new ConversationError("INVALID_INPUT");
             response = Response.json(await repository.exportData(subject,id!),{headers:{"Content-Disposition":`attachment; filename="conversation-${id}.json"`,"X-Content-Type-Options":"nosniff"}});
+          } else if (operation === "pin") {
+            const input = pinInput.parse(await readJson(request));
+            response = Response.json({ conversation: await repository.pin(subject, id!, input.pinned), requestId });
           } else if (operation === "rename") {
             const conversation = await repository.rename(subject, id!, renameInput.parse(await readJson(request)));
             response = Response.json({ conversation, requestId });

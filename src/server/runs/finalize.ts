@@ -31,18 +31,19 @@ export function createFinalization(db: AdmissionDatabase) {
         if (["COMPLETED","NEEDS_CLARIFICATION"].includes(run.status) && existing?.decision === "ALLOW" && existing.messageId && existing.payloadHash === serialized.payloadHash) return { kind: "ALREADY_COMMITTED",runId: run.id,messageId: existing.messageId };
         if (run.status !== "CHECKING_OUTPUT" || signal.aborted || run.deadlineAt <= now || run.attemptVersion !== value.attemptVersion ||
           conversation.revision !== value.revision || run.admittedRevision !== value.revision || value.policyVersion !== SAFETY_POLICY.version || run.policyVersion !== value.policyVersion) throw new AdmissionError("CONFLICT");
-        const clarifying=value.kind==='CLARIFICATION';
+        const clarifying=value.kind==='CLARIFICATION',chat=value.kind==='CHAT';
+        if((run.mode==='CHAT')!==chat)throw new AdmissionError('CONFLICT');
         const [planning]=await tx.select().from(runPlans).where(eq(runPlans.runId,run.id));
         if(clarifying&&(!planning||planning.attemptVersion!==run.attemptVersion||planning.plan.action!=='CLARIFY'||planning.plan.question!==value.markdown))throw new AdmissionError('CONFLICT');
         const calls = await tx.select().from(providerCalls).where(eq(providerCalls.runId,run.id));
         if (!calls.some(c=>c.stage === "OUTPUT_SAFETY" && c.status === "SUCCEEDED" && c.attemptVersion === run.attemptVersion) ||
-          (!clarifying && !calls.some(c=>c.stage === "ANSWER" && (c.status === (value.kind === "ANSWER" ? "SUCCEEDED" : "SKIPPED")) && c.attemptVersion === run.attemptVersion))) throw new AdmissionError("SAFETY_UNAVAILABLE");
+          (!clarifying && !calls.some(c=>c.stage === "ANSWER" && (c.status === ((value.kind === "ANSWER" || chat) ? "SUCCEEDED" : "SKIPPED")) && c.attemptVersion === run.attemptVersion))) throw new AdmissionError("SAFETY_UNAVAILABLE");
         const [input] = await tx.select({ approvedAt: messages.approvedAt,messagePolicy: messages.policyVersion,reviewPolicy: inputSafetyReviews.policyVersion })
           .from(inputSafetyReviews).innerJoin(messages,eq(messages.id,inputSafetyReviews.acceptedMessageId))
           .where(and(eq(inputSafetyReviews.runId,run.id),eq(inputSafetyReviews.decision,"ALLOW"),eq(inputSafetyReviews.attemptVersion,run.attemptVersion)));
         if (!input?.approvedAt || input.messagePolicy !== value.policyVersion || input.reviewPolicy !== value.policyVersion) throw new AdmissionError("SAFETY_UNAVAILABLE");
         const [retrieval] = await tx.select().from(runRetrievals).where(eq(runRetrievals.runId,run.id));
-        if (clarifying ? Boolean(retrieval)||calls.some(c=>["SEARCH","ANSWER","QUERY_SAFETY"].includes(c.stage)) : !retrieval || retrieval.expiresAt <= now || retrieval.policyVersion !== value.policyVersion || retrieval.attemptVersion !== run.attemptVersion ||
+        if (chat ? Boolean(retrieval)||calls.some(c=>!["INPUT_SAFETY","ANSWER","OUTPUT_SAFETY"].includes(c.stage)) : clarifying ? Boolean(retrieval)||calls.some(c=>["SEARCH","ANSWER","QUERY_SAFETY"].includes(c.stage)) : !retrieval || retrieval.expiresAt <= now || retrieval.policyVersion !== value.policyVersion || retrieval.attemptVersion !== run.attemptVersion ||
           (value.kind === "ANSWER" ? retrieval.status !== "READY" : retrieval.status !== "NO_EVIDENCE")) throw new AdmissionError("CONFLICT");
         const sources = await tx.select().from(runSources).where(eq(runSources.runId,run.id)).limit(6);
         const passages = await tx.select().from(sourcePassages).where(eq(sourcePassages.runId,run.id)).limit(6);
@@ -58,7 +59,7 @@ export function createFinalization(db: AdmissionDatabase) {
         await tx.insert(messages).values({ id: messageId,conversationId: conversation.id,role: "ASSISTANT",kind: value.kind === "CLARIFICATION" ? "CLARIFICATION" : "ANSWER",
           parts: [{ type: "text",text: value.markdown }],sequence: conversation.nextSequence,approvedAt: now,policyVersion: value.policyVersion,createdAt: now });
         if (citations.length) await tx.insert(messageCitations).values(citations);
-        await settleRun(tx,run,value.kind === "ANSWER" ? run.answerCredits : 0,now);
+        await settleRun(tx,run,(value.kind === "ANSWER" || chat) ? run.answerCredits : 0,now);
         await tx.update(conversations).set({ nextSequence: conversation.nextSequence+1,updatedAt: now }).where(eq(conversations.id,conversation.id));
         if (signal.aborted) throw new AdmissionError("CONFLICT");
         const changed = await tx.update(runs).set({ status: clarifying ? "NEEDS_CLARIFICATION" : "COMPLETED",updatedAt: now }).where(and(eq(runs.id,run.id),eq(runs.status,"CHECKING_OUTPUT"),eq(runs.attemptVersion,value.attemptVersion),gt(runs.deadlineAt,sql`clock_timestamp()`),

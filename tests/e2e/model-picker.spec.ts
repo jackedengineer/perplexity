@@ -8,8 +8,9 @@ async function fixture(page:import('@playwright/test').Page,pro=false,path='/'){
 }
 test('picker selects models, supports keyboard and stays inside the viewport',async({page},info)=>{
  await fixture(page);const trigger=page.getByRole('button',{name:'Answer model: Qwen3 30B'});await trigger.click();
- const menu=page.getByRole('menu',{name:'Answer models'});await expect(menu).toBeVisible();
- await expect(page.getByRole('menuitemradio',{name:/Qwen3/})).toBeFocused();
+ const menu=page.getByRole('dialog',{name:'Answer models'});await expect(menu).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'Search models'})).toBeFocused();
+ await page.getByRole('textbox',{name:'Search models'}).fill('Gemini');
  await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
  await expect(page.getByRole('button',{name:'Answer model: Gemini 2.5 Flash Lite'})).toBeFocused();await expect(menu).toHaveCount(0);
  await page.getByRole('button',{name:'Answer model: Gemini 2.5 Flash Lite'}).click();
@@ -46,4 +47,79 @@ test('Pro billing links dismiss their dialog even on the billing page',async({pa
  await account.getByRole('link',{name:'Pro subscription — manage billing'}).click();
  await expect(account).not.toBeVisible();
  await expect(page).toHaveURL(/\/billing$/);
+});
+
+test('favorites persist and model search has an empty state',async({page})=>{
+ await fixture(page);await page.getByRole('button',{name:'Answer model: Qwen3 30B'}).click();
+ await page.getByRole('button',{name:'Favorite DeepSeek V3',exact:true}).click();
+ await page.keyboard.press('Escape');await page.reload();
+ await page.getByRole('button',{name:'Answer model: Qwen3 30B'}).click();
+ await expect(page.getByRole('button',{name:'Unfavorite DeepSeek V3',exact:true})).toHaveAttribute('aria-pressed','true');
+ await page.getByRole('textbox',{name:'Search models'}).fill('absent-model');
+ await expect(page.getByRole('status')).toContainText('No models match');
+});
+
+test('retry picks another model and keeps the original turn',async({page})=>{
+ await fixture(page,false,'/?saved=1');
+ await page.getByRole('button',{name:'Try another model',exact:true}).click();
+ const revision=page.getByRole('dialog',{name:'Try another model',exact:true});
+ await revision.getByRole('button',{name:'Answer model: Qwen3 30B'}).click();
+ await page.getByRole('textbox',{name:'Search models'}).fill('Gemini');
+ await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
+ await revision.getByRole('button',{name:'Send again'}).click();
+ await expect(page.getByRole('button',{name:'Answer model: Gemini 2.5 Flash Lite'})).toBeVisible();
+ await expect(page.getByRole('article',{name:'Approved answer'})).toHaveCount(2,{timeout:10000});
+ await expect(page.getByRole('article',{name:'Your question'})).toHaveCount(2);
+});
+
+test('edit dialog preserves original question and closes with Escape',async({page})=>{
+ await fixture(page,false,'/?saved=1');
+ await page.getByRole('button',{name:'Edit & resend',exact:true}).click();
+ const revision=page.getByRole('dialog',{name:'Edit your question'});
+ await revision.getByRole('textbox',{name:'Question',exact:true}).fill('Explain evaporation simply.');
+ await page.keyboard.press('Escape');await expect(revision).not.toBeVisible();
+ await expect(page.getByRole('article',{name:'Your question'})).toContainText('How does the water cycle work?');
+ await expect(page.getByRole('article',{name:'Your question'})).toHaveCount(1);
+ await page.getByRole('button',{name:'Deep Research Pro'}).click();
+ await expect(page.getByRole('link',{name:'Upgrade to Pro ↗',exact:true})).toBeVisible();
+});
+
+test('Sources never cover the answer or composer on desktop',async({page},info)=>{
+ test.skip(info.project.name!=='desktop','Desktop side panel; mobile uses a modal.');
+ await fixture(page,false,'/?saved=1');
+ await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
+ for(const width of [1200,1280,1440]){
+  await page.setViewportSize({width,height:800});
+  await page.getByRole('button',{name:'Sources',exact:true}).click();
+  const panel=await page.locator('.answer-sources').boundingBox();
+  for(const selector of ['.answer-prose','.thread-bottom']){
+   const box=await page.locator(selector).boundingBox();
+   expect(box!.x+box!.width).toBeLessThanOrEqual(panel!.x-16);
+   expect(box!.width).toBeGreaterThan(500);
+  }
+  await page.getByRole('button',{name:'Sources',exact:true}).click();
+  const closed=await page.locator('.answer-prose').boundingBox();
+  expect(closed!.width).toBe(720);
+ }
+});
+
+test('library search, clear and Escape preserve the pinned scope',async({page},info)=>{
+ for(const pinned of [true,false]){
+  await page.goto(`/library?search=1${pinned?'&pinned=true':''}`);
+  await expect(page.locator('.workspace-plan').getByRole('link',{name:'Upgrade to Pro'})).toBeVisible();
+  if(info.project.name==='desktop'){
+   const plan=await page.locator('.workspace-plan').boundingBox();
+   const create=await page.locator('.library-page').getByRole('link',{name:'New',exact:true}).boundingBox();
+   expect(create!.x+create!.width).toBeLessThanOrEqual(plan!.x);
+  }
+  const input=page.getByRole('searchbox',{name:'Search your conversations'});
+  await input.fill('water & clouds');await input.press('Enter');
+  await expect(page).toHaveURL(url=>url.searchParams.get('q')==='water & clouds'&&url.searchParams.has('pinned')===pinned);
+  await expect(page.getByRole('heading',{name:pinned?'Pinned chats':'Chats',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Clear search',exact:true}).click();
+  await expect(page).toHaveURL(url=>!url.searchParams.has('q')&&url.searchParams.has('pinned')===pinned);
+  await input.press('Escape');
+  await expect(page).toHaveURL(url=>!url.searchParams.has('search')&&url.searchParams.has('pinned')===pinned);
+  await expect(page.locator('.library-page').getByRole('button',{name:'Search conversations',exact:true})).toBeVisible();
+ }
 });

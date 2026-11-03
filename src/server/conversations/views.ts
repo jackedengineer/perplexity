@@ -3,6 +3,7 @@ import { publicAnswerView } from "@/server/answers/view";
 
 // Public response schemas are shared with the browser; keep server input transforms out of its bundle.
 export const conversationView = z.strictObject({
+  pinnedAt: z.optional(z.nullable(z.iso.datetime())),
   id: z.uuid(), title: z.string(), revision: z.int(),
   createdAt: z.iso.datetime(), updatedAt: z.iso.datetime(),
 });

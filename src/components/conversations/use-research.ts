@@ -52,9 +52,9 @@ export function useResearch(conversationId: string,revision: number,initialRunId
     const intent=controller.getIntent();if(!intent||busy.current||stopping.current)return;stopRequested.current=false;busy.current=true;setPending(true);setError("");setStage(null);clearError();
     await sendMessage({text:intent.message.text});
   },[clearError,sendMessage,controller]);
-  const submit=useCallback(async(text: string,clientRequestId=crypto.randomUUID(),selectedModel:ModelKey=modelKey)=>{
+  const submit=useCallback(async(text: string,clientRequestId=crypto.randomUUID(),selectedModel:ModelKey=modelKey,mode:"FAST"|"CHAT"="FAST")=>{
     if(busy.current||!text.trim())return;
-    if(!controller.getIntent()){controller.setIntent({conversationId,clientRequestId,expectedRevision:revision,message:{text},mode:"FAST",modelKey:selectedModel});setQuestion(text);}
+    if(!controller.getIntent()){controller.setIntent({conversationId,clientRequestId,expectedRevision:revision,message:{text},mode,modelKey:selectedModel});setQuestion(text);}
     await send();
   },[conversationId,revision,send,controller,modelKey]);
   useEffect(()=>()=>{void stopChat();recovery.current?.abort();},[stopChat]);

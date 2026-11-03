@@ -1,6 +1,8 @@
 import type { CSSProperties } from "react";
 
 const paths = {
+  star: "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z",
+  pin: "m9 3 6 0-1 6 4 4H6l4-4-1-6M12 13v8",
   thumbUp:"M7 10H3v11h4M7 20h11l3-10h-7l1-6-3-1-5 8v9",thumbDown:"M7 14H3V3h4M7 4h11l3 10h-7l1 6-3 1-5-8V4",
   copy: "M9 9h12v12H9zM15 9V3H3v12h6",external: "M14 3h7v7M21 3 10 14M10 3H3v18h18v-7",
   plus: "M12 5v14M5 12h14", search: "m20 20-4-4M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0",
@@ -19,7 +21,7 @@ export function Icon({ name, size = 20, style }: { name: IconName; size?: number
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={style}><path d={paths[name]} /></svg>;
 }
 export function ResearchMark() {
-  return <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true">
-    <path d="M14 2v24M5 5l18 18M23 5 5 23M4 10h20v12L14 12 4 22V10Zm1-5 9 7 9-7v18l-9-7-9 7V5Z" />
+  return <svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M7 6h13a6 6 0 0 1 6 6v5a6 6 0 0 1-6 6h-5l-7 5v-6a6 6 0 0 1-5-6v-4a6 6 0 0 1 4-6ZM11 12h8M11 17h5"/>
   </svg>;
 }

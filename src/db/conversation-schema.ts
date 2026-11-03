@@ -14,6 +14,7 @@ export const conversations = pgTable("conversations", {
   creationRequestId: uuid("creation_request_id").notNull(),
   creationFingerprint: text("creation_fingerprint").notNull(),
   title: varchar("title", { length: 160 }).notNull(),
+  pinnedAt: timestamp("pinned_at", { withTimezone: true, precision: 3 }),
   revision: integer("revision").notNull().default(0),
   deletedAt: timestamp("deleted_at", { withTimezone: true, precision: 3 }),
   nextSequence: integer("next_sequence").notNull().default(1),
