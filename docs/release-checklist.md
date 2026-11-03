@@ -1,7 +1,14 @@
 # Graphite release checkpoint — 3 November 2026
 
 See [Graphite release](graphite-release.md) for feature behavior, verification,
-production migration order and rollback. Production acceptance is pending.
+production migration order and rollback. PR #26 merged after clean CI and both
+reviews; migrations 0031/0032 and Worker `81951d40-d983-4808-b104-60be2aa7ba14`
+are live. Model search/favorites/costs, pins/history search, Chat/Web, revisions,
+citations and responsive layout passed live checks. Deep Research's Free-account
+gate passed; Pro display uses approved fixtures. A new admitted cancellation test
+is pending because the test account reached its unchanged five-answer daily cap.
+No budgets or unknown-cost holds were changed. The November 5 ordinary-key expiry
+and real paid-account/first-payment acceptance remain outstanding.
 
 # Current release checks — 2 November 2026
 

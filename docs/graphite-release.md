@@ -61,9 +61,50 @@ additive migrations and all run/accounting rows; do not delete paid usage or hol
 If the previous UI cannot render saved CHAT payloads, use a forward UI fix or stop
 new submissions while restoring compatibility rather than deleting history.
 
-## Release status
+## Production acceptance — 3 November 2026
 
-Cloudflare build, current-head CI/reviews, production migrations and live acceptance
-are pending at this checkpoint. No new paid subscription or Deep Research charge
-was simulated in production. Existing payment/real-customer acceptance limitations
-remain recorded in the main release checklist.
+- PR #26 merged as `8a158f497f766de5939f59f897b93b3e27d48610` after both
+  reviews completed cleanly on `4b9db132dd5179ee84a0a823483d141517306eaa`.
+  Both review threads are resolved. Quality CI run `41632044851` passed:
+  891 unit/integration tests, 10 foundation, 4 offer and 29 motion/model browser
+  tests; the desktop-only geometry case is intentionally skipped on mobile.
+  The separate Cloudflare build/browser job also passed.
+- Production migrations 0031/0032 applied to the verified Singapore Neon target;
+  the journal now contains 33 migrations. The nullable pin column and CHAT snapshot
+  constraint were read back. No budget or entitlement mutation was applied.
+- Cloudflare Worker `81951d40-d983-4808-b104-60be2aa7ba14` serves
+  https://perplexity.jacked.dev. Runtime secrets/vars, the custom domain, billing
+  settings and the every-minute maintenance schedule were retained. The final
+  bundle scan found zero configured secret matches across 1,790 generated files.
+- Live browser: model filtering, visible credit costs, Qwen favorite persistence,
+  pin persistence after reload, Cmd-K title search, Chat/Web/Deep controls,
+  non-destructive model retry and edited prompts all passed. Three approved answers
+  remain in one saved conversation. The Web answer renders three citations and
+  distinguishes two additional retrieved sources. At 1280px the answer/composer
+  end at x=920 and Sources starts at x=944. Mobile 390px has no horizontal overflow;
+  the model picker fits and Sources opens/closes as a native modal.
+- Live Chat completed in 9.079s using GPT-4.1 nano and 8.014s on retry using Qwen.
+  Each made only input-safety, answer and output-safety calls: no retrieval.
+  Editing the prompt into Web mode completed in 19.030s with GPT-4.1 mini.
+  These are three samples, not latency percentiles. Progressive approved-answer
+  reveal and visible request/answer-checking progress were observed.
+- Known provider cost for those runs totaled $0.001530. The Web run retains its
+  $0.048789 unknown-cost hold for search/extraction; no holds were erased. The
+  verification key remained capped at $1.80 within the existing combined $2
+  envelope; readback usage was $0.076405046. The independent $5 paid pilot is unchanged.
+
+### Explicit acceptance limits
+
+- The available live account is Free. Deep Research correctly shows Upgrade to Pro
+  without granting access. Pro badge/report allowance display was verified using
+  the approved development/browser fixtures and CI, not a fabricated LIVE paid
+  period. A real paid account and paid Deep Research execution were not tested in
+  this release. Existing first captured-payment acceptance remains pending.
+- After these three successful runs, the account reached the existing five-answer
+  daily limit. Two cancellation probes were rejected before admission; the first
+  Stop raced with that rejection and displayed a conservative unconfirmed-stop
+  message. No fourth run or provider call was created. Fresh admitted cancellation
+  remains pending after the daily reset; offline cancellation coverage passed.
+  Monthly credits can still be visible when this separate daily answer cap is reached.
+- The ordinary verification key/operator period still expires November 5 at
+  11:48 UTC. No expiry, quota, budget, key or paid pilot window was extended.
