@@ -8,7 +8,7 @@ export const subscriptionId=reference('sub'),paymentId=reference('pay'),invoiceI
 const priceKey=z.enum([testOffer.priceKey,liveOffer.priceKey]);
 export const checkoutInput=z.strictObject({requestId:z.uuid(),priceKey});
 export const confirmationInput=z.strictObject({checkoutId:z.uuid(),razorpay_payment_id:paymentId,razorpay_subscription_id:subscriptionId,razorpay_signature:z.string().regex(/^[a-f0-9]{64}$/u)});
-export const subscriptionSchema=z.object({id:subscriptionId,plan_id:planId,status:z.enum(['created','authenticated','active','pending','halted','cancelled','completed','expired']),quantity:z.literal(1),notes:z.object({checkoutId:z.uuid(),priceKey})});
+export const subscriptionSchema=z.object({id:subscriptionId,plan_id:planId,status:z.enum(['created','authenticated','active','pending','halted','cancelled','completed','expired']),quantity:z.literal(1),paid_count:z.int().nonnegative().optional(),current_start:z.int().nonnegative().nullable().optional(),current_end:z.int().nonnegative().nullable().optional(),notes:z.object({checkoutId:z.uuid(),priceKey})});
 export const invoiceSchema=z.object({id:invoiceId,payment_id:paymentId,status:z.literal('paid'),amount:z.literal(proPlan.amountPaise),amount_paid:z.literal(proPlan.amountPaise),currency:z.literal('INR'),billing_start:z.int().positive(),billing_end:z.int().positive()});
 export const paymentSchema=z.object({id:paymentId,invoice_id:invoiceId,status:z.literal('captured'),amount:z.literal(proPlan.amountPaise),currency:z.literal('INR'),amount_refunded:z.literal(0)});
 // Polling uses the same linked invoice/payment identity as grants. A refund is
@@ -57,6 +57,14 @@ export function createRazorpay(config:{keyId:string;keySecret:string;allowLive?:
   subscriptions:async()=>z.object({items:z.array(z.unknown()).max(100)}).parse(await request('subscriptions?count=100')).items.flatMap(item=>{const parsed=subscriptionSchema.safeParse(item);return parsed.success?[parsed.data]:[];}),
   invoices:async(id:string)=>z.object({items:z.array(z.unknown()).max(100)}).parse(await request('invoices?subscription_id='+ref(id,subscriptionId)+'&count=100')).items,
   payment:async(id:string)=>request('payments/'+ref(id,paymentId)),
-  cancel:async(id:string)=>subscriptionSchema.parse(await request('subscriptions/'+ref(id,subscriptionId)+'/cancel',{cancel_at_cycle_end:1})),
+  cancel:async(id:string)=>{
+   const path='subscriptions/'+ref(id,subscriptionId);
+   const current=subscriptionSchema.parse(await request(path));
+   if(current.id!==id)throw new JobError('UNAVAILABLE');
+   if(['cancelled','completed','expired'].includes(current.status))return current;
+   // An unpaid created subscription has no billing cycle to finish. Razorpay
+   // rejects cycle-end cancellation there; paid cycles retain the existing path.
+   return subscriptionSchema.parse(await request(path+'/cancel',{cancel_at_cycle_end:current.status==='created'?0:1}));
+  },
  };
 }

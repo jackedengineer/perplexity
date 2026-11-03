@@ -11,7 +11,7 @@ import {jobsFixture} from './jobs-fixture';
 
 let f:Awaited<ReturnType<typeof jobsFixture>>,checkoutId='',pilot:LivePilot;
 const secret='synthetic-live-key-secret-for-tests',webhook='synthetic-live-webhook-secret-for-tests';
-const now=Math.floor(Date.now()/1000),subscription=()=>({id:'sub_liveflow',plan_id:'plan_liveflow',status:'active' as const,quantity:1 as const,notes:{checkoutId,priceKey:liveOffer.priceKey}});
+const now=Math.floor(Date.now()/1000),subscription=()=>({id:'sub_liveflow',plan_id:'plan_liveflow',status:'active' as const,paid_count:1,current_start:now,current_end:now+2592000,quantity:1 as const,notes:{checkoutId,priceKey:liveOffer.priceKey}});
 const invoice={id:'inv_liveflow',payment_id:'pay_liveflow',status:'paid',amount:99900,amount_paid:99900,currency:'INR',billing_start:now-10,billing_end:now+2592000};
 const payment={id:invoice.payment_id,invoice_id:invoice.id,status:'captured',amount:99900,currency:'INR',amount_refunded:0};
 const create=vi.fn(async(id:string)=>{checkoutId=id;return subscription();});
@@ -98,4 +98,10 @@ it('limits each owner to one new LIVE pilot reservation per rolling day, even af
  await f.db.update(maintenanceStatus).set({completedAt:new Date()});
  expect(await startCheckout(f.db,subject,request,'plan_liveflow',{...api,create:noCreate},pilot)).toMatchObject({state:'READY'});
  expect(noCreate).toHaveBeenCalledTimes(1);
+});
+
+it.each([['expired','CANCELLED'],['completed','COMPLETED'],['cancelled','UNKNOWN']] as const)('persists provider terminal %s during cancellation',async(providerState,state)=>{
+ const [row]=await f.db.insert(billingCheckouts).values({userId:f.owner,requestId:crypto.randomUUID(),planId:'plan_terminal',priceKey:liveOffer.priceKey,environment:'LIVE',subscriptionId:'sub_'+crypto.randomUUID().replaceAll('-',''),state:'READY'}).returning();
+ await cancelSubscription(f.db,f.subject,row.id,{...api,cancel:async()=>({...subscription(),id:row.subscriptionId!,plan_id:row.planId,status:providerState,notes:{checkoutId:row.id,priceKey:liveOffer.priceKey}})});
+ expect((await f.db.select().from(billingCheckouts).where(eq(billingCheckouts.id,row.id)))[0]).toMatchObject({state,providerState,cancelAtCycleEnd:true});
 });

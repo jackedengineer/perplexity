@@ -1,8 +1,9 @@
 import {afterAll,beforeAll,expect,it,vi} from 'vitest';
+import {createHmac} from 'node:crypto';
 import {eq} from 'drizzle-orm';
 import {billingCheckouts,jobPeriods,maintenanceStatus,operatorUsageBuckets} from '@/db/schema';
 import {assertPilotCapacity,type LivePilot} from '@/server/payments/pilot';
-import {reconcileCheckout} from '@/server/payments/billing';
+import {cancelSubscription,ingestWebhook,reconcileCheckout} from '@/server/payments/billing';
 import type {RazorpayApi} from '@/server/payments/razorpay';
 import {jobsFixture} from './jobs-fixture';
 let f:Awaited<ReturnType<typeof jobsFixture>>,policy:LivePilot;
@@ -17,6 +18,7 @@ it('denies purchases without a recent completion from the actual job worker',asy
  await f.db.insert(maintenanceStatus).values({name:'paid-worker:'+f.key,startedAt:new Date(),completedAt:new Date(),outcome:'COMPLETED'});
  await expect(check()).resolves.toBeUndefined();
 });
+
 it('rejects expired delivery windows, an excessive ceiling and spend/unknown holds without clearing them',async()=>{
  const snapshot=await f.db.select().from(operatorUsageBuckets);
  await f.db.update(operatorUsageBuckets).set({reservedProviderMicroUsd:3_000_000n});
@@ -51,4 +53,46 @@ it('releases a natively expired unpaid checkout but retains an active paid-throu
  await expect(check()).rejects.toMatchObject({code:'QUOTA'});
  await f.db.update(jobPeriods).set({state:'REVOKED'}).where(eq(jobPeriods.id,paid.id));
  await expect(check()).resolves.toBeUndefined();
+});
+
+it('keeps completed payment capacity reserved before confirmation or webhook delivery',async()=>{
+ const [row]=await f.db.insert(billingCheckouts).values({userId:f.owner,requestId:crypto.randomUUID(),planId:'plan_completed',priceKey:'pro-live-monthly-inr-v1',environment:'LIVE',state:'READY',subscriptionId:'sub_completed'}).returning();
+ const sub={id:'sub_completed',plan_id:row.planId,status:'completed' as const,quantity:1 as const,notes:{checkoutId:row.id,priceKey:'pro-live-monthly-inr-v1' as const}};
+ const now=Math.floor(Date.now()/1000),invoice={id:'inv_completed',payment_id:'pay_completed',status:'paid',amount:99900,amount_paid:99900,currency:'INR',billing_start:now-10,billing_end:now+2592000};
+ const unexpected=async()=>{throw new Error('Unexpected provider mutation');};
+ const api:RazorpayApi={keyId:'rzp_live_fixture',plan:unexpected,create:unexpected,subscriptions:unexpected,cancel:async()=>sub,subscription:async()=>sub,
+  invoices:async()=>[invoice],payment:async()=>({id:invoice.payment_id,invoice_id:invoice.id,status:'captured',amount:99900,currency:'INR',amount_refunded:0})};
+ // Completed is authoritative, but invoice delivery can lag. No paid grant may
+ // be fabricated, and another account must not acquire the sole funded seat.
+ await cancelSubscription(f.db,f.subject,row.id,{...api,invoices:async()=>[]});
+ await expect(check()).rejects.toMatchObject({code:'QUOTA'});
+ expect(await f.db.select().from(jobPeriods).where(eq(jobPeriods.subscriptionId,sub.id))).toHaveLength(0);
+ // Native reconciliation eventually observes the captured invoice. The same
+ // capacity stays occupied while the legitimate owner receives seven reports.
+ await reconcileCheckout(f.db,row.id,api);
+ expect((await f.db.select().from(jobPeriods).where(eq(jobPeriods.subscriptionId,sub.id)))[0]).toMatchObject({state:'ACTIVE',jobLimit:7});
+ await expect(check()).rejects.toMatchObject({code:'QUOTA'});
+ await f.db.update(jobPeriods).set({endsAt:new Date(Date.now()-1000)}).where(eq(jobPeriods.subscriptionId,sub.id));
+ await expect(check()).resolves.toBeUndefined();
+});
+
+it.each(['refund','dispute'])('releases a completed seat after a verified early %s is reconciled',async(kind)=>{
+ const subId='sub_early'+kind,paymentId='pay_early'+kind,invoiceId='inv_early'+kind;
+ const [row]=await f.db.insert(billingCheckouts).values({userId:f.owner,requestId:crypto.randomUUID(),planId:'plan_early',priceKey:'pro-live-monthly-inr-v1',environment:'LIVE',state:'COMPLETED',subscriptionId:subId}).returning();
+ const now=Math.floor(Date.now()/1000),invoice={id:invoiceId,payment_id:paymentId,status:'paid',amount:99900,amount_paid:99900,currency:'INR',billing_start:now-10,billing_end:now+2592000};
+ const unexpected=async()=>{throw new Error('Unexpected provider mutation');};
+ const api:RazorpayApi={keyId:'rzp_live_fixture',plan:unexpected,create:unexpected,subscriptions:unexpected,cancel:unexpected,
+  subscription:async()=>({id:subId,plan_id:row.planId,status:'completed',quantity:1,notes:{checkoutId:row.id,priceKey:'pro-live-monthly-inr-v1'}}),invoices:async()=>[invoice],
+  payment:async()=>({id:paymentId,invoice_id:invoiceId,status:kind==='refund'?'refunded':'captured',amount:99900,currency:'INR',amount_refunded:kind==='refund'?99900:0})};
+ if(kind==='dispute'){
+  const bytes=Buffer.from(JSON.stringify({event:'payment.dispute.created',payload:{dispute:{entity:{payment_id:paymentId}}}})),secret='synthetic-early-dispute-secret';
+  await ingestWebhook(f.db,'evt_earlydispute',bytes,createHmac('sha256',secret).update(bytes).digest('hex'),secret,'LIVE');
+ }
+ // An unlinked reversal alone cannot release this checkout's obligation.
+ await expect(check()).rejects.toMatchObject({code:'QUOTA'});
+ await reconcileCheckout(f.db,row.id,api);
+ expect((await f.db.select().from(jobPeriods).where(eq(jobPeriods.subscriptionId,subId)))[0]).toMatchObject({state:'REVOKED',paymentId,invoiceId,userId:f.owner});
+ await expect(check()).resolves.toBeUndefined();
+ await reconcileCheckout(f.db,row.id,api);
+ expect((await f.db.select().from(jobPeriods).where(eq(jobPeriods.subscriptionId,subId)))[0].state).toBe('REVOKED');
 });
