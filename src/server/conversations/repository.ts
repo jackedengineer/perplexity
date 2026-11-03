@@ -12,11 +12,13 @@ import { createConversationPrivacy } from "./privacy";
 import { ConversationError } from "./errors";
 
 const fields = {
+  pinnedAt: conversations.pinnedAt,
   id: conversations.id, title: conversations.title, revision: conversations.revision,
   createdAt: conversations.createdAt, updatedAt: conversations.updatedAt,
 };
-type Row = Omit<Conversation, "createdAt" | "updatedAt"> & { createdAt: Date; updatedAt: Date };
+type Row = Omit<Conversation, "createdAt" | "updatedAt" | "pinnedAt"> & { createdAt: Date; updatedAt: Date; pinnedAt?: Date | null };
 const serialize = (row: Row): Conversation => ({
+  pinnedAt: row.pinnedAt?.toISOString() ?? null,
   id: row.id, title: row.title, revision: row.revision,
   createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
 });
@@ -65,11 +67,18 @@ export function createConversationRepository(db: PgDatabase<PgQueryResultHKT, ty
         return { conversation: serialize(existing), created: false };
       });
     },
+    async pin(authSubject: string, id: string, pinned: boolean) {
+      // A UI preference must not invalidate an in-flight run's revision fence.
+      const [row] = await db.update(conversations).set({ pinnedAt: pinned ? new Date() : null })
+        .where(and(owned(authSubject), eq(conversations.id, id))).returning(fields);
+      if (!row) throw new ConversationError("NOT_FOUND");
+      return serialize(row);
+    },
     async list(authSubject: string, input: ListInput) {
       const after = input.cursor;
       const pattern = `%${input.q.replace(/[\\%_]/gu, "\\$&")}%`;
       const rows = await db.select(fields).from(conversations).where(and(
-        owned(authSubject), input.q ? ilike(conversations.title, pattern) : undefined,
+        owned(authSubject), input.pinned ? isNotNull(conversations.pinnedAt) : undefined, input.q ? ilike(conversations.title, pattern) : undefined,
         after ? or(lt(conversations.updatedAt, new Date(after.updatedAt)),
           and(eq(conversations.updatedAt, new Date(after.updatedAt)), lt(conversations.id, after.id))) : undefined,
       )).orderBy(desc(conversations.updatedAt), desc(conversations.id)).limit(input.limit + 1);

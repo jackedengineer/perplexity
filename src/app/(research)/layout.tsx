@@ -12,9 +12,9 @@ import "./graphite.css";
 export const metadata = { robots: { index: false, follow: false } };
 export default async function ResearchLayout({ children }: { children: React.ReactNode }) {
   const identity = await requireConversationIdentity();
-  const [recent, preferences] = await Promise.all([
-    getConversationRepository().list(identity.user.id, { limit: 20, q: "" }), cookies(),
+  const [recent, pinned, preferences] = await Promise.all([
+    getConversationRepository().list(identity.user.id, { limit: 20, q: "" }), getConversationRepository().list(identity.user.id, {limit:20,q:"",pinned:"true"}), cookies(),
   ]);
   let deepResearchEnabled=false;try{configuredResearchModels();deepResearchEnabled=true;}catch{/* Default off. */}
-  return <ModelAccessProvider preferenceKey={identity.user.id}><QuestionIntentProvider><ResearchShell deepResearchEnabled={deepResearchEnabled} jobsEnabled={jobsEnabled()} name={identity.user.name} recent={recent.items} initialCollapsed={preferences.get("perplex_sidebar")?.value === "collapsed"}>{children}</ResearchShell></QuestionIntentProvider></ModelAccessProvider>;
+  return <ModelAccessProvider preferenceKey={identity.user.id}><QuestionIntentProvider><ResearchShell deepResearchEnabled={deepResearchEnabled} jobsEnabled={jobsEnabled()} name={identity.user.name} recent={recent.items} pinned={pinned.items} initialCollapsed={preferences.get("perplex_sidebar")?.value === "collapsed"}>{children}</ResearchShell></QuestionIntentProvider></ModelAccessProvider>;
 }

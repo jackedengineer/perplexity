@@ -1,28 +1,29 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {useModelAccess} from "./model-access";
 import {PlanIndicator} from "./plan-indicator";
+import { QuickSearch } from "./quick-search";
 import { SessionControls } from "@/components/session-controls";
 import type { Conversation } from "@/server/conversations/contracts";
 import { Icon, ResearchMark } from "./icons";
 
-export function ResearchShell({ children, recent, name, initialCollapsed, jobsEnabled = false, deepResearchEnabled = false }: {
-  children: React.ReactNode; recent: Conversation[]; name: string; initialCollapsed: boolean; jobsEnabled?: boolean; deepResearchEnabled?: boolean;
+export function ResearchShell({ children, recent, pinned = [], name, initialCollapsed, jobsEnabled = false, deepResearchEnabled = false }: {
+  children: React.ReactNode; recent: Conversation[]; pinned?: Conversation[]; name: string; initialCollapsed: boolean; jobsEnabled?: boolean; deepResearchEnabled?: boolean;
 }) {
   const {data}=useModelAccess();
   const pathname = usePathname();
-  const router = useRouter();
+  const [searchOpen,setSearchOpen]=useState(false);
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [recentOpen, setRecentOpen] = useState(true);
   const mobileNav = useRef<HTMLDialogElement>(null);
   const account = useRef<HTMLDialogElement>(null);
-  const search = () => { mobileNav.current?.close(); router.push("/library?search=1"); };
+  const search = () => { mobileNav.current?.close(); setSearchOpen(true); };
   useEffect(() => {
     function shortcuts(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault(); mobileNav.current?.close(); router.push("/library?search=1");
+        event.preventDefault(); mobileNav.current?.close(); setSearchOpen(true);
       }
     }
     const desktop = window.matchMedia("(min-width: 768px)");
@@ -30,7 +31,7 @@ export function ResearchShell({ children, recent, name, initialCollapsed, jobsEn
     desktop.addEventListener("change", closeOnDesktop);
     window.addEventListener("keydown", shortcuts);
     return () => { window.removeEventListener("keydown", shortcuts); desktop.removeEventListener("change", closeOnDesktop); };
-  }, [router]);
+  }, []);
   function toggleSidebar() {
     const next = !collapsed;
     setCollapsed(next);
@@ -50,12 +51,13 @@ export function ResearchShell({ children, recent, name, initialCollapsed, jobsEn
         <Link href="/workspace" className="sidebar-link" aria-label="New conversation" onClick={close}><Icon name="plus" /><span>New chat</span></Link>
         {jobsEnabled && <Link href="/jobs" aria-label={deepResearchEnabled?'Deep Research':'Execution checks'} className="sidebar-link" onClick={close}><Icon name="automation" /><span>{deepResearchEnabled?'Deep Research':'Execution checks'}</span></Link>}
         <button className="sidebar-link" onClick={search} aria-label="Search conversations"><Icon name="search"/><span>Search chats</span></button>
+        {!isCollapsed&&pinned.length>0&&<><div className="sidebar-section-label">Pinned</div><div className="sidebar-recents">{pinned.map(conversation=><Link key={conversation.id} prefetch={false} href={`/search/${conversation.id}`} onClick={close} aria-current={pathname===`/search/${conversation.id}`?'page':undefined}><Icon name="pin" size={12}/> {conversation.title}</Link>)}{pinned.length===20&&<Link href="/library?pinned=true" onClick={close}>View all pinned</Link>}</div></>}
         <div className={`sidebar-section-label ${pathname === "/library" ? "is-selected" : ""}`}>
           <Link href="/library" aria-label="Recents" onClick={close}><Icon name="clock" size={18} /><span>Recents</span></Link>
           {!isCollapsed && <button className="research-icon-button" aria-label={recentOpen ? "Collapse recents" : "Expand recents"} aria-expanded={recentOpen} onClick={() => setRecentOpen(!recentOpen)}><Icon name={recentOpen ? "down" : "chevron"} size={14} /></button>}
         </div>
         {!isCollapsed && recentOpen && <div className="sidebar-recents">
-          {recent.length === 0 ? <p>No recent conversations</p> : recent.map((conversation) =>
+          {recent.length === 0 ? <p>No recent conversations</p> : recent.filter(conversation=>!conversation.pinnedAt).map((conversation) =>
             <Link key={conversation.id} prefetch={false} href={`/search/${conversation.id}`} onClick={close} title={conversation.title}
               aria-current={pathname === `/search/${conversation.id}` ? "page" : undefined}>{conversation.title}</Link>)}
           {recent.length === 20 && <Link href="/library" onClick={close}>View all</Link>}
@@ -82,6 +84,7 @@ export function ResearchShell({ children, recent, name, initialCollapsed, jobsEn
       <div className="workspace-plan"><PlanIndicator/></div>
       {children}
     </div>
+    {searchOpen&&<QuickSearch initial={recent} onClose={()=>setSearchOpen(false)}/>}
     <dialog className="mobile-navigation" aria-label="Navigation" ref={mobileNav} onClick={(event) => { if (event.target === event.currentTarget) mobileNav.current?.close(); }}>{sidebar(false, true)}</dialog>
     <dialog className="research-dialog account-dialog" aria-labelledby="account-heading" ref={account} onClick={(event) => { if (event.target === event.currentTarget) account.current?.close(); }}>
       <div className="dialog-heading"><h2 id="account-heading">Your account</h2><button className="research-icon-button" aria-label="Close account menu" onClick={() => account.current?.close()}><Icon name="close" size={17} /></button></div>

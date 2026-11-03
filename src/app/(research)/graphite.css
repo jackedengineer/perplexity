@@ -59,3 +59,14 @@
 @media (max-height: 720px) { .new-thread { padding-top: 20px; } .new-thread-heading > svg { margin-bottom: 12px; } .starter-prompts { margin-bottom: 16px; } }
 @media (max-width: 767px) { .workspace-plan { top: 8px; right: 45px; padding: 0; height: 40px; } .workspace-plan .plan-allowance { display: none; } .research-mobile-header > a[aria-label="Perplex home"] { margin-right: auto; margin-left: 6px; } .new-thread { width: calc(100% - 32px); padding-top: 36px; } .new-thread-heading h1 { font-size: 26px; } .new-thread-heading p { font-size: 14px; } .answer-topbar { padding-right: 12px; } .starter-prompts button { padding: 12px 0; } .model-favorite { min-width: 40px; height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .research-shell *, .model-popover * { animation: none !important; transition: none !important; } }
+.quick-search { width: min(560px,calc(100% - 32px)); max-height: min(560px,80dvh); margin: 12vh auto auto; padding: 0; border: 1px solid #414141; border-radius: 12px; color: var(--r-text); background: #222; box-shadow: 0 20px 60px #0006; animation: model-menu-enter 140ms ease-out; }
+.quick-search::backdrop { background: #0008; }
+.quick-search-input { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--r-line); }
+.quick-search-input input { flex: 1; min-width: 0; outline: 0; border: 0; background: transparent; color: inherit; font: inherit; }
+.quick-search-input:focus-within { border-bottom-color: #aaa; }
+.quick-search-results { padding: 8px; overflow: auto; max-height: 360px; }
+.quick-search-results a { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 6px; }
+.quick-search-results a:hover { background: #303030; }
+.quick-search-results a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quick-search-results p { padding: 20px 12px; color: var(--r-muted); }
+.quick-search footer { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--r-line); padding: 12px 16px; font-size: 12px; color: var(--r-muted); }
