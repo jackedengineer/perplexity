@@ -1,3 +1,8 @@
+# Graphite release checkpoint — 3 November 2026
+
+See [Graphite release](graphite-release.md) for feature behavior, verification,
+production migration order and rollback. Production acceptance is pending.
+
 # Current release checks — 2 November 2026
 
 ## Follow-up payment capacity check — 13:55 UTC
