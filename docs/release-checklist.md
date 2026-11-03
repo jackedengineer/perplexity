@@ -1,3 +1,16 @@
+# Workspace entry release — 3 November 2026
+
+- [x] PR #27 merged after clean current-commit code/security reviews and Quality CI.
+- [x] Visitor workspace, highlighted sign-in, authenticated entry/sign-out and
+  desktop/mobile sidebar transitions verified on the live Cloudflare domain.
+- [x] Both navigation regressions fixed: staged questions and model/mode selections
+  survive the workspace-to-chat route transition; transport browser tests pass.
+- [x] No migrations, budget changes or paid AI calls for this release.
+
+See [workspace entry acceptance](workspace-entry.md) for the Worker version, test
+counts and rollback. Earlier paid-account and cancellation acceptance limits below
+are unaffected by this UI release.
+
 # Graphite release checkpoint — 3 November 2026
 
 See [Graphite release](graphite-release.md) for feature behavior, verification,

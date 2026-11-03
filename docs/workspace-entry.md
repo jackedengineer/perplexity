@@ -18,4 +18,34 @@ Validation: lint/types and 14 targeted unit tests pass. The credential-free
 Cloudflare build passes its private-cache checks. Optimized real-browser entry,
 visitor controls and desktop collapse/expand were verified without AI calls.
 Foundation browser regressions cover public entry, private-history denial,
-sign-in navigation, draft retention, navigation and reduced motion; CI is required.
+sign-in navigation, draft retention, navigation and reduced motion. CI and release acceptance are recorded below.
+
+## Production acceptance — 3 November 2026
+
+PR #27 merged as `fb7c08a93983bef7ce3044f5bfceb2b68d091cf4` after both
+reviews completed cleanly on `cef922bbde9681b50f7676e74b6198233b701015`; both
+inline findings are resolved. The fixes preserve the in-memory question across
+route groups and restore its selected mode/model. Regression coverage sends the
+actual client transport request to an intercepted offline boundary.
+
+Quality run `41644029985` passed 891 unit/integration tests, 12 foundation browser
+tests, four offer tests and 33 motion/model tests (one desktop-only geometry case
+skipped on mobile). The Cloudflare build/browser job also passed. A test-only
+keyboard focus bug was diagnosed from its trace and fixed without relaxing checks.
+
+Worker `3798b39e-c89f-4732-a9aa-6f01cc6f23a7` is live at
+https://perplexity.jacked.dev. Live browser verification covered authenticated
+entry, sign-out into the visitor workspace, highlighted sign-in navigation with
+Google's existing sign-in button available, desktop collapse/expand at 180ms, and
+mobile open/close at 180ms with no horizontal overflow at 390px. The root returns
+307 to `/workspace`; unauthenticated conversation APIs return 401. No application-
+origin console errors were observed; Turnstile emitted opaque third-party frame
+console entries on the sign-in page. No challenge bypass or guest AI call was used.
+
+The final bundle scan covered 1,801 generated files with no configured secret
+matches. The deployed application source equals the reviewed source; the final
+follow-up changes only the browser test. Runtime vars/secrets, maintenance schedule,
+budgets and existing unknown-cost holds were retained. No migrations, purchases,
+provider calls, quota increases or credential changes were made. Rollback can
+restore the previous Worker `81951d40-d983-4808-b104-60be2aa7ba14` without a database
+change.
