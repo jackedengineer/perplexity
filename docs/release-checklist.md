@@ -1,5 +1,27 @@
 # Current release checks — 3 November 2026
 
+## Hosted model acceptance and reconciliation — 08:00 UTC
+
+- [x] Qwen completed a fresh hosted rainbow question in about 20 seconds with
+  five citations. DeepSeek completed a Moon-phases question in about 28 seconds
+  with four cited sources and one additional retrieved source. Progress, source
+  panels and persisted answers were inspected in the real browser.
+- [x] User-authorized current DAY allowance raised from $0.40 to $0.55. The
+  $1.70 ordinary period, non-resetting provider envelope ($2 combined), expiry
+  and independent $5 pilot are unchanged. Normal day provisioning stays $0.40.
+- [x] Tavily billing confirmed Researcher Free, 44/1,000 credits, PAYG off,
+  zero PAYG credits and no upcoming invoice. Recorded immutable zero-charge
+  resolutions for these two successful search calls, then ran the existing
+  runtime reconciliation service. $0.098150 released; repeated reconciliation
+  returned UNCHANGED. The earlier OpenRouter timeout remains unknown and held.
+- [x] Daily headroom after checks/reconciliation: $0.185089; ordinary period
+  headroom: $0.535010. The provider key has $1.725431447 remaining. Research is
+  available. The earlier 07:38 blocker below is historical.
+- [ ] Follow up on raw `(S1, S4)` labels in DeepSeek prose alongside valid
+  rendered citation links; citation-source validation passed, but this is not
+  a claim of perfect answer presentation or independent factual verification.
+- [ ] Monitor the transient Qwen feedback-load error separately from research.
+
 ## Additional model rollout — 07:38 UTC
 
 - [x] Bounded live Qwen and DeepSeek probes produced structured answers with

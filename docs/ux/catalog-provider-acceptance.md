@@ -1,5 +1,39 @@
 # Catalog provider acceptance — 3 November 2026
 
+## Hosted follow-up — 08:00 UTC
+
+Both hosted model checks now passed. Qwen run
+`d5a1fa28-ccca-4396-bdc1-66e7c69dfba1` completed in about 20 seconds with five
+citations; DeepSeek run `9f147a2a-350c-4072-9a50-c6f088d8f7b3` completed in
+about 28 seconds with four citations. Source panels and answer persistence were
+verified in the browser. Recorded total run costs are $0.000778 and $0.001072,
+including known AI stages. Search used verified free Tavily credits.
+
+With user authorization, only the current operator day was raised $0.40 → $0.55;
+all spend/holds were retained. No provider cap increase was necessary. The prior
+timeout's generation receipt still returned 404, so its hold remains intact.
+
+Tavily billing showed Researcher Free, 44/1,000 monthly plan credits, PAYG off,
+0 PAYG credits and no upcoming invoice. Its authenticated usage endpoint also
+reported zero PAYG usage. This evidence covers the two successful current-month
+`tavily/basic` calls (one credit each). The privileged receipt CLI recorded
+VERIFIED_NOT_BILLED resolutions with a hash of the saved evidence; the existing
+runtime reconciliation service released $0.049222 and $0.048928. A second call
+for each returned UNCHANGED. No direct reservation decrement was used.
+
+Evidence is in ignored artifacts: `catalog-hosted-acceptance.json`,
+`catalog-tavily-free-receipt-evidence.json`, `catalog-reconciliation-result.json`,
+`catalog-day-budget-adjustment.json`, `catalog-qwen-live-success.png`,
+`catalog-deepseek-live-success.png` and `catalog-live-picker-enabled.png`.
+
+Remaining daily headroom: $0.185089; period headroom: $0.535010. Research is
+available with both additions enabled. Gemini stays disabled. These two benign
+checks are not a general reliability guarantee. DeepSeek emitted raw S-labels
+inside prose alongside valid citation links; Qwen had a transient feedback-load
+error. Preserve those as follow-ups rather than declaring the entire UI flawless.
+
+## Earlier direct-provider checks and initial blocker
+
 User authorized paid checks within existing budgets. This record distinguishes
 provider acceptance against authored evidence from a complete hosted search.
 
