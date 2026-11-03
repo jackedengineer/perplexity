@@ -103,7 +103,7 @@ test('workspace sign-in opens Google directly without an intermediate page',asyn
 test('visitor policies stay at the bottom and OAuth errors stay in the workspace',async({page})=>{
  await page.goto('/sign-in?error=oauth');
  await expect(page).toHaveURL(/\/workspace\?error=oauth$/);
- await expect(page.getByRole('alert')).toContainText('Google sign-in wasn’t completed');
+ await expect(page.getByRole('main').getByRole('alert')).toContainText('Google sign-in wasn’t completed');
  for(const height of [844,560]){
   await page.setViewportSize({width:390,height});
   const footer=page.locator('.visitor-policy-footer');
