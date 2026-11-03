@@ -8,7 +8,7 @@ export const subscriptionId=reference('sub'),paymentId=reference('pay'),invoiceI
 const priceKey=z.enum([testOffer.priceKey,liveOffer.priceKey]);
 export const checkoutInput=z.strictObject({requestId:z.uuid(),priceKey});
 export const confirmationInput=z.strictObject({checkoutId:z.uuid(),razorpay_payment_id:paymentId,razorpay_subscription_id:subscriptionId,razorpay_signature:z.string().regex(/^[a-f0-9]{64}$/u)});
-export const subscriptionSchema=z.object({id:subscriptionId,plan_id:planId,status:z.enum(['created','authenticated','active','pending','halted','cancelled','completed','expired']),quantity:z.literal(1),notes:z.object({checkoutId:z.uuid(),priceKey})});
+export const subscriptionSchema=z.object({id:subscriptionId,plan_id:planId,status:z.enum(['created','authenticated','active','pending','halted','cancelled','completed','expired']),quantity:z.literal(1),paid_count:z.int().nonnegative().optional(),current_start:z.int().nonnegative().nullable().optional(),current_end:z.int().nonnegative().nullable().optional(),notes:z.object({checkoutId:z.uuid(),priceKey})});
 export const invoiceSchema=z.object({id:invoiceId,payment_id:paymentId,status:z.literal('paid'),amount:z.literal(proPlan.amountPaise),amount_paid:z.literal(proPlan.amountPaise),currency:z.literal('INR'),billing_start:z.int().positive(),billing_end:z.int().positive()});
 export const paymentSchema=z.object({id:paymentId,invoice_id:invoiceId,status:z.literal('captured'),amount:z.literal(proPlan.amountPaise),currency:z.literal('INR'),amount_refunded:z.literal(0)});
 // Polling uses the same linked invoice/payment identity as grants. A refund is

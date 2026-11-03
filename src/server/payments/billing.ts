@@ -64,6 +64,16 @@ async function recordReversal(tx:JobTransaction,paymentId:string,reason:string,m
  await tx.insert(reversals).values({paymentId,reason,environment:mode}).onConflictDoNothing();
  await tx.update(periods).set({state:'REVOKED'}).where(and(eq(periods.paymentId,paymentId),eq(periods.environment,mode)));
 }
+// Cancellation can race a hosted payment after the adapter's initial GET.
+// UNKNOWN retains the existing pilot reservation until the terminal provider
+// response proves no charge, or every charged cycle has linked local evidence.
+async function cancellationState(db:JobDatabase,row:Checkout,sub:Awaited<ReturnType<RazorpayApi['subscription']>>):Promise<'CANCELLED'|'UNKNOWN'>{
+ if(row.environment!=='LIVE'||sub.status==='expired')return 'CANCELLED';
+ if(sub.paid_count===0&&sub.current_start===null&&sub.current_end===null)return 'CANCELLED';
+ if(sub.paid_count===undefined||sub.paid_count===0)return 'UNKNOWN';
+ const recorded=await db.select({id:periods.id}).from(periods).where(and(eq(periods.subscriptionId,sub.id),eq(periods.environment,row.environment),eq(periods.userId,row.userId)));
+ return recorded.length>=sub.paid_count?'CANCELLED':'UNKNOWN';
+}
 async function reconcileCycles(db:JobDatabase,row:Checkout,api:RazorpayApi,onlyPayment?:string,deadline=performance.now()+10000){
  const mode=paymentMode(api.keyId),offer=offerFor(mode);
  if(row.environment!==mode||row.priceKey!==offer.priceKey||!row.subscriptionId)throw new JobError('CONFLICT');
@@ -101,8 +111,8 @@ async function reconcileCycles(db:JobDatabase,row:Checkout,api:RazorpayApi,onlyP
    if(!saved||saved.userId!==row.userId||saved.subscriptionId!==sub.id||saved.invoiceId!==cycle.invoiceId)throw new JobError('CONFLICT');
   });
  }
- const next=sub.status==='cancelled'||sub.status==='expired'?'CANCELLED':sub.status==='completed'?'COMPLETED':'READY';
- await db.update(checkouts).set({providerState:sql`CASE WHEN ${checkouts.state} IN ('CANCELLED','COMPLETED') THEN ${checkouts.providerState} ELSE ${sub.status} END`,state:sql`CASE WHEN ${checkouts.state} IN ('CANCELLED','COMPLETED') THEN ${checkouts.state} ELSE ${next} END`,updatedAt:sql`clock_timestamp()`}).where(eq(checkouts.id,row.id));
+ const next=sub.status==='cancelled'||sub.status==='expired'?await cancellationState(db,row,sub):sub.status==='completed'?'COMPLETED':'READY';
+ await db.update(checkouts).set({providerState:sql`CASE WHEN ${next}='READY' AND (${checkouts.state} IN ('CANCELLED','COMPLETED') OR (${checkouts.state}='UNKNOWN' AND ${checkouts.providerState}='cancelled')) THEN ${checkouts.providerState} ELSE ${sub.status} END`,state:sql`CASE WHEN ${next}='READY' AND (${checkouts.state} IN ('CANCELLED','COMPLETED') OR (${checkouts.state}='UNKNOWN' AND ${checkouts.providerState}='cancelled')) THEN ${checkouts.state} ELSE ${next} END`,updatedAt:sql`clock_timestamp()`}).where(eq(checkouts.id,row.id));
 }
 export async function confirmCheckout(db:JobDatabase,subject:string,raw:unknown,secret:string,api:RazorpayApi){
  const input=confirmationInput.parse(raw),row=await ownedCheckout(db,subject,input.checkoutId,paymentMode(api.keyId));
@@ -114,7 +124,7 @@ export async function cancelSubscription(db:JobDatabase,subject:string,id:string
  if(row.cancelAtCycleEnd)return;
  const sub=await api.cancel(row.subscriptionId);
  if(sub.id!==row.subscriptionId||sub.notes.checkoutId!==row.id||sub.plan_id!==row.planId||sub.notes.priceKey!==row.priceKey)throw new JobError('CONFLICT');
- await db.update(checkouts).set({cancelAtCycleEnd:true,providerState:sub.status,state:sub.status==='cancelled'||sub.status==='expired'?'CANCELLED':sub.status==='completed'?'COMPLETED':row.state,updatedAt:sql`clock_timestamp()`}).where(eq(checkouts.id,row.id));
+ await db.update(checkouts).set({cancelAtCycleEnd:true,providerState:sub.status,state:sub.status==='cancelled'||sub.status==='expired'?await cancellationState(db,row,sub):sub.status==='completed'?'COMPLETED':row.state,updatedAt:sql`clock_timestamp()`}).where(eq(checkouts.id,row.id));
  // The verified invoice retains its own paid-through timestamp; no new grant.
 }
 export async function ingestWebhook(db:JobDatabase,eventId:string,bytes:Uint8Array,signature:string,secret:string,mode:PaymentMode='TEST'){
