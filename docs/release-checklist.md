@@ -1,4 +1,22 @@
-# Current release checks — 2 November 2026
+# Current release checks — 3 November 2026
+
+## Additional model rollout — 07:38 UTC
+
+- [x] Bounded live Qwen and DeepSeek probes produced structured answers with
+  validated citations and passed the production output safety gate. Gemini's
+  pinned route returned HTTP 404; it remains disabled. See
+  [provider acceptance evidence](ux/catalog-provider-acceptance.md).
+- [x] Enabled only the passing Qwen/DeepSeek keys alongside the existing Nano
+  opt-in. Production Worker version is `d57b6616-60d8-4063-886b-495d30c8f2c3`,
+  with unchanged source `8ecc982`. Both additions appeared in the live picker.
+- [ ] Full hosted answers for both additions: Qwen's browser attempt timed out
+  in INPUT_SAFETY before invoking the answer model. DeepSeek was not attempted
+  after operator headroom dropped below the required $0.05 reservation.
+- [ ] Reconcile that timeout only with a verified cost receipt, or resume checks
+  after normal daily-budget renewal. Current daily availability is $0.036939;
+  the existing window ends November 3 at 16:55 IST. No quota, cap, unknown hold,
+  deadline, provider restriction or safety gate was relaxed.
+
 
 ## Follow-up payment capacity check — 13:55 UTC
 
