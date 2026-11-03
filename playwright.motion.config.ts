@@ -1,6 +1,6 @@
 import {defineConfig,devices} from '@playwright/test';
 // Offline UI app. Never loads .env.local, sessions, Neon or provider credentials.
-export default defineConfig({testDir:'./tests/e2e',testMatch:'answer-motion.spec.ts',
+export default defineConfig({testDir:'./tests/e2e',testMatch:['answer-motion.spec.ts','model-picker.spec.ts'],
  outputDir:'.artifacts/answer-motion-results',workers:1,retries:0,forbidOnly:Boolean(process.env.CI),timeout:30000,
  use:{baseURL:'http://localhost:43741',trace:'retain-on-failure'},
  projects:[{name:'desktop',use:{...devices['Desktop Chrome']}},{name:'mobile',use:{...devices['iPhone 13'],defaultBrowserType:'chromium'}}],

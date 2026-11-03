@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {useModelAccess} from "./model-access";
+import {PlanIndicator} from "./plan-indicator";
 import { SessionControls } from "@/components/session-controls";
 import type { Conversation } from "@/server/conversations/contracts";
 import { Icon, ResearchMark, type IconName } from "./icons";
@@ -66,10 +67,11 @@ export function ResearchShell({ children, recent, name, initialCollapsed, jobsEn
         </div>}
       </nav>
       <div className="sidebar-footer">
+        <PlanIndicator compact={isCollapsed}/>
         {!isCollapsed && <div className="private-workspace"><Icon name="lock" size={12} />Private workspace</div>}
         <button className="account-button" aria-label="Open account menu" onClick={() => { close(); account.current?.showModal(); }}>
           <span className="account-avatar"><Icon name="user" size={16} /></span>
-          {!isCollapsed && <span className="account-name">{name}<small>Personal account</small></span>}
+          {!isCollapsed && <span className="account-name">{name}<small>{data?.usage.subscription?'Pro member':data?.usage.tier==='GUEST'?'Guest trial':'Free plan'}</small></span>}
         </button>
       </div>
     </>;
@@ -82,12 +84,13 @@ export function ResearchShell({ children, recent, name, initialCollapsed, jobsEn
         <Link href="/workspace" aria-label="Perplex home"><ResearchMark /></Link>
         <Link href="/workspace" className="research-icon-button" aria-label="New conversation"><Icon name="plus" /></Link>
       </div>
+      <div className="workspace-plan"><PlanIndicator/></div>
       {children}
     </div>
     <dialog className="mobile-navigation" aria-label="Navigation" ref={mobileNav} onClick={(event) => { if (event.target === event.currentTarget) mobileNav.current?.close(); }}>{sidebar(false, true)}</dialog>
     <dialog className="research-dialog account-dialog" aria-labelledby="account-heading" ref={account} onClick={(event) => { if (event.target === event.currentTarget) account.current?.close(); }}>
       <div className="dialog-heading"><h2 id="account-heading">Your account</h2><button className="research-icon-button" aria-label="Close account menu" onClick={() => account.current?.close()}><Icon name="close" size={17} /></button></div>
-      <p>{name}</p>{data?.usage.tier==="GUEST"&&<Link href="/sign-in">Sign in with Google to save guest history</Link>}<p className="research-muted">Your conversations are private.</p><SessionControls />
+      <p>{name}</p><PlanIndicator/>{data?.usage.subscription&&<p className="research-muted">{data.usage.subscription.reportsRemaining} Deep Research reports remaining · Access until {new Date(data.usage.subscription.endsAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</p>}{data?.usage.tier==="GUEST"&&<Link href="/sign-in">Sign in with Google to save guest history</Link>}<p className="research-muted">Your conversations are private.</p><SessionControls />
     </dialog>
   </div>;
 }
