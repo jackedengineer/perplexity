@@ -53,7 +53,7 @@ export function ApprovedAnswer({ messageId,answer,text,reveal,onSources }: {mess
     }
   }); }
   return <div className="approved-answer">
-    <div className="answer-researched">{answer.kind === "ANSWER" ? "Researched" : answer.kind === "NO_EVIDENCE" ? "Search complete" : "One more detail"}</div>
+    <div className="answer-researched">{answer.kind === "CHAT" ? "Chat · No web search" : answer.kind === "ANSWER" ? "Web · Sources used" : answer.kind === "NO_EVIDENCE" ? "Search complete" : "One more detail"}</div>
     <div className="answer-prose" aria-busy={reveal?.active??false} aria-live="off">{render(reveal?.document??answer.document)}</div>
     {reveal&&<span className="sr-only" role="status">{reveal.active?'Showing approved answer':'Answer ready'}</span>}
     {reveal?.active?<button className="research-button answer-show-full" type="button" onClick={event=>{event.currentTarget.closest('article')?.focus({preventScroll:true});reveal.finish();}}>Show full answer<Icon name="down" size={13}/></button>:<div className="answer-actions">

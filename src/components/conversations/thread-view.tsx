@@ -1,4 +1,7 @@
 "use client";
+import {ReviseQuestion,type RevisionOptions} from "./revise-question";
+import {useStartDeep} from "./use-start-deep";
+import {useModelAccess} from "./model-access";
 import { useState } from "react";
 import Link from "next/link";
 import type { Conversation,HistoryPage } from "@/server/conversations/views";
@@ -10,8 +13,18 @@ import { QuestionComposer } from "./question-composer";
 import {useAnswerReveal} from './use-answer-reveal';
 export type ResearchState={question:string;pending:boolean;error:string;label:string;committed:CommittedAnswer|null;revealMessageId?:string;retry:()=>void;stop?:()=>void};
 export const idleResearch: ResearchState={question:"",pending:false,error:"",label:"Checking request",committed:null,retry:()=>{}};
-export function ThreadView({conversation,initial,research=idleResearch,submit}: {conversation:Conversation;initial:HistoryPage;research?:ResearchState;submit:(text:string)=>void}) {
+export function ThreadView({conversation,initial,research=idleResearch,submit}: {conversation:Conversation;initial:HistoryPage;research?:ResearchState;submit:(text:string,options?:RevisionOptions)=>void}) {
   const [text,setText]=useState(""),[sourcesOpen,setSourcesOpen]=useState(false);
+  const [revision,setRevision]=useState<{text:string;action:"edit"|"retry"}|null>(null);
+  const {mode,setMode,select}=useModelAccess(),startDeep=useStartDeep();
+  const [startingDeep,setStartingDeep]=useState(false),[deepError,setDeepError]=useState('');
+  async function send(){
+    if(!text.trim())return;
+    if(mode==='DEEP'){
+      setStartingDeep(true);setDeepError('');
+      try{await startDeep(text);}catch(error){setDeepError(error instanceof Error?error.message:'Could not start research.');setStartingDeep(false);}
+    }else{submit(text);setText('');}
+  }
   const saved=research.committed;
   const reveal=useAnswerReveal(saved&&research.revealMessageId===saved.messageId?saved:null);
   const [baseSequence]=useState(()=>Math.max(0,...initial.items.map(message=>message.sequence)));
@@ -30,7 +43,7 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
     </header>
     <section className="thread-content" aria-label="Conversation history" tabIndex={0}>
       <h1>{conversation.title}</h1>
-      {history.items.length>0&&<ConversationHistory key={saved?.messageId??`saved:${initial.items.length}`} conversationId={conversation.id} initial={history} reveal={reveal} sourcesOpen={sourcesOpen} onSourcesOpenChange={setSourcesOpen}/>}
+      {history.items.length>0&&<ConversationHistory key={saved?.messageId??`saved:${initial.items.length}`} conversationId={conversation.id} initial={history} reveal={reveal} sourcesOpen={sourcesOpen} onSourcesOpenChange={setSourcesOpen} onRevise={!research.pending&&!startingDeep?(text,action)=>setRevision({text,action}):undefined}/>}
       {research.question&&!history.items.some(message=>message.role==="USER"&&message.sequence>baseSequence)&&!saved&&<article className="history-message question-message pending-question" aria-label="Your question"><p>{research.question}</p></article>}
       {research.pending&&!saved&&<div className="research-progress" role="status" aria-live="polite"><span className="progress-mark" aria-hidden="true"><ResearchMark/></span><span className="progress-label" key={research.label}>{research.label}</span><div className="answer-skeleton" aria-hidden="true"><span/><span/><span/></div></div>}
       {research.error&&!saved&&<div className="research-failure"><p role="alert">{research.error}</p><div className="failure-actions">
@@ -39,9 +52,11 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
       </div></div>}
       {!history.items.length&&!research.question&&!research.pending&&!research.error&&<div className="thread-empty"><Icon name="search" size={24}/><h2>What would you like to explore?</h2><p>Ask a question to search the web and get an answer with sources.</p></div>}
     </section>
+    {revision&&<ReviseQuestion question={revision.text} action={revision.action} onClose={()=>setRevision(null)} onSubmit={(text,options)=>{setRevision(null);setMode(options.mode);select(options.modelKey);submit(text,options);}}/>}
     <div className="thread-bottom">
       {research.pending?<QuestionComposer text="" onText={()=>{}} onSubmit={()=>{}} pending onStop={research.stop} placeholder={research.label}/>
-         :<QuestionComposer text={text} onText={setText} onSubmit={()=>{if(text.trim()){void submit(text);setText('');}}} pending={false} placeholder={hasAnswer?'Ask a follow-up…':'Ask a question…'}/>}
+         :<QuestionComposer text={text} onText={setText} onSubmit={()=>void send()} pending={startingDeep} placeholder={mode==='DEEP'?'Start a new research report…':hasAnswer?'Ask a follow-up…':'Ask a question…'}/>}
+      {deepError&&<p className="composer-feedback" role="alert">{deepError}</p>}
     </div>
   </main>;
 }

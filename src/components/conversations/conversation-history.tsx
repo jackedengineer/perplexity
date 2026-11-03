@@ -6,7 +6,7 @@ import type { PublicAnswer } from "@/server/answers/view";
 import { historyPageView, type HistoryPage } from "@/server/conversations/views";
 import type {AnswerReveal} from './use-answer-reveal';
 
-export function ConversationHistory({ conversationId, initial,reveal,sourcesOpen: controlledOpen,onSourcesOpenChange }: { conversationId: string; initial: HistoryPage;reveal?:AnswerReveal;sourcesOpen?: boolean;onSourcesOpenChange?: (value:boolean)=>void }) {
+export function ConversationHistory({ conversationId, initial,reveal,sourcesOpen: controlledOpen,onSourcesOpenChange,onRevise }: { conversationId: string; initial: HistoryPage;reveal?:AnswerReveal;sourcesOpen?: boolean;onSourcesOpenChange?: (value:boolean)=>void;onRevise?:(text:string,action:"edit"|"retry")=>void }) {
   const router = useRouter();
   const [history, setHistory] = useState(initial);
   const [pending, setPending] = useState(false);
@@ -50,8 +50,10 @@ export function ConversationHistory({ conversationId, initial,reveal,sourcesOpen
   return <div ref={root} className="history-stack">
     {history.nextBefore && <button className="research-button load-older" disabled={pending} onClick={() => void older()}>{pending ? "Loading earlier messages…" : "Load earlier messages"}</button>}
     <div className="history-feedback" aria-live="polite">{failed ? <p role="alert">Earlier messages couldn’t load. Please try again.</p> : <span className="sr-only">{loaded ? `${loaded} earlier messages loaded.` : ""}</span>}</div>
-    {history.items.map((message) => <article className={`history-message ${message.role === "USER" ? "question-message" : "answer-message"}`} tabIndex={-1} key={message.id} aria-label={message.role === "USER" ? "Your question" : "Approved answer"}>
+    {history.items.map((message,index) => <article className={`history-message ${message.role === "USER" ? "question-message" : "answer-message"}`} tabIndex={-1} key={message.id} aria-label={message.role === "USER" ? "Your question" : "Approved answer"}>
       {message.answer ? <ApprovedAnswer messageId={message.id} answer={message.answer} text={message.parts.map(part=>part.text).join("\n")} reveal={reveal?.messageId===message.id?reveal:undefined} onSources={()=>{setSelected(message.answer!);setSourcesOpen(true);}} /> : <>{message.role === "ASSISTANT" && <h2>Answer</h2>}{message.parts.map((part,index)=><p key={index}>{part.text}</p>)}</>}
+      {onRevise&&message.role==='USER'&&<button className="message-revise" onClick={()=>onRevise(message.parts.map(p=>p.text).join('\n'),'edit')}>Edit & resend</button>}
+      {onRevise&&message.answer&&history.items.slice(0,index).findLast(m=>m.role==='USER')&&<button className="message-revise" onClick={()=>onRevise(history.items.slice(0,index).findLast(m=>m.role==='USER')!.parts.map(p=>p.text).join('\n'),'retry')}>Try another model</button>}
     </article>)}
     <SourcesPanel answer={currentAnswer} open={sourcesOpen} onToggle={()=>setSourcesOpen(!sourcesOpen)} />
   </div>;

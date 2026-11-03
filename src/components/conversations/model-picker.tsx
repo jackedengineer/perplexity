@@ -13,12 +13,13 @@ const details:Record<ModelKey,{mark:string;description:string}>={
  'economy-gemini':{mark:'✦',description:'Lightweight and fast · Google'},
  'standard-deepseek':{mark:'D',description:'Versatile open model · DeepSeek'},
 };
-export function ModelPicker({models,value,onSelect,disabled,favorites=[],onFavorite}:{models:Model[];value:ModelKey;onSelect:(key:ModelKey)=>void;disabled:boolean;favorites?:string[];onFavorite?:(key:ModelKey)=>void}){
+export function ModelPicker({models,value,onSelect,disabled,favorites=[],onFavorite,inline=false}:{models:Model[];value:ModelKey;onSelect:(key:ModelKey)=>void;disabled:boolean;favorites?:string[];onFavorite?:(key:ModelKey)=>void;inline?:boolean}){
  const id=useId(),trigger=useRef<HTMLButtonElement>(null),menu=useRef<HTMLDivElement>(null);
  const [position,setPosition]=useState<{left:number;top:number;maxHeight:number;above:boolean}|null>(null);
  const [query,setQuery]=useState('');
  const visible=filterModels(models,query,favorites);
  const selected=models.find(m=>m.key===value);
+ const renderMenu=(node:React.ReactNode)=>inline?node:createPortal(node,document.body);
  const close=()=>{setPosition(null);trigger.current?.focus();};
  function open(){
   setQuery('');
@@ -37,7 +38,7 @@ export function ModelPicker({models,value,onSelect,disabled,favorites=[],onFavor
  return <><button type="button" ref={trigger} className="model-trigger" aria-label={`Answer model: ${selected?.name??'Unavailable'}`} aria-haspopup="dialog" aria-expanded={!!position} aria-controls={position?id:undefined} disabled={disabled||!models.length}
   onClick={()=>position?close():open()} onKeyDown={e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();open();}}}>
   <span>{selected?.name??'Research unavailable'}</span><Icon name="down" size={13}/>
- </button>{position&&createPortal(<div ref={menu} id={id} className="model-popover" role="dialog" aria-label="Answer models" style={{left:position.left,top:position.top,maxHeight:position.maxHeight,transform:position.above?'translateY(-100%)':undefined}}
+ </button>{position&&renderMenu(<div ref={menu} id={id} className="model-popover" role="dialog" aria-label="Answer models" style={{left:position.left,top:position.top,maxHeight:position.maxHeight,transform:position.above?'translateY(-100%)':undefined}}
  onKeyDown={e=>{
   if(e.key==='Escape'){e.preventDefault();close();return;}
 
@@ -61,5 +62,5 @@ export function ModelPicker({models,value,onSelect,disabled,favorites=[],onFavor
    {onFavorite&&<button type="button" className="model-favorite" aria-label={`${favorites.includes(model.key)?'Unfavorite':'Favorite'} ${model.name}`} aria-pressed={favorites.includes(model.key)} onClick={()=>onFavorite(model.key)}><Icon name="star" size={16}/></button>}
   </div>)}
   <p className="model-menu-note">Favorites stay on this device. Costs are charged only for completed answers.</p>
- </div>,document.body)}</>;
+ </div>)}</>;
 }

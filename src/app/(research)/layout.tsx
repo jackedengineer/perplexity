@@ -1,4 +1,4 @@
-import {configuredResearchModels} from '@/server/deep-research/configuration';
+import {configuredJobResearchModels} from '@/server/jobs/cloudflare-configuration';
 import {jobsEnabled} from '@/server/jobs/service';
 import {ModelAccessProvider} from "@/components/conversations/model-access";
 import { QuestionIntentProvider } from "@/components/conversations/question-intent";
@@ -15,6 +15,6 @@ export default async function ResearchLayout({ children }: { children: React.Rea
   const [recent, pinned, preferences] = await Promise.all([
     getConversationRepository().list(identity.user.id, { limit: 20, q: "" }), getConversationRepository().list(identity.user.id, {limit:20,q:"",pinned:"true"}), cookies(),
   ]);
-  let deepResearchEnabled=false;try{configuredResearchModels();deepResearchEnabled=true;}catch{/* Default off. */}
-  return <ModelAccessProvider preferenceKey={identity.user.id}><QuestionIntentProvider><ResearchShell deepResearchEnabled={deepResearchEnabled} jobsEnabled={jobsEnabled()} name={identity.user.name} recent={recent.items} pinned={pinned.items} initialCollapsed={preferences.get("perplex_sidebar")?.value === "collapsed"}>{children}</ResearchShell></QuestionIntentProvider></ModelAccessProvider>;
+  let deepResearchEnabled=false;try{configuredJobResearchModels();deepResearchEnabled=jobsEnabled();}catch{/* Default off. */}
+  return <ModelAccessProvider preferenceKey={identity.user.id} deepAvailable={deepResearchEnabled}><QuestionIntentProvider><ResearchShell deepResearchEnabled={deepResearchEnabled} jobsEnabled={jobsEnabled()} name={identity.user.name} recent={recent.items} pinned={pinned.items} initialCollapsed={preferences.get("perplex_sidebar")?.value === "collapsed"}>{children}</ResearchShell></QuestionIntentProvider></ModelAccessProvider>;
 }

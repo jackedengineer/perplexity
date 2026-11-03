@@ -57,7 +57,7 @@
 .question-message { background: #222; border-radius: 12px; padding: 16px 20px; width: fit-content; max-width: 92%; margin-left: auto; }
 .research-progress .answer-skeleton { display: none; }
 @media (max-height: 720px) { .new-thread { padding-top: 20px; } .new-thread-heading > svg { margin-bottom: 12px; } .starter-prompts { margin-bottom: 16px; } }
-@media (max-width: 767px) { .workspace-plan { top: 8px; right: 45px; padding: 0; height: 40px; } .workspace-plan .plan-allowance { display: none; } .research-mobile-header > a[aria-label="Perplex home"] { margin-right: auto; margin-left: 6px; } .new-thread { width: calc(100% - 32px); padding-top: 36px; } .new-thread-heading h1 { font-size: 26px; } .new-thread-heading p { font-size: 14px; } .answer-topbar { padding-right: 12px; } .starter-prompts button { padding: 12px 0; } .model-favorite { min-width: 40px; height: 44px; } }
+@media (max-width: 767px) { .workspace-plan { top: 8px; right: 45px; padding: 0; height: 40px; } .workspace-plan .plan-allowance { font-size: 10px; } .research-mobile-header > a[aria-label="Perplex home"] { margin-right: auto; margin-left: 6px; } .new-thread { width: calc(100% - 32px); padding-top: 36px; } .new-thread-heading h1 { font-size: 26px; } .new-thread-heading p { font-size: 14px; } .answer-topbar { padding-right: 12px; } .starter-prompts button { padding: 12px 0; } .model-favorite { min-width: 40px; height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .research-shell *, .model-popover * { animation: none !important; transition: none !important; } }
 .quick-search { width: min(560px,calc(100% - 32px)); max-height: min(560px,80dvh); margin: 12vh auto auto; padding: 0; border: 1px solid #414141; border-radius: 12px; color: var(--r-text); background: #222; box-shadow: 0 20px 60px #0006; animation: model-menu-enter 140ms ease-out; }
 .quick-search::backdrop { background: #0008; }
@@ -70,3 +70,45 @@
 .quick-search-results a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quick-search-results p { padding: 20px 12px; color: var(--r-muted); }
 .quick-search footer { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--r-line); padding: 12px 16px; font-size: 12px; color: var(--r-muted); }
+.mode-picker { display: flex; width: fit-content; gap: 3px; padding: 3px; margin-bottom: 10px; border-radius: 8px; background: #151515; flex-shrink: 0; }
+.mode-picker button { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 6px; padding: 7px 12px; background: transparent; color: #aaa; cursor: pointer; font: inherit; font-size: 12px; transition: background 140ms ease, color 140ms ease; }
+.mode-picker button[aria-pressed=true] { background: #333; color: #efefed; }
+.mode-picker button:hover { color: #fff; }
+.mode-picker button:disabled { cursor: default; }
+.mode-picker small { border: 1px solid #555; border-radius: 3px; font-size: 9px; padding: 0 3px; line-height: 15px; }
+.new-thread > .mode-picker { margin-top: auto; }
+.new-thread > .question-composer { margin-top: 0; }
+.composer-upgrade { font-size: 12px; background: #e8e8e3; color: #222; border-radius: 6px; padding: 7px 10px; }
+.deep-composer-hint { font-size: 11px; color: var(--r-muted); }
+.thread-bottom > .mode-picker { margin-left: auto; margin-right: auto; }
+@media (max-width:767px) { .mode-picker button { min-height: 40px; } }
+.message-revise { display: inline-flex; margin-top: 10px; padding: 6px 0; border: 0; background: transparent; color: var(--r-muted); font: inherit; font-size: 12px; cursor: pointer; transition: color 120ms; }
+.message-revise:hover { color: var(--r-text); }
+.revision-dialog { overflow: visible; background: #222; border-color: #414141; }
+.revision-dialog p { margin: 12px 0 20px; font-size: 13px; }
+.revision-label { display: block; font-size: 12px; margin-bottom: 8px; }
+.revision-dialog textarea { display: block; width: 100%; min-height: 100px; max-height: 30dvh; resize: vertical; padding: 12px; border: 1px solid #555; border-radius: 8px; background: #191919; color: #efefed; font: inherit; }
+.revision-options { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin: 16px 0; }
+.revision-options label { font-size: 12px; color: var(--r-muted); }
+.revision-options select { border: 1px solid #555; border-radius: 6px; background: #222; color: #efefed; padding: 8px; font: inherit; margin-left: 6px; }
+.revision-dialog .dialog-footer { align-items: center; flex-wrap: wrap; }
+.revision-dialog .dialog-footer > span { margin-right: auto; font-size: 12px; }
+.history-message.question-message { display: block; padding: 14px 18px; margin-bottom: 22px; }
+.question-message > p { max-width: 100%; padding: 0; border-radius: 0; background: transparent; font-family: inherit; }
+.research-shell .answer-prose { font-family: inherit; }
+.research-shell .jobs-card { background: #222; border-color: #383838; border-radius: 12px; }
+.research-shell .jobs-primary { background: #e8e8e3; color: #222; border-color: #e8e8e3; }
+.research-shell .jobs-badge,.research-shell .jobs-eyebrow,.research-shell .jobs-page p,.research-shell .deep-prose p { color: var(--r-muted); }
+.research-shell .jobs-dot { background: #aaa; }
+.research-shell .deep-composer textarea { background: #191919; border-color: #555; }
+.research-shell .deep-citation { background: #383838; color: #efefed; }
+.research-shell .deep-sources a { color: #ddd; border-color: #383838; }
+.research-shell .answer-prose h2,.research-shell .answer-prose h3 { font-family: inherit; }
+.thread-content:has(.approved-answer) { padding: 28px 32px; }
+.thread-content:has(.approved-answer) .history-stack { width: min(720px,100%); margin-inline: auto; }
+.research-shell .usage-summary .text-button { color: #b8b8b5; border-color: #444; }
+@media(max-width:767px) { .thread-content:has(.approved-answer) { padding: 20px 16px; } }
+.active-thread .thread-bottom { align-self: center; margin-left: 0; width: min(720px,calc(100% - 32px)); }
+.research-shell { overflow: clip; }
+.answer-sources:not(.sources-open) { display: none; }
+.research-shell .answer-sources,.research-shell .mobile-sources-dialog { background: #222; border-color: #444; }

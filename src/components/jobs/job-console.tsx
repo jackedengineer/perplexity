@@ -1,4 +1,5 @@
 'use client';
+import {useModelAccess} from '@/components/conversations/model-access';
 import {ResearchReport} from './research-report';
 import {DeleteResearch} from './delete-research';
 import Link from 'next/link';
@@ -13,6 +14,7 @@ class JobHttpError extends Error{constructor(message:string,public status:number
 async function responseBody(response:Response){let body;try{body=await response.json();}catch{throw new JobHttpError('The service could not be reached. Please try again.',response.status);}
  if(!response.ok)throw new JobHttpError(body.error?.message??'Please try again in a moment.',response.status);return body;}
 export function JobConsole({initialJobs,initialId,billingAvailable,deepAvailable=false,environment='TEST'}:{initialJobs:Summary[];initialId:string|null;billingAvailable:boolean;deepAvailable?:boolean;environment?:'TEST'|'LIVE'}){
+ const {refresh}=useModelAccess();
  const router=useRouter(),[id,setId]=useState(initialId),[job,setJob]=useState<JobView|null>(null),[events,setEvents]=useState<JobEvent[]>([]);
  const [expanded,setExpanded]=useState(false);
  const test=environment==='TEST',[removedIds,setRemovedIds]=useState<string[]>([]);
@@ -26,11 +28,11 @@ export function JobConsole({initialJobs,initialId,billingAvailable,deepAvailable
     if(controller.signal.aborted)return;
     const incoming=body.events as JobEvent[];cursor=incoming.at(-1)?.sequence??cursor;
     failures=0;setJob(body.job);setEvents(previous=>{const before=previous.filter(e=>e.sequence<=(incoming[0]?.sequence??Infinity)-1);return [...before,...incoming];});setError('');
-    if(['QUEUED','RUNNING'].includes(body.job.state)||cursor<body.job.cursor)timer=setTimeout(poll,document.hidden?10000:2000);
+    if(['QUEUED','RUNNING'].includes(body.job.state)||cursor<body.job.cursor)timer=setTimeout(poll,document.hidden?10000:2000);else refresh();
    }catch(e){if(!controller.signal.aborted){const reconnect=!(e instanceof JobHttpError)||[408,429,500,502,503,504].includes(e.status);setError(reconnect?'Connection interrupted. Reconnecting to saved progress…':e instanceof Error?e.message:'Connection interrupted. Your job is saved.');if(reconnect&&failures++<5)timer=setTimeout(poll,Math.min(15000,2000*2**failures));}}
   }
   void poll();return()=>{controller.abort();clearTimeout(timer);};
- },[id,retry]);
+ },[id,retry,refresh]);
  async function start(){
   if(busy)return;setBusy(true);setError('');intent.current??=crypto.randomUUID();
   try{

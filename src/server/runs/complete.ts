@@ -1,4 +1,5 @@
 import {loadPlanningContext} from './context';
+import {CHAT_PROMPT_VERSION} from '@/server/ai/chat-draft';
 import {ANSWER_PROMPT_VERSION} from '@/server/ai/prompts/answer';
 import {traceStage} from '@/server/telemetry/trace';
 import { z } from "zod";
@@ -58,7 +59,7 @@ export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { ans
       let draft;
       try {
         if(budget.signal.aborted){await calls.finish(callId,'SKIPPED',{costMicroUsd:0n,inputTokens:0,outputTokens:0,actualModel:null});throw new AdmissionError('DEADLINE_EXCEEDED');}
-        draft = await traceStage("answer.draft",()=>generatePrivateDraft(prepared,dependencies.answer,{ signal:budget.signal,deadlineAt:claim.deadlineAt },loaded.run.mode === "CHAT" ? "CHAT" : "FAST"),()=>({promptVersion:ANSWER_PROMPT_VERSION}));
+        draft = await traceStage("answer.draft",()=>generatePrivateDraft(prepared,dependencies.answer,{ signal:budget.signal,deadlineAt:claim.deadlineAt },loaded.run.mode === "CHAT" ? "CHAT" : "FAST"),()=>({promptVersion:loaded.run.mode === "CHAT" ? CHAT_PROMPT_VERSION : ANSWER_PROMPT_VERSION}));
         await calls.finish(callId,draft.kind === "NO_EVIDENCE" ? "SKIPPED" : "SUCCEEDED",draft.usage);
         if(budget.signal.aborted)throw new AdmissionError('DEADLINE_EXCEEDED');
       } catch {
