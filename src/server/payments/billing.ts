@@ -64,6 +64,16 @@ async function recordReversal(tx:JobTransaction,paymentId:string,reason:string,m
  await tx.insert(reversals).values({paymentId,reason,environment:mode}).onConflictDoNothing();
  await tx.update(periods).set({state:'REVOKED'}).where(and(eq(periods.paymentId,paymentId),eq(periods.environment,mode)));
 }
+// Cancellation can race a hosted payment after the adapter's initial GET.
+// UNKNOWN retains the existing pilot reservation until the terminal provider
+// response proves no charge, or every charged cycle has linked local evidence.
+async function cancellationState(db:JobDatabase,row:Checkout,sub:Awaited<ReturnType<RazorpayApi['subscription']>>):Promise<'CANCELLED'|'UNKNOWN'>{
+ if(row.environment!=='LIVE'||sub.status==='expired')return 'CANCELLED';
+ if(sub.paid_count===0&&sub.current_start===null&&sub.current_end===null)return 'CANCELLED';
+ if(sub.paid_count===undefined||sub.paid_count===0)return 'UNKNOWN';
+ const recorded=await db.select({id:periods.id}).from(periods).where(and(eq(periods.subscriptionId,sub.id),eq(periods.environment,row.environment),eq(periods.userId,row.userId)));
+ return recorded.length>=sub.paid_count?'CANCELLED':'UNKNOWN';
+}
 async function reconcileCycles(db:JobDatabase,row:Checkout,api:RazorpayApi,onlyPayment?:string,deadline=performance.now()+10000){
  const mode=paymentMode(api.keyId),offer=offerFor(mode);
  if(row.environment!==mode||row.priceKey!==offer.priceKey||!row.subscriptionId)throw new JobError('CONFLICT');
@@ -78,9 +88,15 @@ async function reconcileCycles(db:JobDatabase,row:Checkout,api:RazorpayApi,onlyP
   const payment=await api.payment(parsed.data.payment_id);let cycle:ReturnType<typeof verifyCycle>;
   const refund=verifiedRefund(parsed.data,payment);
   if(refund){
+   const invoice=parsed.data;
+   if(invoice.billing_end<=invoice.billing_start||invoice.billing_end-invoice.billing_start>32*86400)throw new JobError('INVALID_INPUT');
    await db.transaction(async tx=>{
     const current=await lockedCheckout(tx,row.id);if(current.subscriptionId!==sub.id||current.environment!==mode)throw new JobError('CONFLICT');
     await recordReversal(tx,refund.paymentId,'reconciliation.refund',mode,{userId:row.userId,subscriptionId:sub.id,invoiceId:refund.invoiceId});
+    // Persist linked, non-entitling evidence even when reversal arrived first.
+    // A completed checkout can then release its seat without treating a missing
+    // invoice (or an unlinked webhook tombstone) as proof of no obligation.
+    await tx.insert(periods).values({userId:row.userId,subscriptionId:sub.id,environment:mode,paymentId:refund.paymentId,invoiceId:refund.invoiceId,startsAt:new Date(invoice.billing_start*1000),endsAt:new Date(invoice.billing_end*1000),jobLimit:offer.jobLimit,state:'REVOKED'}).onConflictDoNothing();
    });
    continue;
   }
@@ -89,14 +105,14 @@ async function reconcileCycles(db:JobDatabase,row:Checkout,api:RazorpayApi,onlyP
    const current=await lockedCheckout(tx,row.id);if(current.subscriptionId!==sub.id||current.environment!==mode)throw new JobError('CONFLICT');
    // Serialize against signed refunds/disputes before inspecting their tombstone.
    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'payment:'+mode+':'+cycle.paymentId},0))`);
-   if((await tx.select().from(reversals).where(and(eq(reversals.paymentId,cycle.paymentId),eq(reversals.environment,mode)))).length)return;
-   await tx.insert(periods).values({...cycle,userId:row.userId,subscriptionId:sub.id,environment:mode,jobLimit:offer.jobLimit}).onConflictDoNothing();
+   const reversed=(await tx.select().from(reversals).where(and(eq(reversals.paymentId,cycle.paymentId),eq(reversals.environment,mode)))).length>0;
+   await tx.insert(periods).values({...cycle,userId:row.userId,subscriptionId:sub.id,environment:mode,jobLimit:offer.jobLimit,state:reversed?'REVOKED':'ACTIVE'}).onConflictDoNothing();
    const [saved]=await tx.select().from(periods).where(eq(periods.paymentId,cycle.paymentId));
    if(!saved||saved.userId!==row.userId||saved.subscriptionId!==sub.id||saved.invoiceId!==cycle.invoiceId)throw new JobError('CONFLICT');
   });
  }
- const next=sub.status==='cancelled'||sub.status==='expired'?'CANCELLED':sub.status==='completed'?'COMPLETED':'READY';
- await db.update(checkouts).set({providerState:sql`CASE WHEN ${checkouts.state} IN ('CANCELLED','COMPLETED') THEN ${checkouts.providerState} ELSE ${sub.status} END`,state:sql`CASE WHEN ${checkouts.state} IN ('CANCELLED','COMPLETED') THEN ${checkouts.state} ELSE ${next} END`,updatedAt:sql`clock_timestamp()`}).where(eq(checkouts.id,row.id));
+ const next=sub.status==='cancelled'||sub.status==='expired'?await cancellationState(db,row,sub):sub.status==='completed'?'COMPLETED':'READY';
+ await db.update(checkouts).set({providerState:sql`CASE WHEN ${next}='READY' AND (${checkouts.state} IN ('CANCELLED','COMPLETED') OR (${checkouts.state}='UNKNOWN' AND ${checkouts.providerState}='cancelled')) THEN ${checkouts.providerState} ELSE ${sub.status} END`,state:sql`CASE WHEN ${next}='READY' AND (${checkouts.state} IN ('CANCELLED','COMPLETED') OR (${checkouts.state}='UNKNOWN' AND ${checkouts.providerState}='cancelled')) THEN ${checkouts.state} ELSE ${next} END`,updatedAt:sql`clock_timestamp()`}).where(eq(checkouts.id,row.id));
 }
 export async function confirmCheckout(db:JobDatabase,subject:string,raw:unknown,secret:string,api:RazorpayApi){
  const input=confirmationInput.parse(raw),row=await ownedCheckout(db,subject,input.checkoutId,paymentMode(api.keyId));
@@ -108,7 +124,7 @@ export async function cancelSubscription(db:JobDatabase,subject:string,id:string
  if(row.cancelAtCycleEnd)return;
  const sub=await api.cancel(row.subscriptionId);
  if(sub.id!==row.subscriptionId||sub.notes.checkoutId!==row.id||sub.plan_id!==row.planId||sub.notes.priceKey!==row.priceKey)throw new JobError('CONFLICT');
- await db.update(checkouts).set({cancelAtCycleEnd:true,providerState:sub.status,state:sub.status==='cancelled'?'CANCELLED':row.state,updatedAt:sql`clock_timestamp()`}).where(eq(checkouts.id,row.id));
+ await db.update(checkouts).set({cancelAtCycleEnd:true,providerState:sub.status,state:sub.status==='cancelled'||sub.status==='expired'?await cancellationState(db,row,sub):sub.status==='completed'?'COMPLETED':row.state,updatedAt:sql`clock_timestamp()`}).where(eq(checkouts.id,row.id));
  // The verified invoice retains its own paid-through timestamp; no new grant.
 }
 export async function ingestWebhook(db:JobDatabase,eventId:string,bytes:Uint8Array,signature:string,secret:string,mode:PaymentMode='TEST'){

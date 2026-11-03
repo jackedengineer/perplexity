@@ -28,6 +28,10 @@ export async function assertPilotCapacity(tx:JobTransaction,policy:LivePilot,res
  // capacity even when the checkout itself has reached a terminal state.
  const existing=await tx.select({id:billingCheckouts.id,state:billingCheckouts.state}).from(billingCheckouts).where(and(eq(billingCheckouts.environment,'LIVE'),or(
   inArray(billingCheckouts.state,['CREATING','READY','UNKNOWN']),
+  // A completed one-cycle subscription can arrive before its captured invoice.
+  // Keep its obligation reserved until reconciliation has recorded a period;
+  // provider terminal state alone does not prove that capacity is available.
+  sql`(${billingCheckouts.state}='COMPLETED' AND NOT EXISTS (SELECT 1 FROM ${jobPeriods} WHERE ${jobPeriods.subscriptionId}=${billingCheckouts.subscriptionId} AND ${jobPeriods.environment}='LIVE'))`,
   sql`EXISTS (SELECT 1 FROM ${jobPeriods} WHERE ${jobPeriods.subscriptionId}=${billingCheckouts.subscriptionId} AND ${jobPeriods.environment}='LIVE' AND ${jobPeriods.state}='ACTIVE' AND ${jobPeriods.endsAt}>${now})`,
  ))).limit(2);
  if(existing.length&&!(existing.length===1&&existing[0].id===resumeCheckoutId&&existing[0].state==='READY'))throw new JobError('QUOTA');

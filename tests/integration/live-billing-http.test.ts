@@ -16,7 +16,7 @@ vi.mock('@/server/runs/rate-limit',()=>({createRequestLimiter:()=>({consume:asyn
 import {billingEnabled,paymentsHttp,purchasesEnabled} from '@/server/payments/service';
 let f:Awaited<ReturnType<typeof jobsFixture>>,id='';
 const origin='https://perplexity-gold-alpha.vercel.app',webhook='synthetic-production-webhook-secret';
-const fetcher=vi.fn<typeof fetch>(async()=>Response.json({id:'sub_httplive',plan_id:'plan_httplive',quantity:1,status:'cancelled',notes:{checkoutId:id,priceKey:liveOffer.priceKey}}));
+const fetcher=vi.fn<typeof fetch>(async(url)=>Response.json({id:'sub_httplive',plan_id:'plan_httplive',quantity:1,status:String(url).endsWith('/cancel')?'cancelled':'active',notes:{checkoutId:id,priceKey:liveOffer.priceKey}}));
 beforeAll(async()=>{
  f=await jobsFixture();state.db=f.db;state.subject=f.subject;
  const env={ENABLE_RAZORPAY_LIVE_BILLING:'true',ENABLE_RAZORPAY_TEST_CHECKOUT:'false',VERCEL_ENV:'production',BETTER_AUTH_URL:origin,
@@ -39,8 +39,8 @@ it('keeps live status available with durable admissions off and refuses all new 
 it('retains owned cancellation while new checkout is paused',async()=>{
  const response=await paymentsHttp.cancel(post('/api/billing/'+id+'/cancel'),id);expect(response.status).toBe(200);
  expect((await response.json()).access.remaining).toBe(7);
- expect(fetcher).toHaveBeenCalledTimes(1);
- expect(fetcher.mock.calls[0][0]).toBe('https://api.razorpay.com/v1/subscriptions/sub_httplive/cancel');
+ expect(fetcher).toHaveBeenCalledTimes(2);
+ expect(fetcher.mock.calls.map(([url])=>url)).toEqual(['https://api.razorpay.com/v1/subscriptions/sub_httplive','https://api.razorpay.com/v1/subscriptions/sub_httplive/cancel']);
  const [period]=await f.db.select().from(jobPeriods).where(eq(jobPeriods.environment,'LIVE'));expect(period.state).toBe('ACTIVE');
 });
 it('returns owned billing and successful cancellation when the activity hint is unavailable',async()=>{
@@ -61,7 +61,7 @@ it('returns owned billing and successful cancellation when the activity hint is 
   await f.db.update(billingCheckouts).set({cancelAtCycleEnd:false}).where(eq(billingCheckouts.id,id));
   const cancelled=await paymentsHttp.cancel(post('/api/billing/'+id+'/cancel'),id);
   expect(cancelled.status).toBe(200);expect((await cancelled.json()).checkouts[0].cancelAtCycleEnd).toBe(true);
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(fetcher).toHaveBeenCalledTimes(2);
  }finally{
   for(const [key,value] of Object.entries(prior))vi.stubEnv(key,value);
   vi.stubEnv('VERCEL_ENV',previousVercel);state.jobs=false;state.wake.mockResolvedValue(undefined);
