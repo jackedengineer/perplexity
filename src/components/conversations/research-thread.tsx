@@ -7,10 +7,10 @@ import { useQuestionIntent,type PendingQuestion } from "./question-intent";
 import { ThreadView,idleResearch } from "./thread-view";
 const ActiveResearch=lazy(()=>import("./active-research"));
 export function ResearchThread({conversation,initial,activeRunId}: {conversation:Conversation;initial:HistoryPage;activeRunId?:string}) {
-  const {key:modelKey,mode}=useModelAccess();
+  const {key:modelKey,mode,select,setMode}=useModelAccess();
   const [ready,setReady]=useState(false);
   const [question,setQuestion]=useState<(PendingQuestion&{expectedRevision?:number})|null>(null),{consume}=useQuestionIntent();
-  useEffect(()=>{let disposed=false;queueMicrotask(()=>{if(disposed)return;const next=consume(conversation.id);if(next)setQuestion(next);setReady(true);});return()=>{disposed=true;};},[conversation.id,consume]);
+  useEffect(()=>{let disposed=false;queueMicrotask(()=>{if(disposed)return;const next=consume(conversation.id);if(next){setQuestion(next);if(next.mode)setMode(next.mode);if(next.modelKey)select(next.modelKey);}setReady(true);});return()=>{disposed=true;};},[conversation.id,consume,select,setMode]);
   const submit=(text:string,expectedRevision?:number,options?:RevisionOptions)=>setQuestion({mode:options?.mode??(mode==='CHAT'?'CHAT':'FAST'),modelKey:options?.modelKey??modelKey,expectedRevision,conversationId:conversation.id,text,clientRequestId:crypto.randomUUID()});
   if(!ready)return <ThreadView conversation={conversation} initial={initial} submit={()=>{}} research={{...idleResearch,pending:Boolean(activeRunId),label:"Checking saved result"}}/>;
   if(!question&&!activeRunId)return <ThreadView conversation={conversation} initial={initial} submit={(text,options)=>submit(text,undefined,options)}/>;
