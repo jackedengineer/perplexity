@@ -40,7 +40,7 @@ test("authenticated workspace renders, renews, and signs out", async ({ context,
     await page.goto('/operations');
     await expect(page.getByRole('heading',{name:'Private operations',exact:true})).toHaveCount(0);
     await page.goto("/workspace");
-    await expect(page.locator(".workspace-plan").getByRole("link",{name:"Sign up / Log in"})).toBeVisible();
+    await expect(page.locator(".workspace-plan").getByRole("button",{name:"Sign up / Log in"})).toBeVisible();
   } finally {
     await db.query('DELETE FROM "user" WHERE id=$1', [id]);
     await db.end();

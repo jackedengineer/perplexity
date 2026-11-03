@@ -35,6 +35,6 @@ test('signs in through the real database, keeps ownership boundaries and denies 
  const created=await page.request.post('/api/conversations',{headers:{origin},data:{title:'Synthetic reviewer browser check',clientRequestId:crypto.randomUUID()}});
  expect(created.status()).toBe(201);
  await f.owner.update(session).set({expiresAt:new Date(Date.now()-1000)}).where(eq(session.userId,policy.subject));
- await page.goto('/library');await expect(page).toHaveURL(/\/sign-in$/);
+ await page.goto('/library');await expect(page).toHaveURL(/\/workspace$/);
  expect(errors).toEqual([]);
 });

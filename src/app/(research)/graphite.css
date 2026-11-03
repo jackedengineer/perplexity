@@ -4,7 +4,14 @@
 .sidebar-collapsed .visitor-sign-in { width: 40px; padding: 8px 2px; font-size: 10px; }
 .visitor-mode { color: var(--r-muted); font-size: 12px; }
 .visitor-question > .question-composer { margin-top: auto; }
-.visitor-question > .policy-links { margin-top: 20px; }
+.visitor-policy-footer { flex-shrink: 0; margin-top: auto; padding: 12px 24px max(12px,env(safe-area-inset-bottom)); }
+.visitor-policy-footer .policy-links { margin: 0; gap: 4px 18px; font-size: 11px; color: var(--r-muted); }
+.visitor-policy-footer .policy-links a { padding: 8px 0; }
+.compact-sign-in { position: relative; display: flex; flex-direction: column; align-items: flex-start; }
+.compact-sign-in .auth-feedback { min-height: 0; font-size: 11px; max-width: 240px; color: #f4b6ad; }
+.compact-sign-in .auth-feedback:empty { display: none; }
+.research-shell .visitor-sign-in { cursor: pointer; font-size: 12px; }
+.visitor-sign-in:disabled { cursor: wait; opacity: .7; }
 .visitor-trial { margin-top: 16px; max-width: 360px; color: var(--r-muted); font-size: 12px; }
 .visitor-trial .button { font-size: 13px; padding: 10px 14px; }
 .research-sidebar { overflow: hidden; transition: width 180ms ease, min-width 180ms ease; }
@@ -139,3 +146,6 @@
   .thread-content:has(.sources-open) { padding-right: 360px; }
   .active-thread:has(.sources-open) .thread-bottom { width: min(720px,calc(100% - 392px)); margin-right: 328px; }
 }
+
+.workspace-plan .compact-sign-in .auth-feedback { position: absolute; top: 100%; right: 0; width: 240px; max-width: calc(100vw - 32px); padding: 8px; border: 1px solid var(--r-line); border-radius: 7px; background: var(--r-surface); z-index: 5; }
+.workspace-auth-error { flex-shrink: 0; padding: 12px 24px; color: #f4b6ad; font-size: 12px; }

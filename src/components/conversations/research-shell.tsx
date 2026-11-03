@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import {useModelAccess} from "./model-access";
 import {PlanIndicator} from "./plan-indicator";
 import { QuickSearch } from "./quick-search";
+import {GoogleSignIn} from "@/components/google-sign-in";
 import { SessionControls } from "@/components/session-controls";
 import type { Conversation } from "@/server/conversations/contracts";
 import { Icon, ResearchMark } from "./icons";
@@ -66,7 +67,7 @@ export function ResearchShell({ children, recent, pinned = [], name, initialColl
       <div className="sidebar-footer">
         {!visitor&&<PlanIndicator compact={isCollapsed} onNavigate={close}/>}
         {!isCollapsed && !visitor && <div className="private-workspace"><Icon name="lock" size={12} />Private workspace</div>}
-        {visitor?<Link href="/sign-in" className="visitor-sign-in" onClick={close}>{isCollapsed?"Log in":"Sign up / Log in"}</Link>:<button className="account-button" aria-label="Open account menu" onClick={() => { close(); account.current?.showModal(); }}>
+        {visitor?<GoogleSignIn compact label={isCollapsed?"Log in":"Sign up / Log in"}/>:<button className="account-button" aria-label="Open account menu" onClick={() => { close(); account.current?.showModal(); }}>
           <span className="account-avatar"><Icon name="user" size={16} /></span>
           {!isCollapsed && <span className="account-name">{name}<small>{data?.usage.subscription?'Pro member':data?.usage.tier==='GUEST'?'Guest trial':'Free plan'}</small></span>}
         </button>}
@@ -81,14 +82,14 @@ export function ResearchShell({ children, recent, pinned = [], name, initialColl
         <Link href="/workspace" aria-label="Perplex home"><ResearchMark /></Link>
         <Link href="/workspace" className="research-icon-button" aria-label="New conversation"><Icon name="plus" /></Link>
       </div>
-      <div className="workspace-plan">{visitor||guest?<Link className="visitor-sign-in" href="/sign-in">Sign up / Log in</Link>:<PlanIndicator/>}</div>
+      <div className="workspace-plan">{visitor||guest?<GoogleSignIn compact label="Sign up / Log in"/>:<PlanIndicator/>}</div>
       {children}
     </div>
     {searchOpen&&<QuickSearch initial={recent} onClose={()=>setSearchOpen(false)}/>}
     <dialog className="mobile-navigation" aria-label="Navigation" ref={mobileNav} onClick={(event) => { if (event.target === event.currentTarget) mobileNav.current?.close(); }}>{sidebar(false, true)}</dialog>
     {!visitor&&<dialog className="research-dialog account-dialog" aria-labelledby="account-heading" ref={account} onClick={(event) => { if (event.target === event.currentTarget) account.current?.close(); }}>
       <div className="dialog-heading"><h2 id="account-heading">Your account</h2><button className="research-icon-button" aria-label="Close account menu" onClick={() => account.current?.close()}><Icon name="close" size={17} /></button></div>
-      <p>{name}</p><PlanIndicator onNavigate={()=>account.current?.close()}/>{data?.usage.subscription&&<p className="research-muted">{data.usage.subscription.reportsRemaining} Deep Research reports remaining · Access until {new Date(data.usage.subscription.endsAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</p>}{data?.usage.tier==="GUEST"&&<Link href="/sign-in">Sign in with Google to save guest history</Link>}<p className="research-muted">Your conversations are private.</p><SessionControls />
+      <p>{name}</p><PlanIndicator onNavigate={()=>account.current?.close()}/>{data?.usage.subscription&&<p className="research-muted">{data.usage.subscription.reportsRemaining} Deep Research reports remaining · Access until {new Date(data.usage.subscription.endsAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</p>}{data?.usage.tier==="GUEST"&&<GoogleSignIn compact label="Sign in with Google to save guest history"/>}<p className="research-muted">Your conversations are private.</p><SessionControls />
     </dialog>}
   </div>;
 }
