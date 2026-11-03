@@ -29,7 +29,7 @@ export function SessionControls() {
     try {
       const result = await authClient.signOut();
       if (result.error) throw new Error("Sign out failed");
-      router.replace("/sign-in");
+      router.replace("/workspace");
       router.refresh();
     } catch { setFailed(true); setPending(false); }
   }
