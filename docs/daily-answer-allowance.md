@@ -45,3 +45,17 @@ Rolling back the Worker restores the previous three/five-answer policy. Leave th
 additive migration and accounting receipts intact; never lower a bucket below its
 recorded usage or discard holds. Restoring older credit floors requires a separately
 reviewed accounting change, not resetting counters.
+
+## Hosted verification
+
+Production migration and Worker deployment completed on 4 November. A fresh Web
+answer completed with three citations and persisted on reload; cancellation before
+provider dispatch charged zero credits and released the full reservation. Replaying
+the terminal request created no additional run or provider call. The refreshed UI
+showed 132 credits left today and 4/10 answers remaining for the test account.
+
+The old UI's “4,630 left” was the monthly balance (4,650 less 20 used/reserved), not
+an answer count or money. Reload loads the new daily balance/count labels.
+Shared operator capacity subsequently fell below the $0.05 admission reservation;
+account allowances do not override this independent cap. See the release checklist
+for the exact observed limits and remaining availability work.

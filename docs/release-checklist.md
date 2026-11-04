@@ -1,3 +1,34 @@
+# Ten daily answers — 4 November 2026
+
+- [x] Ten completed Chat/Web answers per IST day for registered and guest accounts;
+  failures/cancellations do not consume answers, and linking preserves usage.
+- [x] Registered allowances: 150 credits/day, 4,650/month. Guests: 20/day,
+  620/trial, economy models only. Shared funding and Deep Research are unchanged.
+- [x] Migration 0035 applied to development and production through the guarded owner
+  workflow; spend, holds, original grants and shared operator ceilings preserved.
+- [x] 929 tests, lint/types, development Neon role check, two real-database browser
+  checks, credential-free Worker build, twenty Worker browser tests and six repeated
+  OAuth checks passed. Google sign-in waits for its handler before becoming enabled.
+- [x] Production version `93131b49-0aef-4c9f-a959-652017f15277` deployed from
+  `1f826c3` with existing secrets/vars retained.
+- [x] Live Web run `6bb3bb57-afaf-44e6-9193-ec549ceebfa1` completed in 12.2 seconds:
+  searching progress, three citations, working NASA link and answer reload verified.
+  Nano cost $0.000252; one Tavily credit, with unknown monetary cost held conservatively.
+- [x] Live cancellation `27ec5c0d-a4af-4c33-a504-00e38e29a47c` stopped before any
+  provider dispatch, charged zero credits and released its full $0.05 reservation.
+  Checking the same request and reloading created no run or provider call. Reload
+  shows the empty conversation because cancellation preceded accepted input.
+- [x] OpenRouter remains $1/day; observed daily usage $0.023786385. Existing key expiry,
+  shared $0.40/day and $1.70/period operator ceilings and separate paid pilot unchanged.
+- [ ] Shared availability remains bounded: at final verification the daily operator
+  pool had only $0.044451 available after spend/holds; fresh admission needs $0.05.
+  The composer therefore paused after subsequent traffic. Reconcile verified receipts
+  or obtain an explicitly approved operator change; never discard unknown-cost holds.
+- [ ] PR #31 CI and external reviews/merge remain separate from these local/live checks.
+
+Policy and rollback: [daily allowance](daily-answer-allowance.md). Local verification
+artifacts are under `.artifacts/daily-allowance/` (ignored, not committed).
+
 # Local safety replacement — 4 November 2026
 
 - [x] Separate classifier removed from Chat, Web and Deep Research service wiring.
