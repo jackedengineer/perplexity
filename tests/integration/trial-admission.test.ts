@@ -64,3 +64,34 @@ it('does not renew an expired lifetime guest grant',async()=>{
  await expect(readUsage(db,p.subject)).rejects.toThrow();
  expect(await db.select().from(schema.creditGrants).where(eq(schema.creditGrants.userId,p.owner.id))).toHaveLength(1);
 });
+
+it.each(['standard-gemini-flash','standard-qwen-max','standard-qwen-397b'])('atomically reserves the larger %s envelope and keeps idempotent replay stable',async modelKey=>{
+ const p=await fixture(false),request={...p.request,modelKey};
+ const result=await p.admission.admit(p.subject,request);expect(result.kind).toBe('ADMITTED');
+ const [run]=await db.select().from(schema.runs).where(eq(schema.runs.userId,p.owner.id));
+ expect(run).toMatchObject({accountingVersion:3,providerReserveMicroUsd:90000n,catalogVersion:'trials-v2'});
+ const reservation=(await db.select().from(schema.usageReservations).where(eq(schema.usageReservations.runId,run.id)))[0];
+ expect(reservation.providerReserveMicroUsd).toBe(90000n);
+ expect((await p.admission.admit(p.subject,request)).kind).toBe('RUN_IN_PROGRESS');
+ await createFinalization(db).fail(p.subject,run.id,'PROVIDER_UNAVAILABLE');
+ expect((await readUsage(db,p.subject)).period.reserved).toBe(0);
+});
+
+it('persists a version-three answer and reconciles late search costs without changing older snapshots',async()=>{
+ const p=await fixture(false),request={...p.request,modelKey:'standard-gemini-flash'};
+ const admitted=await p.admission.admit(p.subject,request);expect(admitted.kind).toBe('ADMITTED');if(admitted.kind!=='ADMITTED')throw Error('Admission failed');
+ await prepareCompletion(db,{subject:p.subject,runId:admitted.run.id,request});
+ const {sessionId}=await completionSession(db,p.subject);
+ const result=await createAnswerCompletion(db,{answer:{modelId:'google/gemini-3.7-flash',generate:async()=>({text:'Water refracts sunlight [S1].',usage:{...knownUsage,costMicroUsd:30000n}})},output:fakeSafety()}).complete(p.subject,sessionId,admitted.run.id,new AbortController().signal);
+ expect(result.kind).toBe('COMMITTED');
+ const calls=await db.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,admitted.run.id));
+ expect(calls.find(c=>c.stage==='ANSWER')).toMatchObject({budgetVersion:3,capMicroUsd:48000n,costMicroUsd:30000n});
+ const original=(await db.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,admitted.run.id)))[0];
+ expect(original.heldProviderMicroUsd).toBeGreaterThan(0n);
+ const search=calls.find(c=>c.stage==='SEARCH')!;
+ await db.insert(schema.providerUsageResolutions).values({runId:admitted.run.id,callId:search.id,kind:'PROVIDER_RECEIPT',costMicroUsd:1000n,evidenceHash:'a'.repeat(64)});
+ const {createUsageReconciliation}=await import('@/server/runs/reconcile');
+ expect(await createUsageReconciliation(db).reconcile(p.subject,admitted.run.id)).toBe('RECONCILED');
+ expect((await db.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,admitted.run.id)))[0]).toEqual(original);
+ expect((await db.select().from(schema.runReconciliations).where(eq(schema.runReconciliations.runId,admitted.run.id)))[0].remainingHeldMicroUsd).toBe(0n);
+});

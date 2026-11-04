@@ -14,7 +14,15 @@ export const STAGE_LIMITS=Object.freeze({
  SEARCH:Object.freeze({capMicroUsd:8000n,maxDurationMs:8000}),SEARCH_SECOND:Object.freeze({capMicroUsd:8000n,maxDurationMs:8000}),EXTRACT:Object.freeze({capMicroUsd:8000n,maxDurationMs:8000}),
  EVIDENCE_SAFETY:Object.freeze({capMicroUsd:2250n,maxDurationMs:5000}),ANSWER:Object.freeze({capMicroUsd:12500n,maxDurationMs:12000}),OUTPUT_SAFETY:Object.freeze({capMicroUsd:2250n,maxDurationMs:5000}),
 });
+// v3 is only used for the larger curated answer models. 20,000 wire bytes
+// conservatively bound input tokens; 20,000*2 + 1,200*6 = 47,200 microUSD.
+// All stage ceilings total 85,250, covered by the 90,000 run reservation.
+export const EXTENDED_STAGE_LIMITS=Object.freeze({...STAGE_LIMITS,
+ ANSWER:Object.freeze({capMicroUsd:48000n,maxDurationMs:12000}),
+});
+export const EXTENDED_RUN_RESERVE=90000n;
 export function stageLimits(version:number,stage:ProviderStage){
+ if(version===3)return EXTENDED_STAGE_LIMITS[stage];
  if(version===2)return STAGE_LIMITS[stage];
  if(version===1&&stage in LEGACY_STAGE_LIMITS)return LEGACY_STAGE_LIMITS[stage as keyof typeof LEGACY_STAGE_LIMITS];
  return undefined;

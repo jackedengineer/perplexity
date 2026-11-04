@@ -20,7 +20,7 @@ export const submissionSchema = z.strictObject({
   conversationId: z.uuid(), clientRequestId: z.uuid(),
   expectedRevision: z.int().min(0).max(2_147_483_646),
   message: z.strictObject({ text: questionTextSchema }),
-  mode: z.enum(["FAST","CHAT"]), modelKey: z.enum([FAST_MODEL_KEY,"economy-nano","economy-mistral","economy-qwen","economy-gemini","standard-deepseek"]),
+  mode: z.enum(["FAST","CHAT"]), modelKey: z.enum([FAST_MODEL_KEY,"economy-nano","economy-mistral","economy-qwen","economy-gemini","standard-deepseek","standard-gemini-flash","standard-qwen-max","standard-qwen-397b"]),
   locale: localeSchema.optional(), timezone: timezoneSchema.optional(),
 });
 export type SubmitQuery = z.infer<typeof submissionSchema>;

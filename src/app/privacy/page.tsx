@@ -34,8 +34,9 @@ export default function PrivacyPage(){
       <li><strong>Cloudflare, Vercel and Neon</strong> provide application hosting, deployment infrastructure and the database.</li>
       <li><strong>OpenRouter and the selected model provider</strong> process questions, relevant conversation
         context, source excerpts and proposed answers for planning, generation and safety checks. We configure
-        routes that require no provider data collection and zero-data-retention support. These routing
-        controls do not mean that your content stays on your device.</li>
+        non-training routes using OpenRouter’s data-retention controls. Some supported Google routes permit
+        safety retention: Google may keep prompts flagged by its safety systems for up to 90 days for abuse
+        monitoring, not training. These controls do not mean that your content stays on your device.</li>
       <li><strong>Tavily</strong> receives search queries and selected page URLs to retrieve web evidence.</li>
       <li><strong>Cloudflare Turnstile</strong> processes browser and verification information to protect guest
         access when guest trials are enabled.</li>
