@@ -51,20 +51,24 @@ it('returns owned billing and successful cancellation when the activity hint is 
   MODEL_SAFETY:'test/safety',SAFETY_OPENROUTER_PROVIDER:'test',MODEL_PLANNER:'test/planner',PLANNER_OPENROUTER_PROVIDER:'test',MODEL_ANSWER:'test/answer',ANSWER_OPENROUTER_PROVIDER:'test',
   PAID_PILOT_PROVIDER_EXPIRES_AT:new Date(Date.now()+40*86400000).toISOString()};
  const prior=Object.fromEntries(Object.keys(env).map(key=>[key,process.env[key]]));
- const previousVercel=process.env.VERCEL_ENV;
+ const previousVercel=process.env.VERCEL_ENV,previousAccess=process.env.PAID_CHECKOUT_ACCESS;
  try{
   for(const [key,value] of Object.entries(env))vi.stubEnv(key,value);
   vi.stubEnv('VERCEL_ENV',undefined);state.jobs=true;state.wake.mockRejectedValue(new Error('KV unavailable'));
   expect(purchasesEnabled()).toBe(true);
   const status=await paymentsHttp.status();expect(status.status).toBe(200);
   expect(await status.json()).toMatchObject({purchasesEnabled:false,access:{remaining:7},checkouts:[{id}]});
+  vi.stubEnv('PAID_CHECKOUT_ACCESS','PUBLIC');
+  // A public purchase is independent of the best-effort dispatch hint and pilot funding.
+  expect(await (await paymentsHttp.status()).json()).toMatchObject({purchasesEnabled:true,access:{remaining:7}});
+  vi.stubEnv('PAID_CHECKOUT_ACCESS',undefined);
   await f.db.update(billingCheckouts).set({cancelAtCycleEnd:false}).where(eq(billingCheckouts.id,id));
   const cancelled=await paymentsHttp.cancel(post('/api/billing/'+id+'/cancel'),id);
   expect(cancelled.status).toBe(200);expect((await cancelled.json()).checkouts[0].cancelAtCycleEnd).toBe(true);
   expect(fetcher).toHaveBeenCalledTimes(2);
  }finally{
   for(const [key,value] of Object.entries(prior))vi.stubEnv(key,value);
-  vi.stubEnv('VERCEL_ENV',previousVercel);state.jobs=false;state.wake.mockResolvedValue(undefined);
+  vi.stubEnv('VERCEL_ENV',previousVercel);vi.stubEnv('PAID_CHECKOUT_ACCESS',previousAccess);state.jobs=false;state.wake.mockResolvedValue(undefined);
  }
 });
 it('ingests live signed events durably with inference off and rejects another signing secret',async()=>{

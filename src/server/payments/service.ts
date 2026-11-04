@@ -28,11 +28,11 @@ export async function currentBillingStatus(subject:string){
  if(enabled&&c.mode==='LIVE')try{await wakeCloudflareJobs();}catch{
   // The dispatch hint can pause purchases, but must not hide owned billing or
   // turn a completed confirmation/cancellation into an apparent failure.
-  enabled=false;console.warn(JSON.stringify({event:'billing.wake',outcome:'UNAVAILABLE'}));
+  if(!c.pilot?.publicCheckout){enabled=false;}console.warn(JSON.stringify({event:'billing.wake',outcome:'UNAVAILABLE'}));
  }
  const status=await billingStatus(getDb(),subject,c.mode);
- // An owned READY intent can resume its existing seat, without creating a
- // second subscription. Other owners only see purchases paused.
+ // An owned READY intent resumes its existing reserved capacity. Never count
+ // a resumed checkout as a second obligation.
  const resumable=status.checkouts.find(row=>row.state==='READY'&&row.subscriptionId)?.id;
  if(enabled&&c.mode==='LIVE'){try{await getDb().transaction(tx=>assertPilotCapacity(tx,c.pilot!,resumable));}catch{enabled=false;}}
  return {...status,purchasesEnabled:enabled};

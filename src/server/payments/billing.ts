@@ -27,7 +27,7 @@ export async function startCheckout(db:JobDatabase,subject:string,raw:unknown,pl
   if(open)throw new JobError('CONFLICT');
   const [active]=await tx.select({id:periods.id}).from(periods).where(and(eq(periods.userId,owner),eq(periods.environment,mode),eq(periods.state,'ACTIVE'),gt(periods.endsAt,sql`clock_timestamp()`))).limit(1);
   if(active)throw new JobError('CONFLICT');
-  if(mode==='LIVE'){
+  if(mode==='LIVE'&&!pilot?.publicCheckout){
    // The owner lock above serializes new UUIDs from the same account. Releasing
    // an unpaid global seat must not let its owner monopolize it every hour.
    const now=await databaseNow(tx);
