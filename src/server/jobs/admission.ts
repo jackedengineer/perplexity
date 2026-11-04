@@ -29,6 +29,8 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
   if(prior){if(prior.deletedAt)throw new JobError('NOT_FOUND');if(prior.fingerprint!==fingerprint)throw new JobError('CONFLICT');if(['QUEUED','RUNNING'].includes(prior.state))await beforeCommit?.();return prior.id;}
   if((await tx.select({id:jobs.id}).from(jobs).where(and(eq(jobs.userId,owner),inArray(jobs.state,['QUEUED','RUNNING']))).limit(1)).length)throw new JobError('CONFLICT');
   const now=await databaseNow(tx);
+  let time:ReturnType<typeof resolveResearchTime>|undefined;
+  if(input.workflow==='deep-research-v2'){try{time=resolveResearchTime(input.question,now);}catch{throw new JobError('INVALID_INPUT');}}
   const [period]=await tx.select().from(periods).where(and(eq(periods.userId,owner),eq(periods.environment,environment),eq(periods.state,'ACTIVE'),lte(periods.startsAt,now),gt(periods.endsAt,now)))
    .orderBy(periods.endsAt,periods.id).limit(1).for('update');
   if(!period)throw new JobError('PAYMENT_REQUIRED');
@@ -52,7 +54,7 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
   const [job]=await tx.insert(jobs).values({userId:owner,requestId:input.requestId,fingerprint,workflow:input.workflow,periodId:period.id,createdAt:now,deadlineAt:new Date(Math.min(now.getTime()+manifest.deadlineMs,period.endsAt.getTime(),...windows.map(w=>w.endsAt.getTime())))}).returning();
   await tx.insert(reservations).values({jobId:job.id,budgetKey,operatorPeriodId:month.id,operatorDayId:day.id,reservedMicroUsd:reserve});
   await tx.insert(steps).values(manifest.steps.map(s=>({jobId:job.id,...s})));
-  if(input.workflow!=='execution-check-v1')await tx.insert(jobResearchInputs).values({jobId:job.id,snapshot:{question:input.question,locale:input.locale,models:researchModels.parse(models),...(input.workflow==='deep-research-v2'?{policy:'v2' as const,version:'deep-research-v2' as const,consensus:{models:CONSENSUS_MODELS,time:resolveResearchTime(input.question,now)}}:{policy:'v1' as const,version:'deep-research-v1' as const})}});
+  if(input.workflow!=='execution-check-v1')await tx.insert(jobResearchInputs).values({jobId:job.id,snapshot:{question:input.question,locale:input.locale,models:researchModels.parse(input.workflow==='deep-research-v2'?{...models,planner:CONSENSUS_MODELS.candidates[2],answer:CONSENSUS_MODELS.judge}:models),...(input.workflow==='deep-research-v2'?{policy:'v2' as const,version:'deep-research-v2' as const,consensus:{models:CONSENSUS_MODELS,time:time!}}:{policy:'v1' as const,version:'deep-research-v1' as const})}});
   await tx.insert(outbox).values({jobId:job.id});await appendEvent(tx,job.id,'QUEUED');
   // A failed external wake-up rolls back the whole admission, rather than
   // accepting work whose dispatch hint was never durably recorded.

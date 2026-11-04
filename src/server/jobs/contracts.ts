@@ -1,7 +1,6 @@
 import {consensusManifest} from '@/server/deep-research/consensus-models';
 import {z} from 'zod';
 import {researchInput,deepResearch} from '@/server/deep-research/contracts';
-export const isResearch=(workflow:string)=>workflow==='deep-research-v1'||workflow==='deep-research-v2';
 export const jobSubmission=z.discriminatedUnion('workflow',[z.strictObject({version:z.literal(1),workflow:z.literal('execution-check-v1'),requestId:z.uuid()}),researchInput.extend({version:z.literal(1),workflow:z.literal('deep-research-v1'),requestId:z.uuid()}),researchInput.extend({version:z.literal(1),workflow:z.literal('deep-research-v2'),requestId:z.uuid()})]);
 export const jobCursor=z.coerce.number().int().min(0).max(1_000_000);
 export const jobId=z.uuid();

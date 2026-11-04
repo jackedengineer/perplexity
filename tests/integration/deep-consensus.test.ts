@@ -13,11 +13,16 @@ let f:Awaited<ReturnType<typeof jobsFixture>>;
 beforeAll(async()=>{f=await jobsFixture();await f.db.update(operatorUsageBuckets).set({providerLimitMicroUsd:3000000n});await f.db.update(jobPeriods).set({jobLimit:30});},30000);
 afterAll(()=>f?.pg.close());
 const input=()=>({version:1,workflow:'deep-research-v2',requestId:crypto.randomUUID(),question:'Compare SQLite and PostgreSQL for offline notes.',locale:'en'});
+it('rejects an invalid date before reserving paid capacity',async()=>{
+ const before=await f.db.select().from(operatorUsageBuckets);
+ await expect(admitJob(f.db,f.subject,{...input(),question:'Compare databases from 2025-02-30 to 2025-03-01.'},f.key,models)).rejects.toThrow('INVALID_INPUT');
+ expect(await f.db.select().from(operatorUsageBuckets)).toEqual(before);
+});
 it('reserves the entire ensemble and publishes only validated citations with immutable time',async()=>{
  const raw=input(),id=await admitJob(f.db,f.subject,raw,f.key,models),p=consensusProviders();
  const candidate=vi.spyOn(p.consensus,'candidate'),judge=vi.spyOn(p.consensus,'judge');
  expect(await admitJob(f.db,f.subject,raw,f.key,models)).toBe(id);
- const snapshot=await loadResearch(f.db,id);expect(snapshot.version).toBe('deep-research-v2');
+ const snapshot=await loadResearch(f.db,id);expect(snapshot.version).toBe('deep-research-v2');expect(snapshot.models.planner.modelId).toBe('deepseek/deepseek-v4.1-flash-1017');expect(snapshot.models.answer.modelId).toBe('openai/gpt-5.4-mini');
  expect(await consumeResearch(f.db,id,{providers:p})).toBe('COMPLETED');
  expect(candidate).toHaveBeenCalledTimes(3);expect(judge).toHaveBeenCalledOnce();
  expect(candidate.mock.calls.map(c=>c[0])).toEqual([0,1,2]);
