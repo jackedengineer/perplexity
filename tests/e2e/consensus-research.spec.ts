@@ -39,3 +39,21 @@ test('streams consensus sections with frozen timeframe, citations and persisted 
   await page.emulateMedia({reducedMotion:'reduce'});expect(await page.locator('.jobs-card').first().evaluate(el=>getComputedStyle(el).animationName)).toBe('none');expect(errors).toEqual([]);
  }finally{await identity.cleanup();}
 });
+test('stops automatic report reconnects after the bounded retry allowance',async({page,context})=>{
+ const identity=await identityFixture(context,'Report Reconnect Tester'),id=crypto.randomUUID(),now=new Date().toISOString();let reports=0;
+ await page.clock.install();
+ await page.route('**/api/jobs/**',async route=>{
+  if(new URL(route.request().url()).pathname.endsWith('/report')){reports++;await route.fulfill({contentType:'application/x-ndjson',body:'{"type":"meta"'});return;}
+  await route.fulfill({json:{job:{id,workflow:'deep-research-v2',state:'COMPLETED',createdAt:now,deadlineAt:now,cursor:0,heldMicroUsd:'0',spentMicroUsd:'0'},events:[]}});
+ });
+ try{
+  await page.goto(`/jobs?job=${id}`);await expect.poll(()=>reports).toBe(1);
+  for(let attempt=2;attempt<=6;attempt++){
+   await expect(page.getByRole('main').getByRole('alert')).toContainText('Connection interrupted');
+   await page.clock.runFor(attempt===2?4000:attempt===3?8000:15000);await expect.poll(()=>reports).toBe(attempt);
+  }
+  await expect(page.getByRole('main').getByRole('alert')).toContainText('Connection interrupted');
+  await page.clock.runFor(60000);expect(reports).toBe(6);
+  await expect(page.getByRole('button',{name:'Reconnect to saved progress'})).toBeVisible();
+ }finally{await identity.cleanup();}
+});

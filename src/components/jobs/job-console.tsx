@@ -29,12 +29,17 @@ export function JobConsole({initialJobs,initialId,billingAvailable,deepAvailable
     const body=await responseBody(await fetch(`/api/jobs/${id}?after=${cursor}&report=stream`,{signal:controller.signal,cache:'no-store'}));
     if(controller.signal.aborted)return;
     const incoming=body.events as JobEvent[];cursor=incoming.at(-1)?.sequence??cursor;
-    failures=0;setJob(body.job);setEvents(previous=>{const before=previous.filter(e=>e.sequence<=(incoming[0]?.sequence??Infinity)-1);return [...before,...incoming];});setError('');
-    if(['QUEUED','RUNNING'].includes(body.job.state)||cursor<body.job.cursor)timer=setTimeout(poll,document.hidden?10000:2000);else {
+    setJob(body.job);setEvents(previous=>{const before=previous.filter(e=>e.sequence<=(incoming[0]?.sequence??Infinity)-1);return [...before,...incoming];});setError('');
+    if(['QUEUED','RUNNING'].includes(body.job.state)||cursor<body.job.cursor){failures=0;timer=setTimeout(poll,document.hidden?10000:2000);}else {
      if(body.job.state==='COMPLETED'&&body.job.workflow.startsWith('deep-research-')&&!body.job.report)await readReportStream(id!,controller.signal,report=>setJob((current)=>current?.id===id?{...current,report}:current));
+     failures=0;
      refresh();
     }
-   }catch(e){if(!controller.signal.aborted){const reconnect=!(e instanceof JobHttpError)||[408,429,500,502,503,504].includes(e.status);setError(reconnect?'Connection interrupted. Reconnecting to saved progress…':e instanceof Error?e.message:'Connection interrupted. Your job is saved.');if(reconnect&&failures++<5)timer=setTimeout(poll,Math.min(15000,2000*2**failures));}}
+   }catch(e){if(!controller.signal.aborted){
+    const reconnect=!(e instanceof JobHttpError)||[408,429,500,502,503,504].includes(e.status),retryAutomatically=reconnect&&failures<5;
+    setError(retryAutomatically?'Connection interrupted. Reconnecting to saved progress…':reconnect?'Connection interrupted. Your job is saved.':e instanceof Error?e.message:'Connection interrupted. Your job is saved.');
+    if(retryAutomatically){failures++;timer=setTimeout(poll,Math.min(15000,2000*2**failures));}
+   }}
   }
   void poll();return()=>{controller.abort();clearTimeout(timer);};
  },[id,retry,refresh]);
