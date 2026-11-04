@@ -2,8 +2,9 @@ import {z} from 'zod';
 import {searchQuerySchema} from '@/server/search/limits';
 import {safeEvidenceText} from '@/server/search/evidence';
 const line=(max:number)=>z.string().trim().min(1).max(max).refine(s=>s.isWellFormed()&&!/[\u0000-\u001f\u007f-\u009f]/u.test(s));
-export const clarificationHistory=z.array(z.strictObject({question:line(160),answer:line(200)})).max(4);
-export const clarificationAnswer=z.strictObject({id:z.enum(['Q1','Q2']),answer:line(200)});
+const answerText=z.string().trim().min(1).max(200).refine(s=>s.isWellFormed()&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/u.test(s));
+export const clarificationHistory=z.array(z.strictObject({question:line(160),answer:answerText})).max(4);
+export const clarificationAnswer=z.strictObject({id:z.enum(['Q1','Q2']),answer:answerText});
 export const researchContinuation=z.strictObject({jobId:z.uuid(),answers:z.array(clarificationAnswer).min(1).max(2)});
 const questions=z.array(z.strictObject({id:z.enum(['Q1','Q2']),question:line(160),options:z.array(line(80)).max(3)})).max(2)
  .refine(q=>new Set(q.map(v=>v.id)).size===q.length);

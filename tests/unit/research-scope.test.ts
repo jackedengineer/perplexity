@@ -7,3 +7,9 @@ it('rejects invented constraints and unsupported source attribution',()=>{const 
 it('accepts constraints only from original user text and saved clarification answers',()=>{const value=scope();value.brief.constraints=[{source:'answer-1',quote:'offline notes'}];expect(validateScope(value,{question:'Compare databases.',clarifications:[{question:'What is the application?',answer:'offline notes'}]}).action).toBe('RESEARCH');});
 it('rejects duplicate question ids and invented geographic assumptions',()=>{const q={id:'Q1',question:'Which topic?',options:[]};expect(scopeDecision.safeParse({action:'CLARIFY',brief:null,questions:[q,q],queries:[],focus:''}).success).toBe(false);const v=scope();v.brief.assumptions=['Assume the user lives in India'];expect(scopeDecision.safeParse(v).success).toBe(false);});
 it('preserves old versioned search checkpoints',()=>{const {queries,focus}=scope();expect(readSearchPlan({queries,focus})).toEqual({queries,focus});});
+it('preserves ordinary multiline clarification text through submission and saved history',async()=>{
+ const {researchContinuation,clarificationHistory}=await import('@/server/deep-research/scope');const answer='SQLite and PostgreSQL\nAn offline notes application';
+ expect(researchContinuation.parse({jobId:crypto.randomUUID(),answers:[{id:'Q1',answer}]}).answers[0].answer).toBe(answer);
+ expect(clarificationHistory.parse([{question:'Which options and application?',answer}])[0].answer).toBe(answer);
+ expect(clarificationHistory.safeParse([{question:'Which options?',answer:'SQLite\u0000Postgres'}]).success).toBe(false);
+});
