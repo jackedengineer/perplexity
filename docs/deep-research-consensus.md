@@ -38,7 +38,7 @@ reducing the ensemble to two models or inventing missing evidence.
 The first paid planning step emits a Zod-validated `RESEARCH` or `CLARIFY`
 decision. Broad but answerable topics proceed with a balanced scope; missing
 comparison subjects, unresolved references or materially different possible goals
-ask one or two short questions. Each supports suggested choices and free text.
+ask one or two short questions. Each supports suggested choices and free text, including ordinary line breaks.
 A rewritten objective must preserve the original request. Explicit constraints
 quote the original question or a saved user answer verbatim; invented constraint
 quotes are rejected. Assumptions are limited to disclosed broad-overview,
@@ -111,7 +111,12 @@ week and this/last month have deterministic resolution. Other nuanced temporal
 wording remains in the original question for planning; this is not a general
 natural-language date parser. Invalid or reversed supported date ranges fail
 instead of silently searching another period. The frozen scope is visible in the
-report and survives replay across midnight.
+report and survives replay across midnight. A full admission timestamp additionally
+anchors freshness ranking so valid same-day timestamps are retained. Explicit
+publication clauses have their own window: events in 2024 can be researched
+using reports published in 2025, in either clause order. Retrospective forecast
+questions retain their historical window. This remains a bounded parser, not
+a general natural-language date interpreter.
 
 ## Verification and limits
 
@@ -148,7 +153,8 @@ final candidate. Azure rejected the first tuple schema; the homogeneous-array
 schema passed. Failed calls remain recorded in local evaluation evidence.
 
 A single synthetic live scenario is not statistical proof of improved accuracy.
-Quote matching proves text provenance, not entailment; the judge can still err.
+Quote matching requires at least twelve normalized characters and rejects blank
+or whitespace-padded short excerpts. It proves text provenance, not entailment; the judge can still err.
 Broad independent human calibration, multilingual coverage and an all-live hosted
 trial remain release acceptance work. Source support labels stay NOT_CHECKED;
 this feature does not misrepresent model judgment as independent human review.

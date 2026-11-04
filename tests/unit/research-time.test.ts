@@ -33,3 +33,10 @@ it('preserves explicit past publication windows when reviewing forecasts',()=>{
 it('freezes the full ranking instant in addition to the calendar reference day',()=>{
  expect(resolveResearchTime('News today',now)).toMatchObject({asOf:'2026-11-04',referenceAt:'2026-11-04T08:00:00.000Z'});
 });
+it('separates an event period from a separately dated publication constraint',()=>{
+ expect(resolveResearchTime('Compare current AI pricing using published research',now)).toMatchObject({kind:'CURRENT',filterPublication:false});
+ for(const question of ['Analyze events in 2024 using reports published in 2025','Use reports published in 2025 about events in 2024']){
+  expect(resolveResearchTime(question,now)).toMatchObject({startDate:'2024-01-01',endDate:'2024-12-31',publicationStartDate:'2025-01-01',publicationEndDate:'2025-12-31',filterPublication:true});
+ }
+ expect(resolveResearchTime('Analyze events from 2024-01-01 to 2024-06-30 using reports published from 2025-01-01 to 2025-06-30',now)).toMatchObject({startDate:'2024-01-01',endDate:'2024-06-30',publicationStartDate:'2025-01-01',publicationEndDate:'2025-06-30'});
+});

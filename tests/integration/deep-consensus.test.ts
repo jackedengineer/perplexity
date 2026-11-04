@@ -60,9 +60,9 @@ it('cancels between candidates without judging or publishing partial content',as
  const judge=vi.spyOn(p.consensus,'judge');await consumeResearch(f.db,id,{providers:p});expect(judge).not.toHaveBeenCalled();const job=await readJob(f.db,f.subject,id);expect(job.state).toBe('CANCELLED');expect(job.report).toBeUndefined();expect(job.heldMicroUsd).toBe('30000');
 });
 it('filters publication dates only on explicit publication requests',async()=>{
- for(const [question,expected] of [['Compare SQLite and PostgreSQL in 2024.','ANY'],['Compare SQLite and PostgreSQL articles published in 2024.','SPECIFIC_RANGE']]){
+ for(const [question,expected] of [['Compare SQLite and PostgreSQL in 2024.','ANY'],['Compare SQLite and PostgreSQL articles published in 2024.','SPECIFIC_RANGE'],['Compare SQLite and PostgreSQL in 2024 using reports published in 2025.','SPECIFIC_RANGE']]){
   const id=await admitJob(f.db,f.subject,{...input(),question},f.key,models),p=consensusProviders(),search=vi.spyOn(p.search,'search');
-  expect(await consumeResearch(f.db,id,{providers:p})).toBe('COMPLETED');expect(search.mock.calls.every(c=>c[1].filters?.freshness===expected)).toBe(true);
+  expect(await consumeResearch(f.db,id,{providers:p})).toBe('COMPLETED');expect(search.mock.calls.every(c=>c[1].filters?.freshness===expected)).toBe(true);if(question.includes('2025'))expect(search.mock.calls[0][1].filters).toMatchObject({startDate:'2025-01-01',endDate:'2025-12-31'});
  }
 });
 it('keeps same-day publication dates at the frozen admission instant',async()=>{

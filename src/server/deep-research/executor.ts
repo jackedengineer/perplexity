@@ -67,7 +67,7 @@ export function researchExecutor(db:JobDatabase,id:string,snapshot:ResearchSnaps
    }
    if(key.startsWith('search-')){
     const text=await query(Number(key.slice(7)));receipt=()=>null;
-    const results=await p.search.search(text,{...options,filters:time?{...preferences,freshness:time.filterPublication?'SPECIFIC_RANGE':'ANY',startDate:time.filterPublication?time.startDate:null,endDate:time.filterPublication?time.endDate:null}:{...preferences,timeRange:freshnessTimeRange(snapshot.question)??undefined,startDate:null,endDate:null}});
+    const results=await p.search.search(text,{...options,filters:time?{...preferences,freshness:time.filterPublication?'SPECIFIC_RANGE':'ANY',startDate:time.filterPublication?(time.publicationStartDate??time.startDate):null,endDate:time.filterPublication?(time.publicationEndDate??time.endDate):null}:{...preferences,timeRange:freshnessTimeRange(snapshot.question)??undefined,startDate:null,endDate:null}});
     receipt=()=>15000n;return known(rowsSchema.parse(results.results),15000n);
    }
    if(key==='initial-evidence'||key==='evidence'){
