@@ -1,6 +1,8 @@
 # Server-side safety and release policy
 
-Status: policy `v1` contracts/categories/fixtures were implemented in T02; the internal input gate, strict classifier transport and atomic approved-question persistence are implemented in T06, 2026-10-22. [T06 evidence and limits](input-safety.md) distinguish transport/lifecycle tests from model accuracy. Retrieval/output enforcement, evaluation and public delivery remain T07–T11 work. This policy does not claim that classifiers can detect every unsafe request.
+**Current runtime:** The owner-approved 2026-11-04 change replaces the separate classifier with [local boundaries and generation-provider safety](local-safety.md). That document supersedes classifier-specific runtime requirements below; the content policy, ownership, budgets and output/citation contracts remain. The following classifier architecture is retained as historical context.
+
+Historical status: policy `v1` contracts/categories/fixtures were implemented in T02; the internal input gate, strict classifier transport and atomic approved-question persistence are implemented in T06, 2026-10-22. [T06 evidence and limits](input-safety.md) distinguish transport/lifecycle tests from model accuracy. Retrieval/output enforcement, evaluation and public delivery remain T07–T11 work. This policy does not claim that classifiers can detect every unsafe request.
 
 ## Assets and trust boundaries
 

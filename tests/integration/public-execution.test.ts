@@ -110,6 +110,7 @@ it('clarification is withheld on output outage, with no search, answer or public
  const p=providers();p.planner={modelId:'test/planner',plan:async()=>({plan:{action:'CLARIFY',question:'Which products are you comparing?',reasonCode:'MISSING_ENTITY'},usage:knownUsage})};
  p.output={...fakeSafety(),classify:async()=>{throw Error('PRIVATE');}};
  expect((await run(p)).result).toMatchObject({kind:'DENIED',code:'SAFETY_UNAVAILABLE'});
+ expect((await db.select().from(schema.outputReviews))[0]).toMatchObject({guardVersion:'legacy-classifier-v1',decision:'UNAVAILABLE'});
  expect((await createAnswerDelivery(db).load(identity,person.runId)).answer).toBeUndefined();
  expect(p.search.search).not.toHaveBeenCalled();expect(p.answer.generate).not.toHaveBeenCalled();
  expect(await db.select().from(schema.messages)).toHaveLength(1);
@@ -197,4 +198,17 @@ it('retains contextual day freshness on a resolved follow-up',async()=>{
  p.planner={...p.planner,plan:async(input,options)=>{const result=await base(input,options);if(result.plan.action==='ANSWER'){result.plan.standaloneQuestion='React news today';result.plan.retrieval.queries=['React news today'];result.plan.retrieval.freshness='RECENT';}return result;}};
  expect((await createRunExecution(db,keys,p).execute(identity,admitted.run,submissionSchema.parse(request),new AbortController().signal,()=>{})).kind).toBe('COMPLETED');
  expect(p.search.search).toHaveBeenCalledWith('React news today',expect.objectContaining({filters:expect.objectContaining({timeRange:'day'})}));
+});
+
+import {createLocalSafetyGuard,LOCAL_GUARD_VERSION} from '@/server/safety/local';
+it('Web keeps citations, owner checks and settlement without any classifier provider calls',async()=>{
+ const p=providers();for(const stage of ['input','query','evidence','output'] as const)p[stage]=createLocalSafetyGuard();
+ expect((await run(p)).result).toEqual({kind:'COMPLETED'});
+ const calls=await db.select().from(schema.providerCalls);
+ expect(calls.map(c=>c.stage).sort()).toEqual(['ANSWER','PLANNER','SEARCH']);
+ expect((await db.select().from(schema.outputReviews))[0].guardVersion).toBe(LOCAL_GUARD_VERSION);
+ expect((await createAnswerDelivery(db).load(identity,person.runId)).answer?.text).toContain('[S1]');
+ await expect(createAnswerDelivery(db).load({...identity,user:{id:'foreign'}},person.runId)).rejects.toMatchObject({code:'NOT_FOUND'});
+ // Search still has no USD receipt; local safety must not release its unknown hold.
+ expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({knownProviderMicroUsd:200n,heldProviderMicroUsd:49800n});
 });

@@ -116,3 +116,18 @@ it('passes explicit invocation credentials to the provider factory without chang
  try{expect(await consumeResearch(f.db,id,{providerEnvironment:environment})).toBe('COMPLETED');expect(factory).toHaveBeenCalledOnce();expect(process.env.OPENROUTER_API_KEY).toBe(original);}
  finally{factory.mockRestore();}
 });
+
+import {createLocalSafetyGuard} from '@/server/safety/local';
+it('durable research replays local checks at zero cost while retaining search and draft charges',async()=>{
+ const isolated=await jobsFixture();try{
+ const f=isolated;
+ await f.db.update(operatorUsageBuckets).set({providerLimitMicroUsd:1000000n});
+ const id=await admitJob(f.db,f.subject,input(),f.key,models),p=providers();
+ for(const stage of ['input','query','evidence','output'] as const)p[stage]=createLocalSafetyGuard();
+ expect(await consumeResearch(f.db,id,{providers:p})).toBe('COMPLETED');
+ const steps=await f.db.select().from(jobSteps).where(eq(jobSteps.jobId,id));
+ expect(steps.filter(s=>s.key==='input'||s.key.startsWith('query-')||s.key.includes('evidence')||s.key.startsWith('output-')||s.key==='report-safety').every(s=>s.costMicroUsd===0n)).toBe(true);
+ const job=await readJob(f.db,f.subject,id);expect(job.report?.sections).toHaveLength(3);expect(job.spentMicroUsd).toBe('105500');
+ expect(await consumeResearch(f.db,id,{providers:p})).toBe('DUPLICATE');
+ }finally{await isolated.pg.close();}
+});

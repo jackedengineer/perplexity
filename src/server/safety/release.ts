@@ -1,3 +1,4 @@
+import {isLocalSafetyGuard,LOCAL_GUARD_VERSION} from './local';
 import {traceStage} from '@/server/telemetry/trace';
 import { z } from "zod";
 import { approvedPayloadSchema } from "@/server/contracts/answer";
@@ -14,21 +15,27 @@ const approvalInput = z.strictObject({ runId: z.uuid(),attemptVersion: z.int().p
   kind: z.enum(["ANSWER","CLARIFICATION","NO_EVIDENCE","CHAT"]),question: questionTextSchema,markdown: questionTextSchema,evidence: evidencePackageSchema });
 export type ApprovedResponse = Readonly<{ runId: string;attemptVersion: number;revision: number;policyVersion: "v1";
   kind: "ANSWER" | "CLARIFICATION" | "NO_EVIDENCE" | "CHAT";markdown: string;sources: readonly Readonly<VisibleSource>[];additionalSources?:readonly Readonly<VisibleSource>[] }>;
+export type OutputGuardVersion = typeof LOCAL_GUARD_VERSION | "legacy-classifier-v1" | "not-recorded";
 export type ReleaseResult = { kind: "APPROVED";response: ApprovedResponse }
-  | { kind: "DENIED";code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE" | "DEADLINE_EXCEEDED";response: SafetyResponse };
+  | { kind: "DENIED";guardVersion:OutputGuardVersion;code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE" | "DEADLINE_EXCEEDED";response: SafetyResponse };
 const approved = new WeakSet<object>();
+const localApproved = new WeakSet<object>();
+export function approvalGuardVersion(value:ApprovedResponse) {return localApproved.has(value)?LOCAL_GUARD_VERSION:"legacy-classifier-v1";}
 export function isApprovedResponse(value: unknown): value is ApprovedResponse { return typeof value === "object" && value !== null && approved.has(value); }
 export function createReleaseGate(provider: SafetyProvider | undefined) {
   const gate = createInputGate(provider,"safety.output");
   return { async approve(value: unknown,options: ExecutionOptions): Promise<ReleaseResult> {
-    const deny = (code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE" | "DEADLINE_EXCEEDED",response: SafetyResponse = SAFETY_RESPONSES.UNAVAILABLE): ReleaseResult=>({ kind: "DENIED",code,response });
+    const deny = (code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE" | "DEADLINE_EXCEEDED",response: SafetyResponse = SAFETY_RESPONSES.UNAVAILABLE): ReleaseResult=>({ kind: "DENIED",code,response,guardVersion:isLocalSafetyGuard(provider)?LOCAL_GUARD_VERSION:"legacy-classifier-v1" });
     try {
       const parsed = approvalInput.safeParse(value);
       if (!parsed.success) return deny("OUTPUT_BLOCKED");
       const input = parsed.data;
       if (input.evidence.runId !== input.runId || (input.kind !== "ANSWER" && input.evidence.sources.length) ||
         (input.kind === "NO_EVIDENCE" && input.markdown !== NO_EVIDENCE_TEXT) || (input.kind === "CLARIFICATION" && input.markdown.length > 800)) return deny("OUTPUT_BLOCKED");
-      const sources = await traceStage("citations",async()=>validateCitations(input.markdown,input.evidence,input.kind === "ANSWER"));
+      let sources: VisibleSource[];
+      try {
+        sources = await traceStage("citations",async()=>validateCitations(input.markdown,input.evidence,input.kind === "ANSWER"));
+      } catch { return deny("OUTPUT_BLOCKED"); }
       const additionalSources=input.evidence.sources.filter(s=>!sources.some(c=>c.sourceId===s.sourceId)).map((s,i)=>visibleSourceFor(input.evidence,s.sourceId,sources.length+i+1));
       const verdict = await gate.evaluate({ text: input.markdown,context: [
         { role: "USER",text: JSON.stringify({ originalQuestion: input.question,responseKind:input.kind }) },
@@ -36,14 +43,14 @@ export function createReleaseGate(provider: SafetyProvider | undefined) {
           publishedAt:source.publishedAt,retrievedAt:source.retrievedAt,contentKind:source.contentKind,supportStatus:source.supportStatus}) })),
       ] },options);
       const decision = resolveSafetyDecision(verdict.verdict);
-      if (decision.decision !== "ALLOW") return deny(decision.decision === "BLOCK" ? "OUTPUT_BLOCKED" : verdict.reason === "TIMEOUT" ? "DEADLINE_EXCEEDED" : "SAFETY_UNAVAILABLE",decision.response);
+      if (decision.decision !== "ALLOW") return deny(verdict.verdict.decision === "BLOCK" ? "OUTPUT_BLOCKED" : verdict.reason === "TIMEOUT" ? "DEADLINE_EXCEEDED" : "SAFETY_UNAVAILABLE",decision.response);
       if (options.signal.aborted || Date.now() >= options.deadlineAt.getTime()) return deny("SAFETY_UNAVAILABLE");
       for (const source of [...sources,...additionalSources]) { Object.freeze(source.passageIds);Object.freeze(source.contentHashes);Object.freeze(source); }
       const candidate = { runId: input.runId,attemptVersion: input.attemptVersion,revision: input.revision,
         policyVersion: SAFETY_POLICY.version,kind: input.kind,markdown: input.markdown,sources: Object.freeze(sources),...(additionalSources.length?{additionalSources:Object.freeze(additionalSources)}:{}) };
       if (!approvedPayloadSchema.safeParse(candidate).success) return deny("OUTPUT_BLOCKED");
       const response: ApprovedResponse = Object.freeze(candidate);
-      approved.add(response); return { kind: "APPROVED",response };
+      approved.add(response); if(isLocalSafetyGuard(provider))localApproved.add(response); return { kind: "APPROVED",response };
     } catch { return deny("SAFETY_UNAVAILABLE"); }
   } };
 }

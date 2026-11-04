@@ -2,7 +2,7 @@ import { z } from "zod";
 import { questionTextSchema } from "@/server/contracts/chat";
 
 export const INPUT_DETECTOR_VERSION = "input-v1";
-export const INPUT_REASONS = ["DETERMINISTIC_SECRET", "DETERMINISTIC_ABUSE", "CLASSIFIER", "INVALID_INPUT",
+export const INPUT_REASONS = ["DETERMINISTIC_SECRET", "DETERMINISTIC_ABUSE", "CLASSIFIER", "LOCAL_CHECK", "INVALID_INPUT",
   "CONFIGURATION_UNAVAILABLE", "PROVIDER_UNAVAILABLE", "MALFORMED_OUTPUT", "CLASSIFIER_UNAVAILABLE", "TIMEOUT", "CANCELLED"] as const;
 export type InputReason = typeof INPUT_REASONS[number];
 const contextText=(max:number)=>z.string().max(max)

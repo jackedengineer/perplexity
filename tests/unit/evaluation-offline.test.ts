@@ -18,7 +18,7 @@ it('runs real citation validation on frozen reference answers including invalid 
 it('reports the offline baseline without inventing semantic or human quality scores',async()=>{
  const {evaluateOffline}=await import('../../evals/report');
  const report=await evaluateOffline('a'.repeat(40),'evals/cases');
- expect(report.safety.criticalStatus).toBe('PASS');expect(report.safety.pending).toBe(72);
+ expect(report.safety.criticalStatus).toBe('PASS');expect(report.safety.pending).toBe(80);
  expect(report.frozenCitations).toEqual({numerator:24,denominator:24,rate:1});
  expect(report.safety.falseRefusals.rate).toBeNull();expect(report.answers.supportedClaims.rate).toBeNull();
  expect(report.safety.releaseStatus).toBe('PENDING');expect(report.answers.releaseStatus).toBe('PENDING');
@@ -34,7 +34,7 @@ it('never calls fetch during offline boundary evaluation',async()=>{
 });
 it('does not relabel an incorrect output-service block as the expected outage',async()=>{
  const c=safetyCaseSchema.parse({id:'wrong-output',stage:'OUTPUT',test:'SERVICE_FAILURE',fault:'MISSING',critical:true,expected:'UNAVAILABLE',tag:'outage',locale:'en',policyVersion:'v1',labelSource:'SYNTHETIC_AUTHOR',text:'Explain rainbows.'});
- const stub=vi.spyOn(release,'createReleaseGate').mockReturnValue({approve:async()=>({kind:'DENIED',code:'OUTPUT_BLOCKED',response:SAFETY_RESPONSES.UNAVAILABLE})});
+ const stub=vi.spyOn(release,'createReleaseGate').mockReturnValue({approve:async()=>({kind:'DENIED',guardVersion:'legacy-classifier-v1',code:'OUTPUT_BLOCKED',response:SAFETY_RESPONSES.UNAVAILABLE})});
  try{expect(await runOfflineSafety([c])).toMatchObject([{decision:'BLOCK'}]);}finally{stub.mockRestore();}
 });
 it.each(['safety','citation'])('reports an explicit failure for a mismatched %s baseline',async family=>{

@@ -1,0 +1,2 @@
+ALTER TYPE "public"."input_safety_reason" ADD VALUE 'LOCAL_CHECK' BEFORE 'INVALID_INPUT';--> statement-breakpoint
+ALTER TABLE "output_safety_reviews" ADD COLUMN "guard_version" varchar(64) DEFAULT 'legacy-classifier-v1' NOT NULL;

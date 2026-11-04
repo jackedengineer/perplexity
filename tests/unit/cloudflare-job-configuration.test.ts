@@ -11,7 +11,7 @@ it('selects dedicated paid credentials without mutating the ordinary research en
 });
 it('cannot fall back to verification credentials or an unconfigured execution backend',()=>{
  for(const patch of [{JOB_OPENROUTER_API_KEY:undefined},{JOB_TAVILY_API_KEY:undefined},{JOB_EXECUTION_BACKEND:'trigger'},
-  {ENABLE_CLOUDFLARE_JOB_WORKER:'false'},{ENABLE_DEEP_RESEARCH:'false'},{MODEL_SAFETY:undefined}]){
+  {ENABLE_CLOUDFLARE_JOB_WORKER:'false'},{ENABLE_DEEP_RESEARCH:'false'},{MODEL_PLANNER:undefined}]){
   expect(()=>cloudflareProviderEnvironment({...env,...patch})).toThrow();
  }
 });
