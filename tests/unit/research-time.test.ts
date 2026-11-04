@@ -25,3 +25,11 @@ it('treats future forecasts as forecasts and never filters out existing evidence
 it('does not treat model versions or numeric quantities as a historical year',()=>{
  expect(resolveResearchTime('Compare Qwen 397B and a 2000 token context',now).startDate).toBeNull();
 });
+it('preserves explicit past publication windows when reviewing forecasts',()=>{
+ for(const word of ['forecast','projection','outlook'])expect(resolveResearchTime(`How accurate was the economic ${word} published in 2024?`,now)).toMatchObject({kind:'HISTORICAL',startDate:'2024-01-01',endDate:'2024-12-31',filterPublication:true});
+ expect(resolveResearchTime('Compare forecasts published today',now)).toMatchObject({kind:'CURRENT',startDate:'2026-11-04',endDate:'2026-11-04',filterPublication:true});
+ expect(resolveResearchTime('Predict next year using news published in 2024',now)).toMatchObject({startDate:'2024-01-01',endDate:'2024-12-31',filterPublication:true});
+});
+it('freezes the full ranking instant in addition to the calendar reference day',()=>{
+ expect(resolveResearchTime('News today',now)).toMatchObject({asOf:'2026-11-04',referenceAt:'2026-11-04T08:00:00.000Z'});
+});

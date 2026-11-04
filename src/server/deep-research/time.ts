@@ -1,6 +1,6 @@
 import {z} from 'zod';
 export const researchTime=z.strictObject({
- asOf:z.iso.date(),kind:z.enum(['EVERGREEN','CURRENT','HISTORICAL','FORECAST']),
+ asOf:z.iso.date(),referenceAt:z.iso.datetime().optional(),kind:z.enum(['EVERGREEN','CURRENT','HISTORICAL','FORECAST']),
  startDate:z.iso.date().nullable(),endDate:z.iso.date().nullable(),
  filterPublication:z.boolean(),basis:z.enum(['EXPLICIT','TOPIC','DEFAULT']),
 }).refine(v=>(v.startDate===null)===(v.endDate===null)&&(!v.startDate||v.startDate<=v.endDate!));
@@ -11,7 +11,7 @@ function validDate(value:string){const parsed=z.iso.date().safeParse(value);if(!
 // Resolve once at admission, in UTC, then persist. A recovered job must not drift
 // into a new day. Event dates and publication dates are deliberately distinct.
 export function resolveResearchTime(question:string,now:Date):ResearchTime{
- const asOf=iso(now),today=new Date(asOf),year=today.getUTCFullYear(),month=today.getUTCMonth();
+ const referenceAt=now.toISOString(),asOf=iso(now),today=new Date(asOf),year=today.getUTCFullYear(),month=today.getUTCMonth();
  let startDate:string|null=null,endDate:string|null=null;
  const dates=[...question.matchAll(/\b\d{4}-\d{2}-\d{2}\b/gu)].map(m=>validDate(m[0]));
  if(dates.length>2)throw Error('Use one research date range');
@@ -30,12 +30,15 @@ export function resolveResearchTime(question:string,now:Date):ResearchTime{
   else if(single){startDate=single[1]+'-01-01';endDate=single[1]===String(year)?asOf:single[1]+'-12-31';}
  }
  if(startDate&&endDate&&startDate>endDate)throw Error('Reversed research range');
+ const publication=/\b(?:published|publication|news|articles dated)\b/iu.test(question);
+ // An explicit past/current publication window remains authoritative even when
+ // the subject is a forecast. Future target dates cannot filter existing sources.
+ if(startDate&&startDate<=asOf)return researchTime.parse({asOf,referenceAt,kind:/\b(?:next year|next month)\b/iu.test(question)?'FORECAST':endDate!<asOf?'HISTORICAL':'CURRENT',startDate,endDate,filterPublication:publication,basis:'EXPLICIT'});
  const forecast=/\b(?:forecast|predict|projection|outlook|next year|next month)\b/iu.test(question)||!!startDate&&startDate>asOf;
- if(forecast)return researchTime.parse({asOf,kind:'FORECAST',startDate:null,endDate:null,filterPublication:false,basis:'EXPLICIT'});
- if(startDate)return researchTime.parse({asOf,kind:endDate!<asOf?'HISTORICAL':'CURRENT',startDate,endDate,filterPublication:/\b(?:published|publication|news|articles dated)\b/iu.test(question),basis:'EXPLICIT'});
+ if(forecast)return researchTime.parse({asOf,referenceAt,kind:'FORECAST',startDate:null,endDate:null,filterPublication:false,basis:'EXPLICIT'});
  const temporal=question.replace(/\b(?:(?:electric(?:al)?|alternating|direct|ocean|water|air) currents?|current (?:flow|density|voltage|resistance))\b/giu,'');
  const explicit=/\b(?:latest|recent|current|now)\b/iu.test(temporal);
  const changing=/\b(?:pricing|prices|availability|elections?|president|ceo|regulations?|laws?|policies|release|versions?|news|market|AI models?|LLMs?)\b/iu.test(temporal);
- return researchTime.parse({asOf,kind:explicit||changing?'CURRENT':'EVERGREEN',startDate:null,endDate:null,filterPublication:false,basis:explicit?'EXPLICIT':changing?'TOPIC':'DEFAULT'});
+ return researchTime.parse({asOf,referenceAt,kind:explicit||changing?'CURRENT':'EVERGREEN',startDate:null,endDate:null,filterPublication:false,basis:explicit?'EXPLICIT':changing?'TOPIC':'DEFAULT'});
 }
 export function timeInstructions(time:ResearchTime){return JSON.stringify({...time,instruction:'Use this frozen temporal scope. Distinguish event dates, publication dates and retrieval dates. Current topics require current primary evidence; older authoritative background may still apply. Forecasts are uncertain, never observed facts. Disclose missing or undated evidence; never claim a source was verified current merely because it was retrieved today.'});}

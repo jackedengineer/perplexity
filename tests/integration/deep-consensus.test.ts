@@ -65,3 +65,12 @@ it('filters publication dates only on explicit publication requests',async()=>{
   expect(await consumeResearch(f.db,id,{providers:p})).toBe('COMPLETED');expect(search.mock.calls.every(c=>c[1].filters?.freshness===expected)).toBe(true);
  }
 });
+it('keeps same-day publication dates at the frozen admission instant',async()=>{
+ const id=await admitJob(f.db,f.subject,{...input(),question:'Compare SQLite and PostgreSQL news today.'},f.key,models),snapshot=await loadResearch(f.db,id),p=consensusProviders();
+ if(snapshot.version!=='deep-research-v2')throw Error('Expected v2');
+ const publishedAt=new Date(Date.parse(snapshot.consensus.time.referenceAt!)-1000).toISOString(),search=p.search.search;
+ p.search.search=async(...args)=>{const result=await search(...args);return {...result,results:result.results.map(r=>({...r,published_date:publishedAt}))};};
+ const candidate=vi.spyOn(p.consensus,'candidate');
+ expect(await consumeResearch(f.db,id,{providers:p})).toBe('COMPLETED');
+ expect(candidate.mock.calls[0][1].evidence.sources[0].publishedAt).toBe(publishedAt);
+});
