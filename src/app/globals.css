@@ -103,3 +103,24 @@ h1 em { font-weight: 400; color: var(--accent); }
   .workspace-content { padding: 60px 0; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* Root fallback loads before route CSS; keep its canvas Graphite throughout. */
+html:has(.workspace-loading),body:has(.workspace-loading) { background: #191919; color-scheme: dark; }
+.workspace-loading { display: flex; flex: 1; min-height: 0; background: #191919; color: #efefed; overflow: hidden; }
+.workspace-loading-full { min-height: 100svh; }
+.loading-sidebar { width: 232px; flex-shrink: 0; padding: 24px 16px; background: #151515; }
+.loading-sidebar i { display: block; height: 28px; margin-bottom: 24px; border-radius: 6px; background: #252525; }
+.loading-sidebar i:first-child { width: 60%; margin-bottom: 48px; }
+.loading-workspace { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.loading-topbar { height: 56px; flex-shrink: 0; padding: 16px 24px; }
+.loading-topbar i { display: block; height: 20px; width: 100px; border-radius: 5px; background: #292929; }
+.loading-column { display: flex; flex-direction: column; flex: 1; width: min(720px,calc(100% - 32px)); margin: 28px auto 24px; }
+.loading-heading,.loading-line { background: #292929; border-radius: 6px; height: 16px; margin-bottom: 16px; animation: workspace-placeholder 1.6s ease-in-out infinite alternate; }
+.loading-heading { width: 55%; height: 32px; margin-bottom: 28px; }
+.loading-line-short { width: 70%; }
+.loading-composer { margin-top: auto; height: 112px; flex-shrink: 0; border: 1px solid #343434; border-radius: 14px; background: #222; padding: 20px; }
+.loading-composer i { display: block; width: 35%; height: 14px; border-radius: 4px; background: #303030; }
+.loading-composer i+i { width: 20%; margin-top: 28px; }
+@keyframes workspace-placeholder { to { opacity: .55; } }
+@media(max-width:767px) { .loading-sidebar { display: none; } }
+@media(prefers-reduced-motion:reduce) { .workspace-loading * { animation: none; } }

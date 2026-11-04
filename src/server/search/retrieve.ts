@@ -49,7 +49,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
           if (run.status !== "PLANNING") return { kind: terminal.has(run.status) ? "RUN_ALREADY_FINISHED" : "RUN_IN_PROGRESS",runId } as const;
           if (signal.aborted || run.deadlineAt <= now) throw new RetrievalError();
           if (conversation.revision !== run.admittedRevision) throw new AdmissionError("CONFLICT");
-          if (run.policyVersion !== SAFETY_POLICY.version || !(["fast-v1:standard-v1","trials-v1:credits-v1"].includes(`${run.catalogVersion}:${run.priceVersion}`))) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
+          if (run.policyVersion !== SAFETY_POLICY.version || !(["fast-v1:standard-v1","trials-v1:credits-v1","trials-v2:credits-v2"].includes(`${run.catalogVersion}:${run.priceVersion}`))) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
           const [reservation] = await tx.select().from(usageReservations).where(and(eq(usageReservations.runId,runId),eq(usageReservations.userId,run.userId)));
           if (!reservation || reservation.providerReserveMicroUsd < RETRIEVAL_LIMITS.reserveMicroUsd) throw new AdmissionError("BUDGET_EXCEEDED");
           const [review] = await tx.select().from(inputSafetyReviews).where(and(eq(inputSafetyReviews.runId,runId),eq(inputSafetyReviews.decision,"ALLOW"),eq(inputSafetyReviews.attemptVersion,run.attemptVersion)));
@@ -61,7 +61,7 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
           const [record]=await tx.select().from(runPlans).where(eq(runPlans.runId,runId));
           const plan=record?queryPlanSchema.parse(record.plan):null;
           // Only historical v1 snapshots may use the original-query retrieval path.
-          if(run.accountingVersion===2&&!record)throw new AdmissionError('CONFLICT');
+          if(run.accountingVersion>=2&&!record)throw new AdmissionError('CONFLICT');
           if(record&&(record.originalHash!==createHash('sha256').update(parts.data[0].text).digest('hex')||record.messageId!==message.id||record.attemptVersion!==run.attemptVersion||plan?.action!=='ANSWER'))throw new AdmissionError('CONFLICT');
           const query=searchQuerySchema.parse(plan?.action==='ANSWER'?plan.retrieval.queries[0]:parts.data[0].text);
           await tx.insert(runRetrievals).values({ runId,attemptVersion: run.attemptVersion,policyVersion: run.policyVersion,

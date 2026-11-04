@@ -96,3 +96,13 @@ it.each(['refund','dispute'])('releases a completed seat after a verified early 
  await reconcileCheckout(f.db,row.id,api);
  expect((await f.db.select().from(jobPeriods).where(eq(jobPeriods.subscriptionId,subId)))[0].state).toBe('REVOKED');
 });
+
+it('keeps public checkout independent of exhausted funding and occupied pilot seats',async()=>{
+ const [row]=await f.db.insert(billingCheckouts).values({userId:f.owner,requestId:crypto.randomUUID(),planId:'plan_public',priceKey:'pro-live-monthly-inr-v1',environment:'LIVE',state:'UNKNOWN'}).returning();
+ await f.db.update(operatorUsageBuckets).set({reservedProviderMicroUsd:5_000_000n});
+ await expect(check()).rejects.toMatchObject({code:'QUOTA'});
+ await expect(f.db.transaction(tx=>assertPilotCapacity(tx,{...policy,publicCheckout:true}))).resolves.toBeUndefined();
+ // No refill, release or spend occurs as a side effect of opening purchases.
+ expect((await f.db.select().from(operatorUsageBuckets))[0].reservedProviderMicroUsd).toBe(5_000_000n);
+ expect((await f.db.select().from(billingCheckouts).where(eq(billingCheckouts.id,row.id)))[0].state).toBe('UNKNOWN');
+});

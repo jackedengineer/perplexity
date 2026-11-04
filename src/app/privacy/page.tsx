@@ -2,7 +2,7 @@ import {PublicPolicy} from '@/components/public-policy';
 
 export const metadata={title:'Privacy policy'};
 export default function PrivacyPage(){
-  return <PublicPolicy title="Privacy policy" notice="Updated 2 November 2026. Paid pilot availability is checked in Billing.">
+  return <PublicPolicy title="Privacy policy" notice="Updated 4 November 2026. Paid subscription availability is checked in Billing.">
     <p>Review-account update: 2 November 2026. An operator-provisioned temporary review account additionally
       uses an application password stored as a salted password hash. This is separate from Google sign-in;
       we do not receive a Google password. Review access expires within seven days. Account/security records
@@ -34,8 +34,9 @@ export default function PrivacyPage(){
       <li><strong>Cloudflare, Vercel and Neon</strong> provide application hosting, deployment infrastructure and the database.</li>
       <li><strong>OpenRouter and the selected model provider</strong> process questions, relevant conversation
         context, source excerpts and proposed answers for planning, generation and safety checks. We configure
-        routes that require no provider data collection and zero-data-retention support. These routing
-        controls do not mean that your content stays on your device.</li>
+        non-training routes using OpenRouter’s data-retention controls. Some supported Google routes permit
+        safety retention: Google may keep prompts flagged by its safety systems for up to 90 days for abuse
+        monitoring, not training. These controls do not mean that your content stays on your device.</li>
       <li><strong>Tavily</strong> receives search queries and selected page URLs to retrieve web evidence.</li>
       <li><strong>Cloudflare Turnstile</strong> processes browser and verification information to protect guest
         access when guest trials are enabled.</li>
@@ -51,8 +52,8 @@ export default function PrivacyPage(){
       CVVs or payment PINs. Payment and reversal records may remain after content deletion for financial
       reconciliation and to prevent duplicate grants.</p>
     <p>Deep Research uses private saved questions, step checkpoints, progress and cited reports.
-      Trigger.dev hosts the configured durable worker and receives job identifiers and execution data;
-      its environment is separate from the browser. Access and new purchases depend on the configured paid offer and funded capacity.</p>
+      Cloudflare runs the production durable worker and processes job identifiers and execution data
+      separately from your browser. Paid access requires verified payment and follows the published offer.</p>
     <h2>Cookies and guest sessions</h2>
     <p>Essential cookies keep you signed in and protect account actions. Sessions have a seven-day rolling
       validity and a separate thirty-day absolute limit. A guest-trial marker lasts thirty days to prevent

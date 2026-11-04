@@ -1,5 +1,24 @@
 # Workspace entry and sidebar motion
 
+## Mobile keyboard canvas fix — 3 November 2026 (release pending)
+
+The Graphite shell painted dark content over the root document's inherited light
+scheme and cream canvas. Both workspace route groups now emit dark color-scheme
+and theme-color metadata. Shell-scoped CSS also paints `html` and `body` dark,
+including areas exposed during keyboard movement or overscroll. No viewport zoom
+restrictions, keyboard listeners or layout scripts were added. Scope follows the
+rendered shell because global CSS can remain loaded after client navigation.
+
+Real-browser checks on the credential-free built Cloudflare worker confirmed the
+dark canvas and metadata at 390px width, focused input without horizontal
+overflow, and the light policy theme after client navigation. Local authenticated
+workspace checks covered 390×844 and 390×390. Lint, type checks and Cloudflare build
+passed. Foundation regressions cover the canvas, focus, metadata and policy
+navigation. An actual iPhone Safari keyboard recheck remains necessary: desktop
+mobile emulation does not display native iOS keyboard accessory controls.
+No AI calls or budget changes were made. Merge and production deployment remain
+pending CI and review.
+
 The homepage redirects to `/workspace`. The workspace is public to view and type
 in; guests still establish their existing bounded, challenged trial before using
 AI. Signed-in users use the existing authenticated workspace frame. Private
@@ -97,3 +116,24 @@ usage readback stayed $0.076405046; all ceilings and existing holds were unchang
 Rollback can restore Worker `3798b39e-c89f-4732-a9aa-6f01cc6f23a7` without a
 database change. Earlier paid-account/first-payment and admitted-cancellation
 acceptance limits are unaffected.
+
+## Research layout and loading — 4 November 2026 (release pending)
+
+Pending questions, progress, errors and saved turns now share a centered 720px
+reading column, aligned with the composer. Mobile uses 16px gutters. The route
+fallback is a server-rendered Graphite skeleton with a persistent dark canvas,
+reserved composer space and reduced-motion support. It renders no fake answer or
+interactive controls while data is unavailable.
+
+Browser verification covered desktop and 390px mobile pending/stopped layouts;
+progress and composer share x=16 and width=358 on mobile. The production history
+check rendered saved answer prose and citations. No paid request was submitted.
+
+Read-only production diagnosis found recent successful Qwen/mini web runs around
+19 seconds, alongside an input-classifier failure, a DeepSeek answer timeout,
+and a planner failure on the short greeting. Failure metadata identifies the
+stage but does not preserve a provider HTTP cause. These reliability issues are
+not repaired by the layout change. At the check, OpenRouter had $1.719829804 left;
+operator daily and period available reservations were $0.099455 and $0.184465.
+Unknown-cost holds remain intact. The ordinary verification key/period still
+expire on November 5; the separate paid pilot is unchanged.

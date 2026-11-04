@@ -4,7 +4,7 @@ import { getDb } from "@/db";
 import { getCurrentSession } from "@/lib/current-session";
 import { getServerEnv } from "@/lib/env";
 import { parsePlannerModel,parseSafetyModel } from "@/server/ai/models";
-import {catalogConfiguration,MODEL_CATALOG} from "@/server/ai/catalog";
+import {catalogConfiguration,MODEL_CATALOG,extendedAnswerBudget} from "@/server/ai/catalog";
 import {createPlannerProvider} from '@/server/ai/planner-provider';
 import { createChatProvider } from "@/server/ai/chat-provider";
 import { createAnswerProvider } from "@/server/ai/answer";
@@ -33,7 +33,7 @@ export const chatHttp = createChatHttp({
       return createRunExecution(db,keys,{
         extract:createTavilyExtract(searchKey.data),planner:createPlannerProvider(planner),input:createOpenRouterSafetyProvider(safety),query:createOpenRouterSafetyProvider(safety),
         evidence:createOpenRouterSafetyProvider(safety,fetch,EVIDENCE_SAFETY_PROMPT),output:createOpenRouterSafetyProvider(safety,fetch,OUTPUT_SAFETY_PROMPT),
-        answer:(mode === "CHAT" ? createChatProvider : createAnswerProvider)(answer,fetch,MODEL_CATALOG.find(m=>m.key===modelKey)!.maxOutputTokens),search:createTavilySearch(searchKey.data),
+        answer:(mode === "CHAT" ? createChatProvider : createAnswerProvider)(answer,fetch,MODEL_CATALOG.find(m=>m.key===modelKey)!.maxOutputTokens,12000,extendedAnswerBudget(modelKey)),search:createTavilySearch(searchKey.data),
       });
     }
     let execution:ReturnType<typeof configureExecution>|undefined;

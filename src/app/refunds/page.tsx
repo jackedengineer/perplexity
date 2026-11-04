@@ -5,11 +5,11 @@ import {SUPPORT} from '@/lib/pro-offer';
 export const metadata={title:'Cancellation and refunds'};
 
 export default function RefundsPage(){
-  return <PublicPolicy title="Cancellation and refunds" notice="The Pro pilot covers one monthly billing cycle, without automatic renewal. Availability is checked in Billing.">
+  return <PublicPolicy title="Cancellation and refunds" notice="The Pro subscription covers one monthly billing cycle, without automatic renewal. Availability is checked in Billing.">
     <p>This policy applies to the independent perplexity service operated by {SUPPORT.operator}.
       Everyday free access has no subscription fee.</p>
     <h2>Cancel future renewals</h2>
-    <p>The current pilot does not renew automatically. For any future renewing offer, use Cancel renewal in your account’s Billing page before the next billing date.
+    <p>The current subscription does not renew automatically. For any future renewing offer, use Cancel renewal in your account’s Billing page before the next billing date.
       Wait for the confirmed cancellation status; closing a checkout window or deleting a conversation does
       not cancel a subscription. If account access is unavailable, email <a href={`mailto:${SUPPORT.email}`}>{SUPPORT.email}</a>
       {' '}from the account’s email address with the subscription identifier. Do not email payment credentials.</p>

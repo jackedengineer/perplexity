@@ -786,3 +786,33 @@ credentials are not public artifacts.
   a real paid-account badge check requires an existing paid account.
 - Provider keys, budgets, unknown-cost holds and checkout flags are unchanged.
   Added model routes remain opt-in pending provider acceptance checks.
+
+### Public checkout and expanded models — 4 November 2026
+
+This candidate supersedes the one-person purchase policy above only when
+`PAID_CHECKOUT_ACCESS=PUBLIC` is explicitly activated. See the
+[implementation and verification record](expanded-models-public-checkout.md).
+
+- [x] Gemini 3.7 Flash and Qwen3.5 397B passed bounded Chat and cited Web provider
+  fixtures; current privacy routing and all provider ceilings remain unchanged.
+- [x] Qwen Max remains unavailable, including when mistakenly included in the
+  environment allowlist, until a compatible endpoint can satisfy current policy.
+- [x] Public checkout tests cover separate buyers, replay, duplicate-subscription
+  protection and unchanged inference budgets. No real purchase was completed.
+- [x] Local browser verifies model search/selection/favorites, credit costs,
+  mobile bounds, pricing-to-Billing navigation and the Google upgrade action.
+- [x] Sidebar and Sources enter/exit motion verified locally at normal and
+  one-tenth speed; desktop reversal, mobile geometry and Escape work.
+- [x] Reproduced and fixed completed-payment duplicate-purchase finding; 906
+  offline tests pass. Earlier merchant CI text mismatch is corrected.
+- [ ] CI and both reviews cover the final PR #29 candidate.
+- [ ] Apply migration 0033 through the owner workflow, then deploy the reviewed
+  build and activate PUBLIC checkout plus only the two verified model keys.
+- [ ] Verify hosted model selection and checkout visibility after activation;
+  recheck the native iPhone keyboard canvas on-device.
+- [ ] Shared safety/planner availability and the earlier DeepSeek timeout remain
+  separate research-reliability issues; catalog fixture success does not close them.
+
+Public purchasing does not replenish or bypass inference budgets. The owner has
+chosen manual funding; existing $5 paid funding, separate verification allowance,
+recorded spend, unknown-cost holds and expiry dates stay unchanged.

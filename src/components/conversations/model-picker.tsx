@@ -11,6 +11,9 @@ const details:Record<ModelKey,{mark:string;description:string}>={
  'economy-mistral':{mark:'M',description:'Compact open model · Mistral'},
  'economy-qwen':{mark:'Q',description:'Efficient open model · Qwen'},
  'economy-gemini':{mark:'✦',description:'Lightweight and fast · Google'},
+ 'standard-gemini-flash':{mark:'✦',description:'Fast general answers · Google'},
+ 'standard-qwen-max':{mark:'Q',description:'Flagship general reasoning · Qwen'},
+ 'standard-qwen-397b':{mark:'Q',description:'Large open model · 397B'},
  'standard-deepseek':{mark:'D',description:'Versatile open model · DeepSeek'},
 };
 export function ModelPicker({models,value,onSelect,disabled,favorites=[],onFavorite,inline=false}:{models:Model[];value:ModelKey;onSelect:(key:ModelKey)=>void;disabled:boolean;favorites?:string[];onFavorite?:(key:ModelKey)=>void;inline?:boolean}){
@@ -29,7 +32,11 @@ export function ModelPicker({models,value,onSelect,disabled,favorites=[],onFavor
  }
  useEffect(()=>{
   if(!position)return;
-  const frame=requestAnimationFrame(()=>menu.current?.querySelector<HTMLInputElement>('input')?.focus());
+  const frame=requestAnimationFrame(()=>{
+   const popup=menu.current;
+   // A fast keyboard selection can precede this frame. Keep the user's focus.
+   if(popup&&!popup.contains(document.activeElement))popup.querySelector<HTMLInputElement>('input')?.focus();
+  });
   function outside(e:PointerEvent){if(!menu.current?.contains(e.target as Node)&&!trigger.current?.contains(e.target as Node))setPosition(null);}
   function dismiss(){setPosition(null);}
   document.addEventListener('pointerdown',outside);window.addEventListener('resize',dismiss);

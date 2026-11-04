@@ -27,10 +27,12 @@ test('merchant information pages are public, accessible and fit narrow screens',
     expect(result.violations).toEqual([]);
     const nav=page.getByRole('navigation',{name:'Policies and support'});
     await expect(nav.getByRole('link')).toHaveCount(6);
-    if(route==='/terms'||route==='/privacy')await expect(page.getByText('Updated 2 November 2026. Paid pilot availability is checked in Billing.',{exact:true})).toBeVisible();
+    if(route==='/terms'||route==='/privacy')await expect(page.getByText('Updated 4 November 2026. Paid subscription availability is checked in Billing.',{exact:true})).toBeVisible();
   }
   await page.getByRole('link',{name:'Pricing',exact:true}).click();
   await expect(page).toHaveURL(/\/pricing$/);
+  // The App Router can commit the URL while the destination is still streaming.
+  await expect(page.getByRole('heading',{name:'More room to research',exact:true})).toBeVisible();
   await page.keyboard.press('Tab');
-  expect(await page.evaluate(()=>document.activeElement?.tagName)).toBe('A');
+  await expect(page.locator('a:focus')).toHaveCount(1);
 });

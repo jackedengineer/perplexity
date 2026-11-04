@@ -38,7 +38,7 @@ export async function prepareCompletion(db: AdmissionDatabase,person: { subject:
   const accepted = await createMessageAcceptance(db,hmacKeys,createInputGate(recordSafetyProvider(calls,"INPUT_SAFETY",fakeSafety()))).accept(person.subject,person.runId,person.request,new AbortController().signal);
   if (accepted.kind !== "ACCEPTED") throw new Error("Synthetic input failed");
   const [snapshot]=await db.select().from(schema.runs).where(eq(schema.runs.id,person.runId));
-  if(snapshot.accountingVersion===2)await planRun(db,person.subject,person.runId,submissionSchema.parse(person.request),recordPlannerProvider(calls,fakePlanner()),new AbortController().signal);
+  if(snapshot.accountingVersion>=2)await planRun(db,person.subject,person.runId,submissionSchema.parse(person.request),recordPlannerProvider(calls,fakePlanner()),new AbortController().signal);
   const search = recordSearchProvider(calls,{ search: async()=>({ results: empty ? [] : [{ title: "Rainbow evidence",url: "https://example.org/rainbows",content: "Water refracts sunlight.",score: 0.9 }],credits: 1 }) });
   const retrieval = createRetrieval(db,{ modelId: "test/safety",search,queryGate: createInputGate(recordSafetyProvider(calls,"QUERY_SAFETY",fakeSafety())),evidenceGate: createEvidenceGate(recordSafetyProvider(calls,"EVIDENCE_SAFETY",fakeSafety())) });
   const retrieved = await retrieval.retrieve(person.subject,person.runId,new AbortController().signal);

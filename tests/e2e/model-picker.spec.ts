@@ -59,6 +59,23 @@ test('favorites persist and model search has an empty state',async({page})=>{
  await expect(page.getByRole('status')).toContainText('No models match');
 });
 
+test('delayed picker autofocus never steals an existing keyboard selection',async({page})=>{
+ await fixture(page,false,'/?saved=1');
+ await page.getByRole('button',{name:'Try another model',exact:true}).click();
+ const revision=page.getByRole('dialog',{name:'Try another model',exact:true});
+ await page.clock.install();await page.clock.pauseAt(new Date());
+ await revision.getByRole('button',{name:'Answer model: Qwen3 30B'}).click();
+ const search=page.getByRole('textbox',{name:'Search models'});
+ await search.fill('Gemini');await search.press('ArrowDown');
+ const choice=page.getByRole('button',{name:'Gemini 2.5 Flash Lite Lightweight and fast · Google 2 credits per answer',exact:true});
+ await expect(choice).toBeFocused();
+ // Release the delayed opening frame after the user has already moved focus.
+ await page.clock.runFor(32);
+ await expect(choice).toBeFocused();
+ await choice.press('Enter');
+ await expect(revision.getByRole('button',{name:'Answer model: Gemini 2.5 Flash Lite',exact:true})).toBeVisible();
+});
+
 test('retry picks another model and keeps the original turn',async({page})=>{
  await fixture(page,false,'/?saved=1');
  await page.getByRole('button',{name:'Try another model',exact:true}).click();
@@ -88,9 +105,12 @@ test('Sources never cover the answer or composer on desktop',async({page},info)=
  test.skip(info.project.name!=='desktop','Desktop side panel; mobile uses a modal.');
  await fixture(page,false,'/?saved=1');
  await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
+  await expect(page.locator('.research-sidebar')).toHaveCSS('width','232px');
  for(const width of [1200,1280,1440]){
   await page.setViewportSize({width,height:800});
   await page.getByRole('button',{name:'Sources',exact:true}).click();
+  await expect(page.locator('.thread-content')).toHaveCSS('padding-right','360px');
+  await expect(page.locator('.thread-bottom')).toHaveCSS('margin-right','328px');
   const panel=await page.locator('.answer-sources').boundingBox();
   for(const selector of ['.answer-prose','.thread-bottom']){
    const box=await page.locator(selector).boundingBox();
@@ -98,6 +118,8 @@ test('Sources never cover the answer or composer on desktop',async({page},info)=
    expect(box!.width).toBeGreaterThan(500);
   }
   await page.getByRole('button',{name:'Sources',exact:true}).click();
+  await expect(page.locator('.thread-bottom')).toHaveCSS('margin-right','0px');
+  await expect(page.locator('.answer-prose')).toHaveCSS('width','720px');
   const closed=await page.locator('.answer-prose').boundingBox();
   expect(closed!.width).toBe(720);
  }
@@ -145,4 +167,37 @@ for(const mode of ['Chat','Web'] as const)test(`${mode} question survives naviga
  await expect(page.getByRole('article',{name:'Your question'})).toContainText('Explain why triangles have three sides.');
  await expect(page.getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-pressed','true');
  await expect(page.getByRole('button',{name:'Answer model: Qwen3 30B',exact:true})).toBeVisible();
+});
+
+test('larger verified models are searchable, priced and selectable',async({page})=>{
+ await page.goto('/');
+ await page.getByRole('button',{name:/Answer model:/}).click();
+ await page.getByRole('textbox',{name:'Search models'}).fill('3.7');
+ await page.getByRole('button',{name:'Gemini 3.7 Flash Fast general answers · Google 8 credits per answer',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Answer model: Gemini 3.7 Flash'})).toBeVisible();
+ await page.getByRole('button',{name:'Answer model: Gemini 3.7 Flash'}).click();
+ await page.getByRole('textbox',{name:'Search models'}).fill('397');
+ await page.getByRole('button',{name:'Qwen3.5 397B Large open model · 397B 8 credits per answer',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Answer model: Qwen3.5 397B'})).toBeVisible();
+});
+test('pricing has a direct billing CTA and a Google upgrade action for visitors',async({page})=>{
+ await page.goto('/upgrade-preview');
+ await expect(page.getByRole('link',{name:'Upgrade to Pro · ₹999'})).toHaveAttribute('href','/billing');
+ await expect(page.getByRole('button',{name:'Start one month for ₹999'})).toBeEnabled();
+ await expect(page.getByRole('button',{name:'Refresh billing status'})).toBeVisible();
+ await expect(page.locator('main')).not.toContainText('pilot');
+ await page.goto('/upgrade-preview?signedOut=1');
+ await expect(page.getByRole('button',{name:'Sign in to upgrade · ₹999'})).toBeVisible();
+});
+
+test('visitor upgrade sends Google the billing return destination',async({page})=>{
+ let destination:string|undefined;
+ await page.route('**/api/auth/sign-in/social',async route=>{
+  const body=route.request().postDataJSON();expect(body.provider).toBe('google');destination=body.callbackURL;
+  await route.fulfill({status:503,json:{message:'Offline authorization fixture'}});
+ });
+ await page.goto('/upgrade-preview?signedOut=1');
+ await page.getByRole('button',{name:'Sign in to upgrade · ₹999'}).click();
+ await expect(page.getByRole('alert').filter({hasText:'We couldn’t sign you in'})).toBeVisible();
+ expect(destination).toBe('/billing');
 });

@@ -6,7 +6,7 @@ import {deepResearch} from '@/server/deep-research/contracts';
 import {JobError} from '@/server/jobs/contracts';
 import {cloudflareProviderEnvironment} from '@/server/jobs/cloudflare-configuration';
 import {databaseNow,type JobTransaction} from '@/server/jobs/store';
-export type LivePilot={budgetKey:string;providerExpiresAt:Date};
+export type LivePilot={budgetKey:string;providerExpiresAt:Date;publicCheckout?:boolean};
 const deliveryWindowMs=35*86400000;
 // Seven reports plus one full reserved retry each. Unknown spend is never released.
 const minimumCapacity=BigInt(PRO_OFFER.maxStartedAttempts)*deepResearch.steps.reduce((n,s)=>n+s.capMicroUsd,0n);
@@ -15,9 +15,14 @@ export function livePilotConfiguration(env:Record<string,string|undefined>=proce
  if(config.mode!=='LIVE'||env.ENABLE_RAZORPAY_LIVE_CHECKOUT!=='true'||!expiry||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(expiry))throw new JobError('DISABLED');
  cloudflareProviderEnvironment(env);
  const providerExpiresAt=new Date(expiry);if(!Number.isFinite(providerExpiresAt.getTime()))throw new JobError('DISABLED');
- return {budgetKey:config.budgetKey,providerExpiresAt};
+ if(env.PAID_CHECKOUT_ACCESS!==undefined&&!['PILOT','PUBLIC'].includes(env.PAID_CHECKOUT_ACCESS))throw new JobError('DISABLED');
+ return {budgetKey:config.budgetKey,providerExpiresAt,publicCheckout:env.PAID_CHECKOUT_ACCESS==='PUBLIC'};
 }
 export async function assertPilotCapacity(tx:JobTransaction,policy:LivePilot,resumeCheckoutId?:string){
+ // Public sales are not coupled to inference funding. Runtime job admission
+ // still enforces every existing operator/provider cap. The owner deliberately
+ // manages replenishment; a checkout never raises or replenishes a budget.
+ if(policy.publicCheckout)return;
  await tx.execute(sql`SET LOCAL lock_timeout='2s'`);
  // Serializes the entire LIVE pilot, including different owners. An UNKNOWN
  // create retains the sole seat; provider uncertainty is not free capacity.

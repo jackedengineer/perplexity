@@ -6,7 +6,7 @@ import {ModelPicker} from './model-picker';
 import {usePathname} from 'next/navigation';
 import * as z from 'zod/mini';
 const windowSchema=z.object({limit:z.number(),used:z.number(),reserved:z.number(),remaining:z.number(),resetsAt:z.string()});
-const accessSchema=z.object({models:z.array(z.object({key:z.enum(['fast-default','economy-nano','economy-mistral','economy-qwen','economy-gemini','standard-deepseek']),name:z.string(),credits:z.number(),band:z.enum(['ECONOMY','STANDARD'])})),
+const accessSchema=z.object({models:z.array(z.object({key:z.enum(['fast-default','economy-nano','economy-mistral','economy-qwen','economy-gemini','standard-deepseek','standard-gemini-flash','standard-qwen-max','standard-qwen-397b']),name:z.string(),credits:z.number(),band:z.enum(['ECONOMY','STANDARD'])})),
  usage:z.object({subscription:z.optional(z.nullable(z.object({plan:z.literal('PRO'),endsAt:z.string(),reportsRemaining:z.number()}))),tier:z.enum(['GUEST','FREE']),period:windowSchema,day:windowSchema,paymentsEnabled:z.literal(false)})});
 type Access=z.infer<typeof accessSchema>;
 type ModelKey=Access['models'][number]['key'];

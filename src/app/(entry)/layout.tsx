@@ -6,6 +6,8 @@ import '../(research)/research.css';
 import '../(research)/answers.css';
 import '../(research)/graphite.css';
 
+export { workspaceViewport as viewport } from '../workspace-viewport';
+
 export const metadata = { robots: { index: false, follow: false } };
 export default async function EntryLayout({children}: {children: React.ReactNode}) {
   const identity = await getCurrentSession();

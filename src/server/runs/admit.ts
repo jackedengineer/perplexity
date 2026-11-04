@@ -1,3 +1,5 @@
+import {extendedAnswerBudget} from '@/server/ai/catalog';
+import {EXTENDED_RUN_RESERVE} from './budgets';
 import { prepareEntitlement } from "@/server/billing/entitlements";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { ACTIVE_RUN_STATUSES, appUsers, conversations, runs, usageReservations } from "@/db/schema";
@@ -51,6 +53,9 @@ export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, 
           try { const result=await prepareEntitlement(tx,owner.id,request.modelKey,basePolicy,now);policy=result.policy;carryPeriod=result.carryPeriod;carryDay=result.carryDay; }
           catch(error){if(error instanceof AdmissionError)return denied(error.code);throw error;}
         }
+        const extended=extendedAnswerBudget(request.modelKey);
+        if(extended)policy={...policy,providerReserveMicroUsd:policy.providerReserveMicroUsd>EXTENDED_RUN_RESERVE?policy.providerReserveMicroUsd:EXTENDED_RUN_RESERVE,
+          catalogVersion:'trials-v2',priceVersion:'credits-v2'};
         if (!await consumeAttempts(tx,owner.id,now,policy)) return denied("RATE_LIMITED");
         // Expected denials roll back this savepoint, retaining only the consumed attempt counters.
         try {
@@ -64,7 +69,7 @@ export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, 
             const fingerprint = fingerprintSubmission(request,snapshot,config);
             await reserveBudgets(reserve,budgets,policy);
             const [run] = await reserve.insert(runs).values({
-              accountingVersion: 2, userId: owner.id, conversationId: conversation.id, clientRequestId: request.clientRequestId,
+              accountingVersion: extended?3:2, userId: owner.id, conversationId: conversation.id, clientRequestId: request.clientRequestId,
               payloadHmac: fingerprint.hmac, hmacKeyId: fingerprint.keyId, payloadVersion: fingerprint.version,
               mode: request.mode, modelKey: request.modelKey, policyVersion: policy.policyVersion,
               catalogVersion: policy.catalogVersion, priceVersion: policy.priceVersion, entitlementVersion: snapshot.entitlementVersion,

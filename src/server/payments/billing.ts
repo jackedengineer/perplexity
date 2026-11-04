@@ -23,13 +23,18 @@ export async function startCheckout(db:JobDatabase,subject:string,raw:unknown,pl
    if(mode==='LIVE'&&prior.state==='READY')await assertPilotCapacity(tx,pilot!,prior.id);
    return {row:prior,create:false};
   }
-  const [open]=await tx.select().from(checkouts).where(and(eq(checkouts.userId,owner),eq(checkouts.environment,mode),inArray(checkouts.state,['CREATING','READY','UNKNOWN']))).limit(1);
+  // Terminal provider state can precede the captured invoice. Preserve this
+  // owner's pending obligation even when public sales have no global seat cap.
+  const [open]=await tx.select().from(checkouts).where(and(eq(checkouts.userId,owner),eq(checkouts.environment,mode),or(
+   inArray(checkouts.state,['CREATING','READY','UNKNOWN']),
+   and(eq(checkouts.state,'COMPLETED'),sql`NOT EXISTS (SELECT 1 FROM ${periods} WHERE ${periods.subscriptionId}=${checkouts.subscriptionId} AND ${periods.environment}=${checkouts.environment} AND ${periods.userId}=${checkouts.userId})`),
+  ))).limit(1);
   if(open)throw new JobError('CONFLICT');
   const [active]=await tx.select({id:periods.id}).from(periods).where(and(eq(periods.userId,owner),eq(periods.environment,mode),eq(periods.state,'ACTIVE'),gt(periods.endsAt,sql`clock_timestamp()`))).limit(1);
   if(active)throw new JobError('CONFLICT');
   if(mode==='LIVE'){
    // The owner lock above serializes new UUIDs from the same account. Releasing
-   // an unpaid global seat must not let its owner monopolize it every hour.
+   // an unpaid checkout must not let its owner churn provider subscriptions.
    const now=await databaseNow(tx);
    const [recent]=await tx.select({id:checkouts.id}).from(checkouts).where(and(eq(checkouts.userId,owner),eq(checkouts.environment,'LIVE'),gt(checkouts.createdAt,new Date(now.getTime()-86400000)))).limit(1);
    if(recent)throw new JobError('QUOTA');

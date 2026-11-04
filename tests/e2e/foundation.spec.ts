@@ -114,3 +114,27 @@ test('visitor policies stay at the bottom and OAuth errors stay in the workspace
   expect(composer!.y+composer!.height).toBeLessThanOrEqual(box!.y);
  }
 });
+
+test('focused mobile workspace keeps a dark document canvas without recoloring policies',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await page.goto('/workspace');
+ const input=page.getByRole('textbox',{name:'Ask a question',exact:true});
+ await input.fill('A draft on mobile');
+ await input.focus();
+ for(const height of [844,390]){
+  await page.setViewportSize({width:390,height});
+  await expect(page.locator('html')).toHaveCSS('background-color','rgb(25, 25, 25)');
+  await expect(page.locator('body')).toHaveCSS('background-color','rgb(25, 25, 25)');
+  await expect(page.locator('html')).toHaveCSS('color-scheme','dark');
+  await expect(input).toBeFocused();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ }
+ await expect(page.locator('meta[name="color-scheme"]')).toHaveAttribute('content','dark');
+ await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content','#191919');
+ // Client navigation retains CSS files; shell-scoped canvas styles must stop matching.
+ await page.locator('.visitor-policy-footer').getByRole('link',{name:'Privacy',exact:true}).click();
+ await expect(page).toHaveURL(/\/privacy$/);
+ await expect(page.locator('html')).toHaveCSS('background-color','rgb(248, 247, 244)');
+ await expect(page.locator('html')).toHaveCSS('color-scheme','light');
+ await expect(page.locator('meta[name="color-scheme"]')).toHaveCount(0);
+});
