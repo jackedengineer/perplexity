@@ -3,14 +3,12 @@ import { z } from "zod";
 import { getDb } from "@/db";
 import { getCurrentSession } from "@/lib/current-session";
 import { getServerEnv } from "@/lib/env";
-import { parsePlannerModel,parseSafetyModel } from "@/server/ai/models";
+import { parsePlannerModel } from "@/server/ai/models";
 import {catalogConfiguration,MODEL_CATALOG,extendedAnswerBudget} from "@/server/ai/catalog";
 import {createPlannerProvider} from '@/server/ai/planner-provider';
 import { createChatProvider } from "@/server/ai/chat-provider";
 import { createAnswerProvider } from "@/server/ai/answer";
-import { createOpenRouterSafetyProvider } from "@/server/safety/openrouter";
-import { EVIDENCE_SAFETY_PROMPT } from "@/server/safety/evidence";
-import { OUTPUT_SAFETY_PROMPT } from "@/server/safety/output";
+import { createLocalSafetyGuard } from "@/server/safety/local";
 import {createTavilyExtract} from "@/server/search/extract";
 import { createTavilySearch } from "@/server/search/tavily";
 import { createRunAdmission } from "@/server/runs/admit";
@@ -27,12 +25,12 @@ export const chatHttp = createChatHttp({
   backend() {
     const db = getDb(),keys = parseAdmissionEnvironment(process.env);
     function configureExecution(modelKey:string,mode:"FAST"|"CHAT") {
-      const safety=parseSafetyModel(process.env),answer=catalogConfiguration(modelKey,process.env),planner=parsePlannerModel(process.env);
+      const answer=catalogConfiguration(modelKey,process.env),planner=parsePlannerModel(process.env);
       const searchKey=z.string().min(16).max(512).regex(/^[A-Za-z0-9._-]+$/u).safeParse(process.env.TAVILY_API_KEY);
-      if(!planner||!safety||!answer||!searchKey.success)throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
+      if(!planner||!answer||!searchKey.success)throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
       return createRunExecution(db,keys,{
-        extract:createTavilyExtract(searchKey.data),planner:createPlannerProvider(planner),input:createOpenRouterSafetyProvider(safety),query:createOpenRouterSafetyProvider(safety),
-        evidence:createOpenRouterSafetyProvider(safety,fetch,EVIDENCE_SAFETY_PROMPT),output:createOpenRouterSafetyProvider(safety,fetch,OUTPUT_SAFETY_PROMPT),
+        extract:createTavilyExtract(searchKey.data),planner:createPlannerProvider(planner),input:createLocalSafetyGuard(),query:createLocalSafetyGuard(),
+        evidence:createLocalSafetyGuard(),output:createLocalSafetyGuard(),
         answer:(mode === "CHAT" ? createChatProvider : createAnswerProvider)(answer,fetch,MODEL_CATALOG.find(m=>m.key===modelKey)!.maxOutputTokens,12000,extendedAnswerBudget(modelKey)),search:createTavilySearch(searchKey.data),
       });
     }

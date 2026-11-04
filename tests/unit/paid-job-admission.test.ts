@@ -20,5 +20,5 @@ it('admits paid research using the dedicated worker models with ordinary credent
  expect(jobsEnabled()).toBe(true);
  const response=await jobsHttp.submit(new Request('https://perplexity.jacked.dev/api/jobs',{method:'POST',headers:{origin:'https://perplexity.jacked.dev','content-type':'application/json'},body:JSON.stringify({version:1,workflow:'deep-research-v1',requestId:crypto.randomUUID(),question:'How do rainbows form?',locale:'en'})}));
  expect(response.status).toBe(202);
- expect(mocks.admit.mock.calls[0][4]).toMatchObject({safety:{modelId:'test/safety'},planner:{modelId:'test/planner'},answer:{modelId:'test/answer'}});
+ expect(mocks.admit.mock.calls[0][4]).toMatchObject({safety:{modelId:'local/boundary-v1'},planner:{modelId:'test/planner'},answer:{modelId:'test/answer'}});
 });

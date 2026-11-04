@@ -31,7 +31,10 @@ export function createReleaseGate(provider: SafetyProvider | undefined) {
       const input = parsed.data;
       if (input.evidence.runId !== input.runId || (input.kind !== "ANSWER" && input.evidence.sources.length) ||
         (input.kind === "NO_EVIDENCE" && input.markdown !== NO_EVIDENCE_TEXT) || (input.kind === "CLARIFICATION" && input.markdown.length > 800)) return deny("OUTPUT_BLOCKED");
-      const sources = await traceStage("citations",async()=>validateCitations(input.markdown,input.evidence,input.kind === "ANSWER"));
+      let sources: VisibleSource[];
+      try {
+        sources = await traceStage("citations",async()=>validateCitations(input.markdown,input.evidence,input.kind === "ANSWER"));
+      } catch { return deny("OUTPUT_BLOCKED"); }
       const additionalSources=input.evidence.sources.filter(s=>!sources.some(c=>c.sourceId===s.sourceId)).map((s,i)=>visibleSourceFor(input.evidence,s.sourceId,sources.length+i+1));
       const verdict = await gate.evaluate({ text: input.markdown,context: [
         { role: "USER",text: JSON.stringify({ originalQuestion: input.question,responseKind:input.kind }) },
@@ -39,7 +42,7 @@ export function createReleaseGate(provider: SafetyProvider | undefined) {
           publishedAt:source.publishedAt,retrievedAt:source.retrievedAt,contentKind:source.contentKind,supportStatus:source.supportStatus}) })),
       ] },options);
       const decision = resolveSafetyDecision(verdict.verdict);
-      if (decision.decision !== "ALLOW") return deny(decision.decision === "BLOCK" ? "OUTPUT_BLOCKED" : verdict.reason === "TIMEOUT" ? "DEADLINE_EXCEEDED" : "SAFETY_UNAVAILABLE",decision.response);
+      if (decision.decision !== "ALLOW") return deny(verdict.verdict.decision === "BLOCK" ? "OUTPUT_BLOCKED" : verdict.reason === "TIMEOUT" ? "DEADLINE_EXCEEDED" : "SAFETY_UNAVAILABLE",decision.response);
       if (options.signal.aborted || Date.now() >= options.deadlineAt.getTime()) return deny("SAFETY_UNAVAILABLE");
       for (const source of [...sources,...additionalSources]) { Object.freeze(source.passageIds);Object.freeze(source.contentHashes);Object.freeze(source); }
       const candidate = { runId: input.runId,attemptVersion: input.attemptVersion,revision: input.revision,

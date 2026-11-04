@@ -1,3 +1,4 @@
+import {isLocalSafetyGuard} from '@/server/safety/local';
 import {z} from 'zod';
 import {eq} from 'drizzle-orm';
 import {jobResearchInputs} from '@/db/schema';
@@ -36,7 +37,7 @@ export function researchExecutor(db:JobDatabase,id:string,snapshot:ResearchSnaps
  // receipts under its current lease, never raw responses or provider errors.
  return async function execute(key:string,options:ExecutionOptions):Promise<StepResult>{
   let receipt:()=>bigint|null|undefined=()=>0n;
-  const tracked=(provider:SafetyProvider):SafetyProvider=>{let called=false;receipt=()=>called?provider.usage?.()?.costMicroUsd:0n;return {...provider,classify:async(input,signal)=>{called=true;return provider.classify(input,signal);}};};
+  const tracked=(provider:SafetyProvider):SafetyProvider=>{if(isLocalSafetyGuard(provider)){receipt=()=>0n;return provider;}let called=false;receipt=()=>called?provider.usage?.()?.costMicroUsd:0n;return {...provider,classify:async(input,signal)=>{called=true;return provider.classify(input,signal);}};};
   try{
    if(key==='input'||key.startsWith('query-')){
     const provider=tracked(key==='input'?p.input:p.query);

@@ -61,3 +61,36 @@ it('revoked sessions cannot receive a Chat answer',async()=>{
  const p=providers();p.input={...fakeSafety(),classify:async()=>{await db.delete(schema.session).where(eq(schema.session.id,identity.sessionId));return {decision:'ALLOW',categoryCodes:[],policyVersion:'v1'};}};
  expect((await run(p)).result).toMatchObject({code:'UNAUTHENTICATED'});expect(p.answer.generate).not.toHaveBeenCalled();
 });
+
+import {createLocalSafetyGuard,LOCAL_GUARD_VERSION} from '@/server/safety/local';
+import {ProviderRefusalError} from '@/server/ai/bounded';
+function localProviders(){const p=providers();return {...p,input:createLocalSafetyGuard(),query:createLocalSafetyGuard(),evidence:createLocalSafetyGuard(),output:createLocalSafetyGuard()};}
+it('local Chat records only the real answer call and an auditable local approval',async()=>{
+ const p=localProviders();person.request.message.text='What is my name?';
+ // The admission fingerprint is immutable; seed the exact reported question.
+ await db.delete(schema.user);await db.delete(schema.operatorUsageBuckets);
+ person=await seedCompletion(db,50000n,'What is my name?',2,undefined,'CHAT');identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};
+ p.answer.generate=vi.fn().mockResolvedValue({text:'You have not told me your name in this chat.',usage:knownUsage});
+ expect((await run(p)).result).toEqual({kind:'COMPLETED'});
+ expect((await db.select().from(schema.providerCalls)).map(c=>c.stage)).toEqual(['ANSWER']);
+ expect((await db.select().from(schema.inputSafetyReviews))[0]).toMatchObject({reason:'LOCAL_CHECK',modelId:null,detectorVersion:LOCAL_GUARD_VERSION});
+ expect((await db.select().from(schema.outputReviews))[0]).toMatchObject({guardVersion:LOCAL_GUARD_VERSION,decision:'ALLOW'});
+ expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({knownProviderMicroUsd:100n,heldProviderMicroUsd:0n});
+});
+it('local output checks still withhold leaked secrets and fabricated citations',async()=>{
+ for(const text of ['sk-or-v1-'+'a'.repeat(64),'A fabricated source [S1].']){
+  const p=localProviders();p.answer.generate=vi.fn().mockResolvedValue({text,usage:knownUsage});
+  expect((await run(p)).result).toMatchObject({kind:'DENIED',code:'OUTPUT_BLOCKED'});
+  expect((await createAnswerDelivery(db).load(identity,person.runId)).answer).toBeUndefined();
+  // A fresh isolated identity for the next distinct case, never replay a run.
+  await db.delete(schema.user);await db.delete(schema.operatorUsageBuckets);
+  person=await seedCompletion(db,50000n,'Hello',2,undefined,'CHAT');identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};
+ }
+});
+it('a native provider refusal is a policy result, not a classifier outage',async()=>{
+ const p=localProviders();p.answer.generate=vi.fn().mockRejectedValue(new ProviderRefusalError());
+ expect((await run(p)).result).toMatchObject({kind:'DENIED',code:'OUTPUT_BLOCKED'});
+ expect(p.answer.generate).toHaveBeenCalledOnce();
+ expect((await createAnswerDelivery(db).load(identity,person.runId)).answer).toBeUndefined();
+ expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({creditsCharged:0,heldProviderMicroUsd:50000n});
+});

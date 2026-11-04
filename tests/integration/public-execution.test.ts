@@ -198,3 +198,16 @@ it('retains contextual day freshness on a resolved follow-up',async()=>{
  expect((await createRunExecution(db,keys,p).execute(identity,admitted.run,submissionSchema.parse(request),new AbortController().signal,()=>{})).kind).toBe('COMPLETED');
  expect(p.search.search).toHaveBeenCalledWith('React news today',expect.objectContaining({filters:expect.objectContaining({timeRange:'day'})}));
 });
+
+import {createLocalSafetyGuard,LOCAL_GUARD_VERSION} from '@/server/safety/local';
+it('Web keeps citations, owner checks and settlement without any classifier provider calls',async()=>{
+ const p=providers();for(const stage of ['input','query','evidence','output'] as const)p[stage]=createLocalSafetyGuard();
+ expect((await run(p)).result).toEqual({kind:'COMPLETED'});
+ const calls=await db.select().from(schema.providerCalls);
+ expect(calls.map(c=>c.stage).sort()).toEqual(['ANSWER','PLANNER','SEARCH']);
+ expect((await db.select().from(schema.outputReviews))[0].guardVersion).toBe(LOCAL_GUARD_VERSION);
+ expect((await createAnswerDelivery(db).load(identity,person.runId)).answer?.text).toContain('[S1]');
+ await expect(createAnswerDelivery(db).load({...identity,user:{id:'foreign'}},person.runId)).rejects.toMatchObject({code:'NOT_FOUND'});
+ // Search still has no USD receipt; local safety must not release its unknown hold.
+ expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({knownProviderMicroUsd:200n,heldProviderMicroUsd:49800n});
+});
