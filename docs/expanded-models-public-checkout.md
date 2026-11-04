@@ -40,3 +40,19 @@ Pricing now links directly to `/billing`. Its signed-out Google button returns t
 - Artifacts: `.artifacts/graphite/expanded-models-live-round3.json`, `expanded-models-allowance.json`, `models-verified-check.log`, `models-final-build.log`, `expanded-model-menu-mobile.png`, `public-upgrade-mobile.png`.
 
 Before release: pass CI/reviews, apply migration 0033 using the owner migration workflow, deploy the reviewed build with `PAID_CHECKOUT_ACCESS=PUBLIC`, append only the two verified keys to `ENABLED_ANSWER_MODELS`, and verify hosted checkout visibility/model selection. Preserve all existing production secrets and budgets. The earlier intermittent safety/planner incidents are not resolved by this catalog/UI change and remain tracked separately.
+
+## Sidebar and Sources motion follow-up
+
+Desktop sidebar labels and groups stay mounted, fade and collapse together;
+the same toggle remains focused when interrupted. Sources enter and exit with
+a short fade/translation, with hidden desktop content made inert immediately.
+The mobile navigation retains its width/position after native `close()` so its
+exit does not snap; Sources use a separate native dialog instead of a hidden
+desktop ancestor. Reduced motion disables transitions, including backdrops.
+
+Real-browser inspection at normal and one-tenth speed verified intermediate
+width/opacity, reversing a sidebar collapse, mobile 280px drawer geometry during
+exit, Sources entry/exit and Escape dismissal. No horizontal overflow at 390px.
+The slowed-motion route exists only in the offline fixture. Browser regressions
+also assert reduced-motion and intermediate exit states. No animation dependency,
+frame loop or AI request is added. Native iPhone verification remains pending.

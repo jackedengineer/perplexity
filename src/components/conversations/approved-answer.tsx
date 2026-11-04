@@ -74,8 +74,9 @@ export function SourcesPanel({ answer,open,onToggle }: { answer: PublicAnswer | 
     const sync=()=>{if(open&&query.matches){if(!dialog?.open)dialog?.showModal();}else dialog?.close();};
     const escape=(event:KeyboardEvent)=>{if(open&&!query.matches&&event.key==="Escape")onToggle();};
     sync();query.addEventListener("change",sync);window.addEventListener("keydown",escape);
-    return()=>{query.removeEventListener("change",sync);window.removeEventListener("keydown",escape);dialog?.close();};
+    return()=>{query.removeEventListener("change",sync);window.removeEventListener("keydown",escape);};
   },[open,onToggle]);
+  useEffect(()=>{const dialog=mobile.current;return()=>dialog?.close();},[]);
   if (!answer?.sources.length) return null;
   const total=answer.sources.length+(answer.additionalSources?.length??0);
   function cards(sources:PublicAnswer['sources'],cited:boolean){return sources.map(source=><a key={source.sourceId} className="source-card" href={source.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">
@@ -89,12 +90,13 @@ export function SourcesPanel({ answer,open,onToggle }: { answer: PublicAnswer | 
     {Boolean(answer.additionalSources?.length)&&<><h3 className="source-group-title">Additional retrieved sources</h3><p className="source-support-note">Reviewed for display; these sources were not cited in the answer.</p>{cards(answer.additionalSources!,false)}</>}
     <p className="source-support-note">Citations identify the sources used. Factual support hasn’t been independently checked. Research excerpts expire after 30 days; source links remain available.</p>
   </div>;
-  return <aside className={`answer-sources ${open ? "sources-open" : ""}`} aria-label="Answer sources">
+  return <><aside className={`answer-sources ${open ? "sources-open" : ""}`} aria-label="Answer sources" aria-hidden={!open} inert={!open}>
     <button className="sources-toggle" onClick={onToggle} aria-expanded={open} aria-controls="approved-source-list">Sources<span className="toolbar-spacer" /><span className="source-total">{total}</span><Icon name={open ? "down" : "chevron"} size={14} /></button>
-    <div id="approved-source-list" className="desktop-source-list" hidden={!open}>{list}</div>
+    <div id="approved-source-list" className="desktop-source-list">{list}</div>
+    </aside>
     <dialog ref={mobile} className="mobile-sources-dialog" aria-label="Answer sources" onCancel={event=>{event.preventDefault();onToggle();}} onClick={event=>{if(event.target===event.currentTarget){const box=event.currentTarget.getBoundingClientRect();if(event.clientY<box.top||event.clientY>box.bottom||event.clientX<box.left||event.clientX>box.right)onToggle();}}}>
       <div className="mobile-sources-heading"><h2>Sources <span>{total}</span></h2><button className="research-icon-button" aria-label="Close sources" onClick={onToggle}><Icon name="close"/></button></div>
       {list}
     </dialog>
-  </aside>;
+  </>;
 }

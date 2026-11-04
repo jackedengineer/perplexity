@@ -88,9 +88,12 @@ test('Sources never cover the answer or composer on desktop',async({page},info)=
  test.skip(info.project.name!=='desktop','Desktop side panel; mobile uses a modal.');
  await fixture(page,false,'/?saved=1');
  await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
+  await expect(page.locator('.research-sidebar')).toHaveCSS('width','232px');
  for(const width of [1200,1280,1440]){
   await page.setViewportSize({width,height:800});
   await page.getByRole('button',{name:'Sources',exact:true}).click();
+  await expect(page.locator('.thread-content')).toHaveCSS('padding-right','360px');
+  await expect(page.locator('.thread-bottom')).toHaveCSS('margin-right','328px');
   const panel=await page.locator('.answer-sources').boundingBox();
   for(const selector of ['.answer-prose','.thread-bottom']){
    const box=await page.locator(selector).boundingBox();
@@ -98,6 +101,8 @@ test('Sources never cover the answer or composer on desktop',async({page},info)=
    expect(box!.width).toBeGreaterThan(500);
   }
   await page.getByRole('button',{name:'Sources',exact:true}).click();
+  await expect(page.locator('.thread-bottom')).toHaveCSS('margin-right','0px');
+  await expect(page.locator('.answer-prose')).toHaveCSS('width','720px');
   const closed=await page.locator('.answer-prose').boundingBox();
   expect(closed!.width).toBe(720);
  }

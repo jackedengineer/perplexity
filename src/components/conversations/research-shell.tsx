@@ -42,34 +42,31 @@ export function ResearchShell({ children, recent, pinned = [], name, initialColl
     const close = () => mobileNav.current?.close();
     return <>
       <div className="sidebar-top">
-        <Link href="/workspace" aria-label="Perplex home" className="workspace-brand" onClick={close}><ResearchMark />{!isCollapsed&&<span>perplexity</span>}</Link>
-        {!isCollapsed && <div className="sidebar-top-actions">
-          <button className="research-icon-button" aria-label={mobile ? "Close navigation" : "Collapse sidebar"} onClick={mobile ? close : toggleSidebar}><Icon name={mobile ? "close" : "panel"} size={17} /></button>
-        </div>}
-        {isCollapsed && <button className="expand-sidebar" aria-label="Expand sidebar" onClick={toggleSidebar}><Icon name="panel" size={17} /></button>}
+        <Link href="/workspace" aria-label="Perplex home" className="workspace-brand" onClick={close} inert={isCollapsed} aria-hidden={isCollapsed}><ResearchMark /><span>perplexity</span></Link>
+        <button className="research-icon-button sidebar-toggle" aria-label={mobile ? "Close navigation" : isCollapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={mobile||!isCollapsed} onClick={mobile ? close : toggleSidebar}><Icon name={mobile ? "close" : "panel"} size={17} /></button>
       </div>
       <nav className="sidebar-navigation" aria-label={mobile ? "Mobile navigation" : "Primary navigation"}>
         <Link href="/workspace" className="sidebar-link" aria-label="New conversation" onClick={close}><Icon name="plus" /><span>New chat</span></Link>
         {jobsEnabled && <Link href="/jobs" aria-label={deepResearchEnabled?'Deep Research':'Execution checks'} className="sidebar-link" onClick={close}><Icon name="automation" /><span>{deepResearchEnabled?'Deep Research':'Execution checks'}</span></Link>}
         {!visitor&&<button className="sidebar-link" onClick={search} aria-label="Search conversations"><Icon name="search"/><span>Search chats</span></button>}
-        {!isCollapsed&&pinned.length>0&&<><div className="sidebar-section-label">Pinned</div><div className="sidebar-recents">{pinned.map(conversation=><Link key={conversation.id} prefetch={false} href={`/search/${conversation.id}`} onClick={close} aria-current={pathname===`/search/${conversation.id}`?'page':undefined}><Icon name="pin" size={12}/> {conversation.title}</Link>)}{pinned.length===20&&<Link href="/library?pinned=true" onClick={close}>View all pinned</Link>}</div></>}
+        {pinned.length>0&&<div className="sidebar-reveal" data-expanded={!isCollapsed} inert={isCollapsed}><div><div className="sidebar-section-label">Pinned</div><div className="sidebar-recents">{pinned.map(conversation=><Link key={conversation.id} prefetch={false} href={`/search/${conversation.id}`} onClick={close} aria-current={pathname===`/search/${conversation.id}`?'page':undefined}><Icon name="pin" size={12}/> {conversation.title}</Link>)}{pinned.length===20&&<Link href="/library?pinned=true" onClick={close}>View all pinned</Link>}</div></div></div>}
         <div className={`sidebar-section-label ${pathname === "/library" ? "is-selected" : ""}`}>
           <Link href={visitor?"/sign-in":"/library"} aria-label="Recents" onClick={close}><Icon name="clock" size={18} /><span>Recents</span></Link>
-          {!isCollapsed && <button className="research-icon-button" aria-label={recentOpen ? "Collapse recents" : "Expand recents"} aria-expanded={recentOpen} onClick={() => setRecentOpen(!recentOpen)}><Icon name={recentOpen ? "down" : "chevron"} size={14} /></button>}
+          <button className="research-icon-button sidebar-copy" inert={isCollapsed} aria-hidden={isCollapsed} aria-label={recentOpen ? "Collapse recents" : "Expand recents"} aria-expanded={recentOpen} onClick={() => setRecentOpen(!recentOpen)}><Icon name="down" size={14} /></button>
         </div>
-        {!isCollapsed && recentOpen && <div className="sidebar-recents">
+        <div className="sidebar-reveal" data-expanded={!isCollapsed&&recentOpen} inert={isCollapsed||!recentOpen}><div className="sidebar-recents">
           {recent.length === 0 ? <p>No recent conversations</p> : recent.filter(conversation=>!conversation.pinnedAt).map((conversation) =>
             <Link key={conversation.id} prefetch={false} href={`/search/${conversation.id}`} onClick={close} title={conversation.title}
               aria-current={pathname === `/search/${conversation.id}` ? "page" : undefined}>{conversation.title}</Link>)}
           {recent.length === 20 && <Link href="/library" onClick={close}>View all</Link>}
-        </div>}
+        </div></div>
       </nav>
       <div className="sidebar-footer">
-        {!visitor&&<PlanIndicator compact={isCollapsed} onNavigate={close}/>}
-        {!isCollapsed && !visitor && <div className="private-workspace"><Icon name="lock" size={12} />Private workspace</div>}
+        {!visitor&&<PlanIndicator onNavigate={close}/>}
+        {!visitor && <div className="sidebar-reveal" data-expanded={!isCollapsed} inert={isCollapsed}><div><div className="private-workspace"><Icon name="lock" size={12} />Private workspace</div></div></div>}
         {visitor?<GoogleSignIn compact label={isCollapsed?"Log in":"Sign up / Log in"}/>:<button className="account-button" aria-label="Open account menu" onClick={() => { close(); account.current?.showModal(); }}>
           <span className="account-avatar"><Icon name="user" size={16} /></span>
-          {!isCollapsed && <span className="account-name">{name}<small>{data?.usage.subscription?'Pro member':data?.usage.tier==='GUEST'?'Guest trial':'Free plan'}</small></span>}
+          <span className="account-name" aria-hidden={isCollapsed}>{name}<small>{data?.usage.subscription?'Pro member':data?.usage.tier==='GUEST'?'Guest trial':'Free plan'}</small></span>
         </button>}
       </div>
     </>;
