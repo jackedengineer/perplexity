@@ -3,7 +3,7 @@ import {PublicPolicy} from '@/components/public-policy';
 
 export const metadata={title:'Terms of use'};
 export default function TermsPage(){
-  return <PublicPolicy title="Terms of use" notice="Updated 2 November 2026. Paid pilot availability is checked in Billing.">
+  return <PublicPolicy title="Terms of use" notice="Updated 4 November 2026. Paid subscription availability is checked in Billing.">
     <p>These terms concern the independent perplexity project at perplexity.jacked.dev and its deployment-hosted entry.
       The support contact is <a href="mailto:trainwithchirag@gmail.com">trainwithchirag@gmail.com</a>.</p>
     <h2>The service</h2>
@@ -27,7 +27,7 @@ export default function TermsPage(){
       person, attack the service or attempt to access another person’s conversations. Legitimate education,
       prevention and authorized security analysis remain permitted, subject to the safety checks.</p>
     <h2>Credits and availability</h2>
-    <p>Everyday research allowances are separate from the optional paid Pro pilot. Answer credits are usage
+    <p>Everyday research allowances are separate from the optional paid Pro subscription. Answer credits are usage
       allowances, not money. Limits, eligible models and reset dates appear in the application. Unsuccessful
       research does not charge answer credits, but incurred provider costs and abuse-attempt limits still apply.
       A service-wide budget may pause research even when your answer credits remain.</p>
@@ -35,12 +35,12 @@ export default function TermsPage(){
       capacity, maintenance or exhausted budgets. The service is provided on a best-effort basis without a
       promised uptime or guaranteed answer. We may restrict abusive access or change availability. Any future
       paid offering is governed by the price and payment terms shown before a purchase.</p>
-    <h2>Pro pilot</h2>
-    <p>Purchases are available only when a funded pilot seat is available in Billing. The Pro offer is ₹999 for one month and seven completed Deep
+    <h2>Pro subscription</h2>
+    <p>Availability is confirmed in Billing before payment. The Pro offer is ₹999 for one month and seven completed Deep
       Research reports in each verified paid month. Browser Tasks are excluded. Unused reports expire at
       the end of the paid period without rollover. Failed or cancelled research does not spend a completed
       report allowance. The paid month permits at most {PRO_OFFER.maxStartedAttempts} attempts that begin provider work, including failed or cancelled attempts; cancellation before execution is excluded. A subscription is not active merely because a payment mandate was authenticated.</p>
-    <p>Razorpay handles payment authorization for one monthly billing cycle. This pilot does not renew
+    <p>Razorpay handles payment authorization for one monthly billing cycle. This subscription does not renew
       automatically; further paid periods require a separately available, funded offer. Verified access
       already paid for continues until its displayed end. Closing checkout, signing out or deleting a
       conversation does not reverse a captured payment. The cancellation and refund policy preserves remedies required by law; there

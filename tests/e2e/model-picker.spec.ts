@@ -146,3 +146,36 @@ for(const mode of ['Chat','Web'] as const)test(`${mode} question survives naviga
  await expect(page.getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-pressed','true');
  await expect(page.getByRole('button',{name:'Answer model: Qwen3 30B',exact:true})).toBeVisible();
 });
+
+test('larger verified models are searchable, priced and selectable',async({page})=>{
+ await page.goto('/');
+ await page.getByRole('button',{name:/Answer model:/}).click();
+ await page.getByRole('textbox',{name:'Search models'}).fill('3.7');
+ await page.getByRole('button',{name:'Gemini 3.7 Flash Fast general answers · Google 8 credits per answer',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Answer model: Gemini 3.7 Flash'})).toBeVisible();
+ await page.getByRole('button',{name:'Answer model: Gemini 3.7 Flash'}).click();
+ await page.getByRole('textbox',{name:'Search models'}).fill('397');
+ await page.getByRole('button',{name:'Qwen3.5 397B Large open model · 397B 8 credits per answer',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Answer model: Qwen3.5 397B'})).toBeVisible();
+});
+test('pricing has a direct billing CTA and a Google upgrade action for visitors',async({page})=>{
+ await page.goto('/upgrade-preview');
+ await expect(page.getByRole('link',{name:'Upgrade to Pro · ₹999'})).toHaveAttribute('href','/billing');
+ await expect(page.getByRole('button',{name:'Start one month for ₹999'})).toBeEnabled();
+ await expect(page.getByRole('button',{name:'Refresh billing status'})).toBeVisible();
+ await expect(page.locator('main')).not.toContainText('pilot');
+ await page.goto('/upgrade-preview?signedOut=1');
+ await expect(page.getByRole('button',{name:'Sign in to upgrade · ₹999'})).toBeVisible();
+});
+
+test('visitor upgrade sends Google the billing return destination',async({page})=>{
+ let destination:string|undefined;
+ await page.route('**/api/auth/sign-in/social',async route=>{
+  const body=route.request().postDataJSON();expect(body.provider).toBe('google');destination=body.callbackURL;
+  await route.fulfill({status:503,json:{message:'Offline authorization fixture'}});
+ });
+ await page.goto('/upgrade-preview?signedOut=1');
+ await page.getByRole('button',{name:'Sign in to upgrade · ₹999'}).click();
+ await expect(page.getByRole('alert')).toContainText('We couldn’t sign you in');
+ expect(destination).toBe('/billing');
+});

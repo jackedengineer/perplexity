@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 
-export function GoogleSignIn({ initialError = false, compact = false, label = "Continue with Google" }: { initialError?: boolean; compact?: boolean; label?: string }) {
+export function GoogleSignIn({ initialError = false, compact = false, label = "Continue with Google", destination = "/workspace" }: {destination?:"/workspace"|"/billing"; initialError?: boolean; compact?: boolean; label?: string }) {
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(initialError);
   async function signIn() {
@@ -10,7 +10,7 @@ export function GoogleSignIn({ initialError = false, compact = false, label = "C
     try {
       const {authClient}=await import('@/lib/auth-client');
       const result = await authClient.signIn.social({
-        provider: "google", callbackURL: "/workspace", errorCallbackURL: "/workspace?error=oauth",
+        provider: "google", callbackURL: destination, errorCallbackURL: "/workspace?error=oauth",
       });
       if (result.error) throw new Error("Sign in failed");
     } catch {
