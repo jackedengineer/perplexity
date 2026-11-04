@@ -82,7 +82,12 @@ test("a public question shows guarded progress, committed citations and exact re
     await page.getByRole("article",{name:"Your question"}).scrollIntoViewIfNeeded();
     if(info.project.name==="desktop"){
       const composer=await page.locator(".thread-bottom .research-composer").boundingBox();
-      expect(composer).toMatchObject({x:132,width:720,height:96});
+      // Graphite centers the answer/composer column and narrows it while Sources is open.
+      const answer=await page.locator('.thread-flow').boundingBox();
+      expect(composer).not.toBeNull();expect(answer).not.toBeNull();
+      expect(Math.abs(composer!.x-answer!.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(composer!.width-answer!.width)).toBeLessThanOrEqual(1);
+      expect(composer!.height).toBe(96);
     }
     await page.screenshot({path:`.artifacts/t11-answer-${info.project.name}.png`,fullPage:true});
     if(info.project.name==="desktop"){

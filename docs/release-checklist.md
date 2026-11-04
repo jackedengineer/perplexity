@@ -4,10 +4,16 @@
 - [x] Zod, local secret/abuse checks, native refusal handling, citations and atomic
   release fences verified; no classifier outage fallback and no provider privacy change.
 - [x] Additive migration 0034 applied to development Neon; historical audits preserved.
-- [x] 924 automated tests, lint/types and Next build passed.
+- [x] 926 automated tests, lint/types and final credential-free Cloudflare build passed.
+- [x] Denied output audits retain the actual local/legacy guard version; failures
+  without an attributed output verdict are explicitly marked `not-recorded`.
+- [x] Planner stage deadline/cancellation outcomes survive the provider wrapper,
+  retaining unknown-cost holds and preventing same-intent paid retries.
 - [x] 14 desktop/mobile development-Neon browser checks passed: guest answers,
   self-reference, reload, secret rejection, native refusal, invalid citations,
-  cancellation and recovery. Providers were synthetic; database and HTTP were real.
+  cancellation and recovery. Six additional desktop/mobile Web, citation/reload and
+  planner/answer deadline checks passed on the final build. Providers were synthetic;
+  database and HTTP were real. Twenty built-Worker browser checks also passed.
 - [x] Bounded live Azure nano/mini probes: unknown name answered, credential theft
   refused (nano content filter, mini textual refusal); final four receipts $0.0004209.
   Initial nano response had correct meaning in Russian ($0.0000402); explicit language
