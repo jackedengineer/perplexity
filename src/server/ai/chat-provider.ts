@@ -1,10 +1,11 @@
+import {providerRefused} from './provider-refusal';
 import {answerProviderPolicy} from './answer-policy';
 import { generateText,Output } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import {chatPrompt,prepareChatInput,CHAT_PROMPT,chatDraftSchema,renderChatDraft} from "./chat-draft";
 import type {AnswerProvider} from "./answer";
 import { type SafetyModelConfig } from "./models";
-import { AnswerError, boundedModelFetch, boundedWork } from "./bounded";
+import { AnswerError, ProviderRefusalError, boundedModelFetch, boundedWork } from "./bounded";
 import { providerUsage, type ProviderUsage } from "./usage";
 export function createChatProvider(config: SafetyModelConfig,request: typeof fetch = fetch,maxOutputTokens:600|1200=1200,maxDurationMs:12000|45000=12000,extendedBudget=false): AnswerProvider {
   const policy=answerProviderPolicy(config.modelId,extendedBudget);
@@ -16,6 +17,7 @@ export function createChatProvider(config: SafetyModelConfig,request: typeof fet
     // can reject a billable completion before returning a GenerateTextResult.
     const envelope = JSON.parse(await response.clone().text());
     usage = providerUsage(envelope?.usage,envelope?.model);
+    if(providerRefused(envelope))throw new ProviderRefusalError();
     return response;
   } });
   return {

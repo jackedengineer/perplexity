@@ -1,3 +1,4 @@
+import {providerRefused} from './provider-refusal';
 import {answerProviderPolicy} from './answer-policy';
 import { generateText,Output } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
@@ -5,7 +6,7 @@ import {draftPrompt,prepareDraftInput} from "./draft-input";
 import type { EvidencePackage } from "@/server/contracts/pipeline";
 import { type SafetyModelConfig } from "./models";
 import { ANSWER_PROMPT } from "./prompts/answer";
-import { AnswerError, boundedModelFetch, boundedWork, type ExecutionOptions } from "./bounded";
+import { AnswerError, ProviderRefusalError, boundedModelFetch, boundedWork, type ExecutionOptions } from "./bounded";
 import { providerUsage, type ProviderUsage } from "./usage";
 import { citedDraftSchema,renderCitedDraft } from "./cited-draft";
 export type DraftInput = { question: string;context?:Array<{role:"USER"|"ASSISTANT";text:string}>;interpretation?:string;answerLanguage?:string;evidence: EvidencePackage };
@@ -21,6 +22,7 @@ export function createAnswerProvider(config: SafetyModelConfig,request: typeof f
     // can reject a billable completion before returning a GenerateTextResult.
     const envelope = JSON.parse(await response.clone().text());
     usage = providerUsage(envelope?.usage,envelope?.model);
+    if(providerRefused(envelope))throw new ProviderRefusalError();
     return response;
   } });
   return {

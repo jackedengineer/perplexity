@@ -2,7 +2,7 @@ import { localeSchema,questionTextSchema } from "@/server/contracts/chat";
 import { validateEvidence } from "@/server/search/evidence";
 import { inspectInput } from "@/server/safety/deterministic";
 import { NO_EVIDENCE_TEXT } from "@/server/safety/release";
-import { AnswerError,type ExecutionOptions } from "@/server/ai/bounded";
+import { AnswerError,ProviderRefusalError,type ExecutionOptions } from "@/server/ai/bounded";
 import type { AnswerProvider,DraftInput,PrivateDraft } from "@/server/ai/answer";
 export type DraftResponse = PrivateDraft & { kind: "ANSWER" | "NO_EVIDENCE" | "CHAT" };
 // Private memory only: this value must pass release approval and atomic persistence.
@@ -18,5 +18,5 @@ export async function generatePrivateDraft(input: DraftInput,provider: AnswerPro
     const draft = await provider.generate({ question: question.data,evidence,...(mode === "CHAT" ? {context:input.context}:{}),answerLanguage:localeSchema.parse(input.answerLanguage??'en'),...(input.interpretation?{interpretation:questionTextSchema.parse(input.interpretation)}:{}) },options);
     if (options.signal.aborted || Date.now() >= options.deadlineAt.getTime() || !questionTextSchema.safeParse(draft.text).success) throw new AnswerError();
     return { kind: mode === "CHAT" ? "CHAT" : "ANSWER",text: draft.text,usage: draft.usage };
-  } catch { throw new AnswerError(); }
+  } catch(error) { if(error instanceof ProviderRefusalError)throw error;throw new AnswerError(); }
 }

@@ -1,5 +1,7 @@
+import {moderationError} from './provider-refusal';
 export type ExecutionOptions = { signal: AbortSignal; deadlineAt: Date };
 export class AnswerError extends Error { constructor() { super("Answer unavailable"); } }
+export class ProviderRefusalError extends AnswerError {}
 export async function boundedWork<T>(options: ExecutionOptions,limitMs: number,work: (signal: AbortSignal)=>Promise<T>): Promise<T> {
   const remaining = Math.min(limitMs,options.deadlineAt.getTime()-Date.now());
   if (options.signal.aborted || !Number.isFinite(remaining) || remaining <= 0) throw new AnswerError();
@@ -11,14 +13,14 @@ export async function boundedWork<T>(options: ExecutionOptions,limitMs: number,w
     const result = await Promise.race([Promise.resolve().then(()=>{ if (controller.signal.aborted) throw new AnswerError(); return work(controller.signal); }),interrupted]);
     if (controller.signal.aborted || options.signal.aborted || Date.now() >= deadline) throw new AnswerError();
     return result;
-  } catch { throw new AnswerError(); }
+  } catch (error) { if(error instanceof ProviderRefusalError)throw error;throw new AnswerError(); }
   finally { clearTimeout(timer); options.signal.removeEventListener("abort",abort);controller.signal.removeEventListener("abort",stop); }
 }
 export function boundedModelFetch(request: typeof fetch,maxRequestBytes=20000): typeof fetch {
   return async(url,init)=>{
     if (String(url) !== "https://openrouter.ai/api/v1/chat/completions" || typeof init?.body !== "string" || Buffer.byteLength(init.body) > maxRequestBytes) throw new AnswerError();
     const response = await request(url,{ ...init,redirect: "manual",credentials: "omit",cache: "no-store" });
-    if (!response.ok || init.signal?.aborted || response.headers.get("content-type")?.split(";")[0].trim() !== "application/json") {
+    if ((!response.ok&&response.status!==403) || init.signal?.aborted || response.headers.get("content-type")?.split(";")[0].trim() !== "application/json") {
       void response.body?.cancel().catch(()=>undefined); throw new AnswerError();
     }
     const reader = response.body?.getReader(); if (!reader) throw new AnswerError();
@@ -30,6 +32,10 @@ export function boundedModelFetch(request: typeof fetch,maxRequestBytes=20000): 
         size += value.byteLength; if (size > 24000) { cancel(); throw new AnswerError(); } chunks.push(value);
       }
       const bytes = new Uint8Array(size); let offset = 0; for (const chunk of chunks) { bytes.set(chunk,offset); offset += chunk.length; }
+      if(!response.ok){
+        let blocked=false;try{blocked=moderationError(JSON.parse(new TextDecoder().decode(bytes)));}catch{}
+        if(blocked)throw new ProviderRefusalError();throw new AnswerError();
+      }
       return new Response(bytes,{ status: response.status,headers: { "content-type": "application/json" } });
     } finally { init.signal?.removeEventListener("abort",cancel);reader.releaseLock(); }
   };
