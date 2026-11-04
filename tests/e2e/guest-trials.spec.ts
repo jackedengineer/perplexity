@@ -16,7 +16,7 @@ test('guest entry, economy answer, usage, ownership and durable trial limit',asy
   await page.goto('/workspace');
   await page.getByRole('button',{name:'Start guest trial',exact:true}).click();
   const signedIn=page.waitForResponse(r=>r.url().endsWith('/api/auth/sign-in/anonymous'));
-  await page.getByRole('button',{name:'Try 3 answers free'}).click();
+  await page.getByRole('button',{name:'Try 10 answers a day'}).click();
   const response=await signedIn;expect(response.status()).toBe(200);subject=(await response.json()).user.id;
   await expect(page).toHaveURL(/\/workspace$/);
   const initialUsage=await page.request.get('/api/usage');
@@ -26,11 +26,13 @@ test('guest entry, economy answer, usage, ownership and durable trial limit',asy
   await models.click();
   await expect(page.getByRole('dialog',{name:'Answer models'}).locator('[data-model-choice]')).toHaveCount(1);
   await page.keyboard.press('Escape');
-  await expect(page.locator('.usage-summary')).toContainText('6 left');
+  await expect(page.locator('.usage-summary')).toContainText('20 credits left today');
+  await expect(page.locator('.usage-summary')).toContainText('10/10 answers left today');
   await page.getByRole('textbox',{name:'Ask a question'}).fill('Why do rainbows form?');
   await page.getByRole('button',{name:'Submit question'}).click();
   await expect(page.locator('.answer-prose')).toContainText('A rainbow appears',{timeout:60000});
-  await expect(page.locator('.usage-summary')).toContainText('4 left');
+  await expect(page.locator('.usage-summary')).toContainText('18 credits left today');
+  await expect(page.locator('.usage-summary')).toContainText('9/10 answers left today');
   expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:`.artifacts/guest-trials-${info.project.name}.png`,fullPage:true});
@@ -43,13 +45,13 @@ test('guest entry, economy answer, usage, ownership and durable trial limit',asy
   expect(tampered.status()).toBe(422);expect((await tampered.json()).error.code).toBe('INVALID_INPUT');
   expect(await f.owner.select().from(schema.runs).where(eq(schema.runs.userId,profile.id))).toHaveLength(1);
   // Exhaust the fixture owner's grant without another provider request.
-  await f.owner.update(schema.usageBuckets).set({settledCredits:6}).where(and(eq(schema.usageBuckets.userId,profile.id),sql`${schema.usageBuckets.retiredAt} IS NULL`));
+  await f.owner.update(schema.usageBuckets).set({settledCredits:20}).where(and(eq(schema.usageBuckets.userId,profile.id),sql`${schema.usageBuckets.retiredAt} IS NULL`));
   await f.owner.delete(schema.admissionAttemptBuckets).where(eq(schema.admissionAttemptBuckets.userId,profile.id));
   const exhausted=await page.request.post('/api/chat',{headers:{origin:'http://localhost:3001'},data:{conversationId,clientRequestId:crypto.randomUUID(),expectedRevision:1,mode:'FAST',modelKey:'economy-nano',message:{text:'Why do rainbows form?'}}});
   expect(exhausted.status()).toBe(429);expect((await exhausted.json()).error.code).toBe('BUDGET_EXCEEDED');
-  await page.reload();await expect(page.locator('.usage-summary')).toContainText('0 left');
+  await page.reload();await expect(page.locator('.usage-summary')).toContainText('0 credits left today');
   const usage=await page.request.get('/api/usage');
-  expect(usage.ok()).toBe(true);expect((await usage.json()).period.remaining).toBe(0);
+  expect(usage.ok()).toBe(true);expect((await usage.json()).day.remaining).toBe(0);
   expect((await page.request.post('/api/auth/sign-out',{headers:{origin:'http://localhost:3001'},data:{}})).ok()).toBe(true);
   const repeat=await page.request.post('/api/auth/sign-in/anonymous',{headers:{origin:'http://localhost:3001'},data:{}});
   expect(repeat.status()).toBe(403);
