@@ -153,3 +153,14 @@ body:has(.research-shell) { background: #191919; }
 
 .workspace-plan .compact-sign-in .auth-feedback { position: absolute; top: 100%; right: 0; width: 240px; max-width: calc(100vw - 32px); padding: 8px; border: 1px solid var(--r-line); border-radius: 7px; background: var(--r-surface); z-index: 5; }
 .workspace-auth-error { flex-shrink: 0; padding: 12px 24px; color: #f4b6ad; font-size: 12px; }
+
+/* Saved turns, pending questions and status share the composer's reading column. */
+.active-thread .thread-content { padding: 28px 32px; }
+.thread-flow { width: min(720px,100%); margin-inline: auto; }
+.active-thread .thread-flow .history-stack,
+.thread-flow .research-progress,
+.thread-flow .research-failure { width: 100%; }
+.active-thread .thread-flow .pending-question { width: fit-content; max-width: 92%; }
+.thread-flow .research-progress { min-height: 56px; padding-block: 8px 24px; }
+@media(max-width:767px) { .active-thread .thread-content { padding: 20px 16px; } }
+@media(min-width:1200px) { .active-thread .thread-content:has(.sources-open) { padding-right: 360px; } }

@@ -116,3 +116,24 @@ usage readback stayed $0.076405046; all ceilings and existing holds were unchang
 Rollback can restore Worker `3798b39e-c89f-4732-a9aa-6f01cc6f23a7` without a
 database change. Earlier paid-account/first-payment and admitted-cancellation
 acceptance limits are unaffected.
+
+## Research layout and loading — 4 November 2026 (release pending)
+
+Pending questions, progress, errors and saved turns now share a centered 720px
+reading column, aligned with the composer. Mobile uses 16px gutters. The route
+fallback is a server-rendered Graphite skeleton with a persistent dark canvas,
+reserved composer space and reduced-motion support. It renders no fake answer or
+interactive controls while data is unavailable.
+
+Browser verification covered desktop and 390px mobile pending/stopped layouts;
+progress and composer share x=16 and width=358 on mobile. The production history
+check rendered saved answer prose and citations. No paid request was submitted.
+
+Read-only production diagnosis found recent successful Qwen/mini web runs around
+19 seconds, alongside an input-classifier failure, a DeepSeek answer timeout,
+and a planner failure on the short greeting. Failure metadata identifies the
+stage but does not preserve a provider HTTP cause. These reliability issues are
+not repaired by the layout change. At the check, OpenRouter had $1.719829804 left;
+operator daily and period available reservations were $0.099455 and $0.184465.
+Unknown-cost holds remain intact. The ordinary verification key/period still
+expire on November 5; the separate paid pilot is unchanged.

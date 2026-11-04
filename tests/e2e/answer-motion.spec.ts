@@ -88,3 +88,34 @@ test('changing motion preference during reveal shows the whole answer without re
  await expect(prose).toHaveAttribute('aria-busy','false');
  await expect(prose).toContainText('water returns to Earth');
 });
+
+test('pending turns and failures stay in the composer column',async({page})=>{
+ await page.goto('/');
+ await submit(page);
+ const column=await page.locator('.thread-flow').boundingBox();
+ const composer=await page.locator('.thread-bottom').boundingBox();
+ const question=await page.locator('.pending-question').boundingBox();
+ const progress=await page.locator('.research-progress').boundingBox();
+ expect(Math.abs(column!.x-composer!.x)).toBeLessThanOrEqual(1);
+ expect(Math.abs(column!.width-composer!.width)).toBeLessThanOrEqual(1);
+ expect(Math.abs(question!.x+question!.width-(column!.x+column!.width))).toBeLessThanOrEqual(1);
+ expect(Math.abs(progress!.x-column!.x)).toBeLessThanOrEqual(1);
+ expect(progress!.y-(question!.y+question!.height)).toBeLessThanOrEqual(32);
+ await page.getByRole('button',{name:'Stop research'}).click();
+ await expect(page.getByRole('alert').filter({hasText:'Research stopped'})).toBeVisible();
+ const failure=await page.locator('.research-failure').boundingBox();
+ expect(Math.abs(failure!.x-column!.x)).toBeLessThanOrEqual(1);
+ expect(Math.abs(failure!.width-column!.width)).toBeLessThanOrEqual(1);
+});
+
+test('route loading preserves the dark canvas and fits the viewport',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.goto('/loading-preview');
+ await expect(page.getByRole('status',{name:'Loading workspace'})).toHaveAttribute('aria-busy','true');
+ await expect(page.locator('html')).toHaveCSS('background-color','rgb(25, 25, 25)');
+ await expect(page.locator('.loading-heading')).toHaveCSS('animation-name','none');
+ const composer=await page.locator('.loading-composer').boundingBox();
+ expect(composer!.x).toBeGreaterThanOrEqual(0);
+ expect(composer!.x+composer!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+ expect(composer!.y+composer!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+});

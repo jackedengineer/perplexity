@@ -43,6 +43,7 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
     </header>
     <section className="thread-content" aria-label="Conversation history" tabIndex={0}>
       <h1>{conversation.title}</h1>
+      <div className="thread-flow">
       {history.items.length>0&&<ConversationHistory key={saved?.messageId??`saved:${initial.items.length}`} conversationId={conversation.id} initial={history} reveal={reveal} sourcesOpen={sourcesOpen} onSourcesOpenChange={setSourcesOpen} onRevise={!research.pending&&!startingDeep?(text,action)=>setRevision({text,action}):undefined}/>}
       {research.question&&!history.items.some(message=>message.role==="USER"&&message.sequence>baseSequence)&&!saved&&<article className="history-message question-message pending-question" aria-label="Your question"><p>{research.question}</p></article>}
       {research.pending&&!saved&&<div className="research-progress" role="status" aria-live="polite"><span className="progress-mark" aria-hidden="true"><ResearchMark/></span><span className="progress-label" key={research.label}>{research.label}</span><div className="answer-skeleton" aria-hidden="true"><span/><span/><span/></div></div>}
@@ -51,6 +52,7 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
         <Link className="research-button" href="/workspace">New search</Link>
       </div></div>}
       {!history.items.length&&!research.question&&!research.pending&&!research.error&&<div className="thread-empty"><Icon name="search" size={24}/><h2>What would you like to explore?</h2><p>Ask a question to search the web and get an answer with sources.</p></div>}
+      </div>
     </section>
     {revision&&<ReviseQuestion question={revision.text} action={revision.action} onClose={()=>setRevision(null)} onSubmit={(text,options)=>{setRevision(null);setMode(options.mode);select(options.modelKey);submit(text,options);}}/>}
     <div className="thread-bottom">
