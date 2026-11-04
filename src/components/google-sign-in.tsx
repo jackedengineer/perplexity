@@ -1,7 +1,13 @@
 "use client";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+
+const subscribeHydration=()=>()=>{};
+const clientReady=()=>true;
+const serverReady=()=>false;
 
 export function GoogleSignIn({ initialError = false, compact = false, label = "Continue with Google", destination = "/workspace" }: {destination?:"/workspace"|"/billing"; initialError?: boolean; compact?: boolean; label?: string }) {
+  // Do not offer a clickable SSR button before its OAuth handler can run.
+  const ready=useSyncExternalStore(subscribeHydration,clientReady,serverReady);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(initialError);
   async function signIn() {
@@ -19,7 +25,7 @@ export function GoogleSignIn({ initialError = false, compact = false, label = "C
     }
   }
   return <div className={compact?"compact-sign-in":"sign-in-action"}>
-    <button type="button" className={compact?"visitor-sign-in":"button google-button"} onClick={signIn} disabled={pending} aria-busy={pending}>
+    <button type="button" className={compact?"visitor-sign-in":"button google-button"} onClick={signIn} disabled={!ready||pending} aria-busy={pending}>
       {!compact&&<span aria-hidden="true" className={pending ? "spinner" : "google-mark"}>{pending ? "" : "G"}</span>}
       {pending ? "Connecting to Google…" : label}
       {!compact&&<span aria-hidden="true">↗</span>}
