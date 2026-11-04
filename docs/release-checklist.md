@@ -801,6 +801,10 @@ This candidate supersedes the one-person purchase policy above only when
   protection and unchanged inference budgets. No real purchase was completed.
 - [x] Local browser verifies model search/selection/favorites, credit costs,
   mobile bounds, pricing-to-Billing navigation and the Google upgrade action.
+- [x] Sidebar and Sources enter/exit motion verified locally at normal and
+  one-tenth speed; desktop reversal, mobile geometry and Escape work.
+- [x] Reproduced and fixed completed-payment duplicate-purchase finding; 906
+  offline tests pass. Earlier merchant CI text mismatch is corrected.
 - [ ] CI and both reviews cover the final PR #29 candidate.
 - [ ] Apply migration 0033 through the owner workflow, then deploy the reviewed
   build and activate PUBLIC checkout plus only the two verified model keys.

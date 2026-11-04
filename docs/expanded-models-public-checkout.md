@@ -32,12 +32,12 @@ Pricing now links directly to `/billing`. Its signed-out Google button returns t
 
 ## Evidence and release steps
 
-- Final local validation: lint, type checks and all 905 offline tests across 139 files pass. The version-three regression covers admission/planning/retrieval/persistence/reconciliation; it caught a missing accepted catalog/price pair before the final run.
+- Final local validation: lint, type checks and all 906 offline tests across 139 files pass. The version-three regression covers admission/planning/retrieval/persistence/reconciliation; it caught a missing accepted catalog/price pair before the final run.
 - The credential-free Cloudflare production build passes. CI additionally runs the browser regression suite. Offline evaluation still reports PENDING semantic/human-review cases; passing tests do not imply independent answer-quality acceptance.
 - Live provider fixture checks: Gemini Chat 2.30s / Web 3.37s; Qwen 397B Chat 1.97s / Web 2.14s. These are small authored fixtures, not an end-to-end live search benchmark.
 - Receipted live model-check spend: 3,082 microUSD across successful samples. Failed routing checks have no cost receipt and remain conservatively booked in the ignored local test ledger. No provider cap was increased.
 - Local browser: select/search/favorite the new models, 390px menu bounds, visible pricing-to-Billing link, enabled billing action, visitor Google action. No card details or payment were submitted.
-- Artifacts: `.artifacts/graphite/expanded-models-live-round3.json`, `expanded-models-allowance.json`, `models-verified-check.log`, `models-final-build.log`, `expanded-model-menu-mobile.png`, `public-upgrade-mobile.png`.
+- Artifacts: `.artifacts/graphite/expanded-models-live-round3.json`, `expanded-models-allowance.json`, `pr29-final-check.log`, `pr29-final-build.log`, `expanded-model-menu-mobile.png`, `public-upgrade-mobile.png`.
 
 Before release: pass CI/reviews, apply migration 0033 using the owner migration workflow, deploy the reviewed build with `PAID_CHECKOUT_ACCESS=PUBLIC`, append only the two verified keys to `ENABLED_ANSWER_MODELS`, and verify hosted checkout visibility/model selection. Preserve all existing production secrets and budgets. The earlier intermittent safety/planner incidents are not resolved by this catalog/UI change and remain tracked separately.
 
@@ -56,3 +56,17 @@ exit, Sources entry/exit and Escape dismissal. No horizontal overflow at 390px.
 The slowed-motion route exists only in the offline fixture. Browser regressions
 also assert reduced-motion and intermediate exit states. No animation dependency,
 frame loop or AI request is added. Native iPhone verification remains pending.
+
+## Review and CI follow-up
+
+Review on `13a538a` found that PUBLIC checkout skipped the old global check for
+a completed subscription whose captured invoice had not arrived. A regression
+reproduced a second READY checkout for that owner. The fix moves this protection
+into the serialized owner check; unrelated buyers remain eligible, and recorded
+expired paid periods allow a later purchase. The new regression plus existing
+pilot/HTTP tests pass (15 tests). No payment or entitlement is fabricated.
+
+That candidate's Cloudflare CI passed; merchant-page CI failed on an outdated
+pilot-notice assertion. Public privacy/terms notices and the assertion now agree,
+and the privacy page names the actual Cloudflare production worker. Final-head
+CI/browser tests and refreshed reviews remain required after these corrections.
