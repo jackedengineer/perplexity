@@ -41,7 +41,7 @@ export default function TermsPage(){
       the end of the paid period without rollover. Failed or cancelled research does not spend a completed
       report allowance. The paid month permits at most {PRO_OFFER.maxStartedAttempts} attempts that begin provider work, including failed or cancelled attempts; cancellation before execution is excluded. A subscription is not active merely because a payment mandate was authenticated.</p>
     <p>Razorpay handles payment authorization for one monthly billing cycle. This subscription does not renew
-      automatically; further paid periods require a separately available, funded offer. Verified access
+      automatically; further paid periods require another purchase. Verified access
       already paid for continues until its displayed end. Closing checkout, signing out or deleting a
       conversation does not reverse a captured payment. The cancellation and refund policy preserves remedies required by law; there
       are no voluntary refunds for change of mind or unused allowance.</p>
