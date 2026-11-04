@@ -1,3 +1,4 @@
+import {isLocalSafetyGuard,LOCAL_GUARD_VERSION} from './local';
 import {traceStage} from '@/server/telemetry/trace';
 import { z } from "zod";
 import { approvedPayloadSchema } from "@/server/contracts/answer";
@@ -17,6 +18,8 @@ export type ApprovedResponse = Readonly<{ runId: string;attemptVersion: number;r
 export type ReleaseResult = { kind: "APPROVED";response: ApprovedResponse }
   | { kind: "DENIED";code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE" | "DEADLINE_EXCEEDED";response: SafetyResponse };
 const approved = new WeakSet<object>();
+const localApproved = new WeakSet<object>();
+export function approvalGuardVersion(value:ApprovedResponse) {return localApproved.has(value)?LOCAL_GUARD_VERSION:"legacy-classifier-v1";}
 export function isApprovedResponse(value: unknown): value is ApprovedResponse { return typeof value === "object" && value !== null && approved.has(value); }
 export function createReleaseGate(provider: SafetyProvider | undefined) {
   const gate = createInputGate(provider,"safety.output");
@@ -43,7 +46,7 @@ export function createReleaseGate(provider: SafetyProvider | undefined) {
         policyVersion: SAFETY_POLICY.version,kind: input.kind,markdown: input.markdown,sources: Object.freeze(sources),...(additionalSources.length?{additionalSources:Object.freeze(additionalSources)}:{}) };
       if (!approvedPayloadSchema.safeParse(candidate).success) return deny("OUTPUT_BLOCKED");
       const response: ApprovedResponse = Object.freeze(candidate);
-      approved.add(response); return { kind: "APPROVED",response };
+      approved.add(response); if(isLocalSafetyGuard(provider))localApproved.add(response); return { kind: "APPROVED",response };
     } catch { return deny("SAFETY_UNAVAILABLE"); }
   } };
 }

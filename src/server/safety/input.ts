@@ -1,3 +1,4 @@
+import {isLocalSafetyGuard,LOCAL_GUARD_VERSION} from './local';
 import {traceStage,recordTelemetry} from '@/server/telemetry/trace';
 import type {TelemetryStage} from '@/server/telemetry/contracts';
 import { guardVerdictSchema, SAFETY_POLICY, type GuardVerdict } from "./policy";
@@ -6,7 +7,7 @@ import {SAFETY_PROMPT_VERSIONS} from './versions';
 import { inspectInput } from "./deterministic";
 import { INPUT_DETECTOR_VERSION, safetyInputSchema, outputSafetyInputSchema, SafetyProviderError, type InputReason, type SafetyProvider } from "./provider";
 
-export type InputCheck = { verdict: GuardVerdict; reason: InputReason; detectorVersion: typeof INPUT_DETECTOR_VERSION;
+export type InputCheck = { verdict: GuardVerdict; reason: InputReason; detectorVersion: typeof INPUT_DETECTOR_VERSION | typeof LOCAL_GUARD_VERSION;
   modelId: string | null; durationMs: number };
 type SafetyStage=Extract<TelemetryStage,`safety.${string}`>;
 export function createInputGate(provider: SafetyProvider | undefined,stage:SafetyStage="safety.input") {
@@ -17,7 +18,7 @@ export function createInputGate(provider: SafetyProvider | undefined,stage:Safet
       const started = performance.now();
       let modelId: string | null = null;
       const result = (verdict: GuardVerdict, reason: InputReason): InputCheck => ({ verdict, reason,
-        detectorVersion: INPUT_DETECTOR_VERSION, modelId, durationMs: Math.max(0,Math.round(performance.now()-started)) });
+        detectorVersion: isLocalSafetyGuard(provider)?LOCAL_GUARD_VERSION:INPUT_DETECTOR_VERSION, modelId, durationMs: Math.max(0,Math.round(performance.now()-started)) });
       const unavailable = (reason: InputReason) => result({ decision: "UNAVAILABLE", retryable: false, policyVersion: SAFETY_POLICY.version },reason);
       const parsed = (stage==="safety.output"?outputSafetyInputSchema:safetyInputSchema).safeParse(value);
       if (!parsed.success) return unavailable("INVALID_INPUT");
@@ -31,7 +32,7 @@ export function createInputGate(provider: SafetyProvider | undefined,stage:Safet
       if (!Number.isFinite(remaining) || remaining <= 0) return unavailable("TIMEOUT");
       if (!provider) return unavailable("CONFIGURATION_UNAVAILABLE");
       if(provider.accepts&&!provider.accepts(parsed.data))return unavailable("INVALID_INPUT");
-      modelId = provider.modelId;
+      modelId = isLocalSafetyGuard(provider)?null:provider.modelId;
       const classifierDeadline = Date.now()+remaining;
       const controller = new AbortController();
       const abort = () => controller.abort(); // Do not forward the caller's arbitrary abort reason.
@@ -51,7 +52,7 @@ export function createInputGate(provider: SafetyProvider | undefined,stage:Safet
         if (controller.signal.aborted || Date.now() >= classifierDeadline) return unavailable("TIMEOUT");
         const checked = guardVerdictSchema.safeParse(verdict);
         if (!checked.success) return unavailable("MALFORMED_OUTPUT");
-        return result(checked.data,checked.data.decision === "UNAVAILABLE" ? "CLASSIFIER_UNAVAILABLE" : "CLASSIFIER");
+        return result(checked.data,checked.data.decision === "UNAVAILABLE" ? "CLASSIFIER_UNAVAILABLE" : isLocalSafetyGuard(provider)?"LOCAL_CHECK":"CLASSIFIER");
       } catch (error) {
         return unavailable(options.signal.aborted ? "CANCELLED" : controller.signal.aborted ? "TIMEOUT"
           : error instanceof SafetyProviderError ? error.reason : "PROVIDER_UNAVAILABLE");
@@ -60,7 +61,7 @@ export function createInputGate(provider: SafetyProvider | undefined,stage:Safet
         if (stopWaiting) controller.signal.removeEventListener("abort",stopWaiting);
       }
       },check=>{
-        const fields={outcome:check.verdict.decision,reason:check.reason,detectorVersion:check.detectorVersion,promptVersion,modelId:check.modelId??undefined,
+        const fields={outcome:check.verdict.decision,reason:check.reason,detectorVersion:check.detectorVersion,promptVersion:isLocalSafetyGuard(provider)?LOCAL_GUARD_VERSION:promptVersion,modelId:check.modelId??undefined,
           categoryCodes:check.verdict.decision==='BLOCK'?check.verdict.categoryCodes:[]};
         recordTelemetry('research.safety',fields);return fields;
       });

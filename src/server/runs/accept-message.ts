@@ -6,7 +6,6 @@ import { conversations, inputSafetyReviews, messages, runs } from "@/db/schema";
 import { submissionSchema, type SubmitQuery } from "@/server/contracts/chat";
 import type { PublicErrorCode } from "@/server/contracts/errors";
 import { createInputGate, type InputCheck } from "@/server/safety/input";
-import { INPUT_DETECTOR_VERSION } from "@/server/safety/provider";
 import { guardVerdictSchema, SAFETY_POLICY } from "@/server/safety/policy";
 import { resolveSafetyDecision, type SafetyResponse } from "@/server/safety/responses";
 import {loadSafetyContext} from './context';
@@ -62,7 +61,7 @@ export function createMessageAcceptance(db: AdmissionDatabase, keys: unknown, ga
           const messageId = verdict.decision === "ALLOW" ? randomUUID() : null;
           await tx.insert(inputSafetyReviews).values({ runId,conversationId: conversation.id,attemptVersion: run.attemptVersion,
             decision: verdict.decision,categoryCodes: verdict.decision === "BLOCK" ? verdict.categoryCodes : [],reason: final.reason,
-            detectorVersion: INPUT_DETECTOR_VERSION,policyVersion: verdict.policyVersion,modelId: final.modelId,durationMs: final.durationMs,
+            detectorVersion: final.detectorVersion,policyVersion: verdict.policyVersion,modelId: final.modelId,durationMs: final.durationMs,
             acceptedMessageId: messageId,createdAt: now });
           if (messageId) {
             await tx.insert(messages).values({ id: messageId,conversationId: conversation.id,role: "USER",kind: "QUESTION",

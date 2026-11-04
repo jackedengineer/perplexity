@@ -7,7 +7,7 @@ import type { AdmissionDatabase,AdmissionTransaction } from "./usage";
 import { lockOwnedRun } from "./lock";
 import { AdmissionError } from "./errors";
 import { settleRun } from "./settle";
-import { isApprovedResponse } from "@/server/safety/release";
+import { isApprovedResponse,approvalGuardVersion } from "@/server/safety/release";
 import { SAFETY_POLICY } from "@/server/safety/policy";
 import { serializeApprovedPayload } from "@/server/ai/approved-payload";
 import type { PublicErrorCode } from "@/server/contracts/errors";
@@ -35,12 +35,14 @@ export function createFinalization(db: AdmissionDatabase) {
         if((run.mode==='CHAT')!==chat)throw new AdmissionError('CONFLICT');
         const [planning]=await tx.select().from(runPlans).where(eq(runPlans.runId,run.id));
         if(clarifying&&(!planning||planning.attemptVersion!==run.attemptVersion||planning.plan.action!=='CLARIFY'||planning.plan.question!==value.markdown))throw new AdmissionError('CONFLICT');
+        const localApproval=approvalGuardVersion(value)==="local-boundary-v1";
         const calls = await tx.select().from(providerCalls).where(eq(providerCalls.runId,run.id));
-        if (!calls.some(c=>c.stage === "OUTPUT_SAFETY" && c.status === "SUCCEEDED" && c.attemptVersion === run.attemptVersion) ||
+        if ((!localApproval&&!calls.some(c=>c.stage === "OUTPUT_SAFETY" && c.status === "SUCCEEDED" && c.attemptVersion === run.attemptVersion)) ||
           (!clarifying && !calls.some(c=>c.stage === "ANSWER" && (c.status === ((value.kind === "ANSWER" || chat) ? "SUCCEEDED" : "SKIPPED")) && c.attemptVersion === run.attemptVersion))) throw new AdmissionError("SAFETY_UNAVAILABLE");
-        const [input] = await tx.select({ approvedAt: messages.approvedAt,messagePolicy: messages.policyVersion,reviewPolicy: inputSafetyReviews.policyVersion })
+        const [input] = await tx.select({ approvedAt: messages.approvedAt,messagePolicy: messages.policyVersion,reviewPolicy: inputSafetyReviews.policyVersion,detectorVersion:inputSafetyReviews.detectorVersion })
           .from(inputSafetyReviews).innerJoin(messages,eq(messages.id,inputSafetyReviews.acceptedMessageId))
           .where(and(eq(inputSafetyReviews.runId,run.id),eq(inputSafetyReviews.decision,"ALLOW"),eq(inputSafetyReviews.attemptVersion,run.attemptVersion)));
+        if (localApproval&&input?.detectorVersion!=="local-boundary-v1")throw new AdmissionError("SAFETY_UNAVAILABLE");
         if (!input?.approvedAt || input.messagePolicy !== value.policyVersion || input.reviewPolicy !== value.policyVersion) throw new AdmissionError("SAFETY_UNAVAILABLE");
         const [retrieval] = await tx.select().from(runRetrievals).where(eq(runRetrievals.runId,run.id));
         if (chat ? Boolean(retrieval)||calls.some(c=>!["INPUT_SAFETY","ANSWER","OUTPUT_SAFETY"].includes(c.stage)) : clarifying ? Boolean(retrieval)||calls.some(c=>["SEARCH","ANSWER","QUERY_SAFETY"].includes(c.stage)) : !retrieval || retrieval.expiresAt <= now || retrieval.policyVersion !== value.policyVersion || retrieval.attemptVersion !== run.attemptVersion ||
@@ -55,7 +57,7 @@ export function createFinalization(db: AdmissionDatabase) {
           if(value.sources.some(c=>c.sourceId===source.sourceId))citations.push({ runId: run.id,messageId,sourceId: stored.id,passageId: passage.id,number: source.number,supportStatus: "NOT_CHECKED" });
         }
         await tx.insert(outputReviews).values({ runId: run.id,conversationId: conversation.id,attemptVersion: run.attemptVersion,decision: "ALLOW",policyVersion: value.policyVersion,
-          messageId,bodyHash: serialized.bodyHash,payloadHash: serialized.payloadHash,payload: serialized.payload,createdAt: now });
+          guardVersion:approvalGuardVersion(value),messageId,bodyHash: serialized.bodyHash,payloadHash: serialized.payloadHash,payload: serialized.payload,createdAt: now });
         await tx.insert(messages).values({ id: messageId,conversationId: conversation.id,role: "ASSISTANT",kind: value.kind === "CLARIFICATION" ? "CLARIFICATION" : "ANSWER",
           parts: [{ type: "text",text: value.markdown }],sequence: conversation.nextSequence,approvedAt: now,policyVersion: value.policyVersion,createdAt: now });
         if (citations.length) await tx.insert(messageCitations).values(citations);

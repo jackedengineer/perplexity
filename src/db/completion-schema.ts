@@ -22,6 +22,7 @@ export const providerCalls = pgTable("provider_calls",{
   check("provider_lifecycle_valid",sql`(${t.status} = 'STARTED' AND ${t.finishedAt} IS NULL AND ${t.costMicroUsd} IS NULL) OR (${t.status} <> 'STARTED' AND ${t.finishedAt} IS NOT NULL AND ${t.finishedAt} >= ${t.startedAt} AND (${t.status} <> 'SKIPPED' OR ${t.costMicroUsd} IS NOT DISTINCT FROM 0))`),
 ]);
 export const outputReviews = pgTable("output_safety_reviews",{
+  guardVersion:varchar("guard_version",{length:64}).notNull().default("legacy-classifier-v1"),
   runId: uuid("run_id").primaryKey(),conversationId: uuid("conversation_id").notNull(),attemptVersion: integer("attempt_version").notNull(),
   decision: varchar("decision",{ length: 16 }).notNull(),policyVersion: varchar("policy_version",{ length: 32 }).notNull(),
   messageId: uuid("message_id"),messageRole: messageRole("message_role").notNull().default("ASSISTANT"),
