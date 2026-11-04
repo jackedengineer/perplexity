@@ -11,3 +11,9 @@ it('bounds the entire workflow within the existing 40-cent paid daily ceiling',(
 it('rejects fabricated quotes and source IDs before judge dispatch',()=>{expect(validateCandidate(candidate(),evidence)).toBeTruthy();expect(()=>validateCandidate({...candidate(),claims:[{text:'Value',support:[{sourceId:'S2',quote:support[0].quote}]}]},evidence)).toThrow();expect(()=>validateCandidate({...candidate(),claims:[{text:'Value',support:[{sourceId:'S1',quote:'The measured value is 43 units.'}]}]},evidence)).toThrow();});
 it('requires judgment of every candidate claim and rejects majority-based unsupported final claims',()=>{const candidates=[candidate(),candidate(),candidate()];expect(validateJudgment(judge(),candidates,evidence)).toBeTruthy();const raw=judge();raw.judgments[0].verdict='UNSUPPORTED';expect(()=>validateJudgment(raw,candidates,evidence)).toThrow();expect(()=>validateJudgment({...judge(),judgments:judge().judgments.slice(1)},candidates,evidence)).toThrow();});
 it('preserves supported disagreements only in the limitations section',()=>{const raw=judge();raw.judgments[2].verdict='CONFLICTING';expect(validateJudgment(raw,[candidate(),candidate(),candidate()],evidence)).toBeTruthy();raw.sections[0][0].claimIds=['C1'];expect(()=>validateJudgment(raw,[candidate(),candidate(),candidate()],evidence)).toThrow();});
+it('rejects empty or short normalized quotes in both candidates and judgments',()=>{
+ for(const quote of [' '.repeat(12),'\t\n'.repeat(8),'     42     ']){
+  expect(()=>validateCandidate({...candidate(),claims:[{text:'Unsupported',support:[{sourceId:'S1',quote}]}]},evidence)).toThrow();
+  const raw=judge();raw.judgments[0].support=[{sourceId:'S1',quote}];expect(()=>validateJudgment(raw,[candidate(),candidate(),candidate()],evidence)).toThrow();
+ }
+});

@@ -17,7 +17,7 @@ export const judgedReport=z.strictObject({
 export type JudgedReport=z.infer<typeof judgedReport>;
 const normalize=(s:string)=>s.replace(/\s+/gu,' ').trim();
 export function verifySupport(items:Array<z.infer<typeof support>>,evidence:EvidencePackage){
- for(const item of items)if(!evidence.sources.some(s=>s.sourceId===item.sourceId)||!evidence.passages.some(p=>p.sourceId===item.sourceId&&normalize(p.text).includes(normalize(item.quote))))throw Error('Evidence quote does not match');
+ for(const item of items)if(normalize(item.quote).length<12||!evidence.sources.some(s=>s.sourceId===item.sourceId)||!evidence.passages.some(p=>p.sourceId===item.sourceId&&normalize(p.text).includes(normalize(item.quote))))throw Error('Evidence quote does not match');
 }
 export function validateCandidate(raw:unknown,evidence:EvidencePackage){const value=candidateAnalysis.parse(raw);for(const claim of value.claims)verifySupport(claim.support,evidence);return value;}
 export function validateJudgment(raw:unknown,candidates:CandidateAnalysis[],evidence:EvidencePackage){
