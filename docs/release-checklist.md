@@ -1,3 +1,23 @@
+# Authorized operator adjustment — 4 November 2026
+
+- [x] User authorized app daily operator limit of $1, retaining OpenRouter $1/day.
+  Updated the active ordinary-research DAY bucket only and provisioned the remaining
+  next daily window through the unchanged period expiry. Existing bucket spend,
+  holds, dates and $1.70 PERIOD ceiling are unchanged; no paid-pilot change.
+- [x] Eight successful Tavily calls in the current monthly free allowance received
+  immutable verified-not-billed receipts. Reconciled six terminal requests, releasing
+  $0.293593 in period holds. Immediate repeats all returned UNCHANGED. Older calls
+  and missing LLM receipts retain their unknown-cost holds.
+- [x] Final ordinary operator availability: $0.791906 for the current day and
+  $0.423054 for the period. OpenRouter $1 daily reset cap verified, daily usage
+  $0.023786385. No new inference calls were made for this maintenance check.
+- [x] Live browser Check availability restored the model picker and daily allowance;
+  existing Web answer/citations remain visible. Screenshot and receipts are stored
+  under ignored `.artifacts/operator-dollar/`.
+- [ ] Existing operator period and provider key expire 5 November 2026 at 17:18 IST.
+  A later renewal must retain the approved $1 daily policy: the legacy automatic
+  day-provisioning function otherwise defaults to $0.40. No expiry was extended.
+
 # Ten daily answers — 4 November 2026
 
 - [x] Ten completed Chat/Web answers per IST day for registered and guest accounts;

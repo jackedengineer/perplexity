@@ -59,3 +59,13 @@ an answer count or money. Reload loads the new daily balance/count labels.
 Shared operator capacity subsequently fell below the $0.05 admission reservation;
 account allowances do not override this independent cap. See the release checklist
 for the exact observed limits and remaining availability work.
+
+## Subsequent authorized operator adjustment
+
+The user subsequently approved $1/day for the ordinary operator pool. The active
+day and remaining next window through the existing 5 November period expiry now
+use $1. Eight verified free Tavily receipts reconciled six terminal runs and released
+$0.293593 of period holds. Unknown calls remain reserved. Browser availability was
+restored; OpenRouter still has a $1 daily cap. The previous pause described above is
+historical evidence, not the final state. A future period renewal must explicitly
+retain the approved daily ceiling rather than use the legacy $0.40 default.
