@@ -1,3 +1,29 @@
+# Local safety replacement — 4 November 2026
+
+- [x] Separate classifier removed from Chat, Web and Deep Research service wiring.
+- [x] Zod, local secret/abuse checks, native refusal handling, citations and atomic
+  release fences verified; no classifier outage fallback and no provider privacy change.
+- [x] Additive migration 0034 applied to development Neon; historical audits preserved.
+- [x] 924 automated tests, lint/types and Next build passed.
+- [x] 14 desktop/mobile development-Neon browser checks passed: guest answers,
+  self-reference, reload, secret rejection, native refusal, invalid citations,
+  cancellation and recovery. Providers were synthetic; database and HTTP were real.
+- [x] Bounded live Azure nano/mini probes: unknown name answered, credential theft
+  refused (nano content filter, mini textual refusal); final four receipts $0.0004209.
+  Initial nano response had correct meaning in Russian ($0.0000402); explicit language
+  guidance fixed the repeated English-language probes. This is a smoke test, not a
+  comprehensive semantic-safety evaluation of all catalog models.
+- [x] Exact OpenRouter receipt reconciled terminal planner run `933afc4b…`, releasing
+  $0.089891 of held capacity. Duplicate reconciliation unchanged. Production composer
+  available again; all budget ceilings, expiry dates and other unknown holds preserved.
+- [x] Credential-free Cloudflare build passed; local environment restored afterward.
+- [ ] Final hosted deployment checks.
+- [ ] Fresh CI and code/security review on the final commit.
+- [ ] Drain old durable jobs, apply production migration 0034, deploy web/job workers.
+- [ ] Hosted answer/citation/progress/cancellation verification on the new version.
+
+Architecture, limitations and rollback: [local safety](local-safety.md).
+
 # Direct Google sign-in and footer — 3 November 2026
 
 - [x] PR #28 merged after clean code/security reviews and both Quality CI jobs.

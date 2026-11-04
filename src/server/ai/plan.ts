@@ -65,7 +65,7 @@ function requireQueryIntent(plan:Extract<QueryPlan,{action:'ANSWER'}>,original:s
  if(numeric(original).some(number=>!plan.retrieval.queries.some(query=>numeric(query).includes(number))))throw new PlanningError();
 }
 // Conservative provenance validation, not a semantic-equivalence or safety proof.
-// Actual outbound queries still require the independent semantic safety gate.
+// Actual outbound queries still pass local boundary checks before search.
 export function validatePlan(value:unknown,input:unknown,maxQueries:number=PLANNER_LIMITS.queryCount):QueryPlan{
  try{
   const original=plannerInputSchema.parse(input),plan=queryPlanSchema.parse(value);
