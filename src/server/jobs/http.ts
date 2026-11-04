@@ -1,3 +1,5 @@
+import {approvedReportStream} from '@/server/deep-research/report-stream';
+import type {JobView} from './contracts';
 import {SAFETY_RESPONSES} from '@/server/safety/responses';
 import {JobError,jobId,jobCursor,jobSubmission} from './contracts';
 import {requireEmptyBody} from '@/server/runs/recovery-http';
@@ -41,8 +43,14 @@ export function createJobsHttp(d:Dependencies){
    const parsed=jobSubmission.safeParse(raw);if(!parsed.success)throw new JobError('INVALID_INPUT');
    return Response.json({id:await backend.admit(subject,parsed.data)},{status:202,headers:privateHeaders});}),
   read:(request:Request,id:string)=>respond(async()=>{const {subject,backend}=await context();const url=new URL(request.url),cursor=jobCursor.safeParse(url.searchParams.get('after')??'0');
-   if(request.method!=='GET'||!jobId.safeParse(id).success||!cursor.success||[...url.searchParams.keys()].some(k=>k!=='after'))throw new JobError('INVALID_INPUT');
-   const job=await backend.read(subject,id),events=await backend.events(subject,id,cursor.data);return Response.json({job,events},{headers:privateHeaders});}),
+   if(request.method!=='GET'||!jobId.safeParse(id).success||!cursor.success||[...url.searchParams.keys()].some(k=>k!=='after'&&k!=='report')||url.searchParams.has('report')&&url.searchParams.get('report')!=='stream')throw new JobError('INVALID_INPUT');
+   const job=await backend.read(subject,id),events=await backend.events(subject,id,cursor.data);return Response.json({job:url.searchParams.get('report')==='stream'?{...(job as JobView),report:undefined}:job,events},{headers:privateHeaders});}),
+  report:(request:Request,id:string)=>respond(async()=>{const {subject,backend}=await context();
+   if(request.method!=='GET'||new URL(request.url).search||!jobId.safeParse(id).success)throw new JobError('INVALID_INPUT');
+   const job=await backend.read(subject,id) as JobView;
+   if(job.state!=='COMPLETED'||!job.report)throw new JobError('NOT_FOUND');
+   return new Response(approvedReportStream(job.report,request.signal),{headers:{...privateHeaders,'Content-Type':'application/x-ndjson; charset=utf-8','X-Accel-Buffering':'no'}});
+  }),
   cancel:(request:Request,id:string)=>respond(async()=>{const {subject,backend}=await context();sameOrigin(request,d.origin());if(!jobId.safeParse(id).success)throw new JobError('INVALID_INPUT');await requireEmptyBody(request);
    await backend.cancel(subject,id);return Response.json({job:await backend.read(subject,id)},{headers:privateHeaders});}),
   remove:(request:Request,id:string)=>respond(async()=>{const {subject,backend}=await context();sameOrigin(request,d.origin());if(!jobId.safeParse(id).success)throw new JobError('INVALID_INPUT');await requireEmptyBody(request);
