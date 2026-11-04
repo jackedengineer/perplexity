@@ -37,9 +37,11 @@ it('reserves economy credits once under concurrent replay and releases them on f
  expect(results.map(r=>r.kind).sort()).toEqual(['ADMITTED','RUN_IN_PROGRESS']);
  const [run]=await db.select().from(schema.runs).where(eq(schema.runs.userId,p.owner.id));
  expect(run).toMatchObject({answerCredits:2,catalogVersion:'trials-v1',priceVersion:'credits-v1',providerReserveMicroUsd:50000n});
- expect((await readUsage(db,p.subject)).period).toMatchObject({limit:6,reserved:2,remaining:4});
+ expect((await readUsage(db,p.subject)).period).toMatchObject({limit:620,reserved:2,remaining:618});
+ expect((await readUsage(db,p.subject)).answers).toMatchObject({limit:10,used:0,reserved:1,remaining:9});
  await createFinalization(db).fail(p.subject,run.id,'PROVIDER_UNAVAILABLE');
- expect((await readUsage(db,p.subject)).period).toMatchObject({reserved:0,used:0,remaining:6});
+ expect((await readUsage(db,p.subject)).period).toMatchObject({reserved:0,used:0,remaining:620});
+ expect((await readUsage(db,p.subject)).answers).toMatchObject({used:0,reserved:0,remaining:10});
 });
 it('preserves spent guest credits when linking into an existing free account',async()=>{
  const p=await fixture(),target=await fixture(false);
@@ -52,10 +54,10 @@ it('preserves spent guest credits when linking into an existing free account',as
  await readUsage(db,target.subject);
  await db.update(schema.usageBuckets).set({settledCredits:4}).where(eq(schema.usageBuckets.userId,target.owner.id));
  await linkGuest(db,p.subject,target.subject);await linkGuest(db,p.subject,target.subject);
- expect((await readUsage(db,target.subject)).period).toMatchObject({limit:40,used:6,remaining:34});
- expect((await readUsage(db,target.subject)).day).toMatchObject({limit:20,used:6,remaining:14});
+ expect((await readUsage(db,target.subject)).period).toMatchObject({limit:4650,used:6,remaining:4644});
+ expect((await readUsage(db,target.subject)).day).toMatchObject({limit:150,used:6,remaining:144});
  // Budget checks include linked spend, even though historical receipts remain separate.
- await db.update(schema.usageBuckets).set({settledCredits:19}).where(sql`${schema.usageBuckets.userId}=${target.owner.id} AND ${schema.usageBuckets.retiredAt} IS NULL`);
+ await db.update(schema.usageBuckets).set({settledCredits:149}).where(sql`${schema.usageBuckets.userId}=${target.owner.id} AND ${schema.usageBuckets.retiredAt} IS NULL`);
  expect(await target.admission.admit(target.subject,target.request)).toEqual({kind:'DENIED',code:'BUDGET_EXCEEDED'});
 });
 it('does not renew an expired lifetime guest grant',async()=>{
@@ -95,3 +97,27 @@ it('persists a version-three answer and reconciles late search costs without cha
  expect((await db.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,admitted.run.id)))[0]).toEqual(original);
  expect((await db.select().from(schema.runReconciliations).where(eq(schema.runReconciliations.runId,admitted.run.id)))[0].remainingHeldMicroUsd).toBe(0n);
 });
+
+// Real admission, accounting and completion; only providers are deterministic doubles.
+it.each([true,false])('allows ten daily answers and rejects the eleventh (guest=%s)',async guest=>{
+ const p=await fixture(guest),{sessionId}=await completionSession(db,p.subject);
+ const complete=createAnswerCompletion(db,{answer:{modelId:'test/answer',generate:async()=>({text:'Water refracts sunlight [S1].',usage:knownUsage})},output:fakeSafety()});
+ for(let index=0;index<10;index++){
+  // Advance past the independent per-minute throttle without weakening production policy.
+  await db.delete(schema.admissionAttemptBuckets).where(sql`${schema.admissionAttemptBuckets.userId}=${p.owner.id} AND ${schema.admissionAttemptBuckets.kind}='MINUTE'`);
+  const [conversation]=await db.insert(schema.conversations).values({userId:p.owner.id,creationRequestId:randomUUID(),creationFingerprint:'daily-test',title:'Daily test'}).returning();
+  const request={...p.request,conversationId:conversation.id,clientRequestId:randomUUID(),expectedRevision:conversation.revision};
+  const admitted=await p.admission.admit(p.subject,request);expect(admitted.kind).toBe('ADMITTED');if(admitted.kind!=='ADMITTED')throw Error(`Answer ${index+1} denied`);
+  await prepareCompletion(db,{subject:p.subject,runId:admitted.run.id,request});
+  expect((await complete.complete(p.subject,sessionId,admitted.run.id,new AbortController().signal)).kind).toBe('COMMITTED');
+ }
+ const usage=await readUsage(db,p.subject);
+ expect(usage.answers).toMatchObject({limit:10,used:10,reserved:0,remaining:0});
+ expect(await p.admission.admit(p.subject,{...p.request,clientRequestId:randomUUID()})).toEqual({kind:'DENIED',code:'BUDGET_EXCEEDED'});
+ if(guest){
+  const target=await fixture(false);await linkGuest(db,p.subject,target.subject);
+  expect((await readUsage(db,target.subject)).answers).toMatchObject({used:10,remaining:0});
+  expect((await readUsage(db,target.subject)).day).toMatchObject({used:20,remaining:130});
+  expect(await target.admission.admit(target.subject,target.request)).toEqual({kind:'DENIED',code:'BUDGET_EXCEEDED'});
+ }
+},30000);

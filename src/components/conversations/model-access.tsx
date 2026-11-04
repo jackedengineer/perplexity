@@ -7,7 +7,7 @@ import {usePathname} from 'next/navigation';
 import * as z from 'zod/mini';
 const windowSchema=z.object({limit:z.number(),used:z.number(),reserved:z.number(),remaining:z.number(),resetsAt:z.string()});
 const accessSchema=z.object({models:z.array(z.object({key:z.enum(['fast-default','economy-nano','economy-mistral','economy-qwen','economy-gemini','standard-deepseek','standard-gemini-flash','standard-qwen-max','standard-qwen-397b']),name:z.string(),credits:z.number(),band:z.enum(['ECONOMY','STANDARD'])})),
- usage:z.object({subscription:z.optional(z.nullable(z.object({plan:z.literal('PRO'),endsAt:z.string(),reportsRemaining:z.number()}))),tier:z.enum(['GUEST','FREE']),period:windowSchema,day:windowSchema,paymentsEnabled:z.literal(false)})});
+ usage:z.object({answers:z.optional(windowSchema),subscription:z.optional(z.nullable(z.object({plan:z.literal('PRO'),endsAt:z.string(),reportsRemaining:z.number()}))),tier:z.enum(['GUEST','FREE']),period:windowSchema,day:windowSchema,paymentsEnabled:z.literal(false)})});
 type Access=z.infer<typeof accessSchema>;
 type ModelKey=Access['models'][number]['key'];
 const AccessContext=createContext<{data:Access|null;key:ModelKey;select:(key:ModelKey)=>void;refresh:()=>void;error:string;mode:ConversationMode;setMode:(mode:ConversationMode)=>void;deepAvailable:boolean;favorites:string[];favorite:(key:ModelKey)=>void}>({data:null,key:'fast-default',select:()=>{},refresh:()=>{},error:'',mode:'FAST',setMode:()=>{},deepAvailable:false,favorites:[],favorite:()=>{}});
@@ -39,5 +39,5 @@ export function UsageSummary(){const {data,error,refresh,key,mode,deepAvailable}
  if(mode==='DEEP')return <p className="usage-summary">{!deepAvailable?'Deep Research is temporarily paused.':data.usage.subscription?`${data.usage.subscription.reportsRemaining} reports remaining · 1 report per completed run`:'Pro · 7 Deep Research reports per month'} · Up to 15 minutes</p>;
  if(!data.models.length)return <p className="usage-summary" role="status">Answers are temporarily paused. Your saved chats are available. <button type="button" className="text-button" onClick={refresh}>Check availability</button></p>;
  const selected=data.models.find(model=>model.key===key);
- return <p className="usage-summary">{selected?.credits??'—'} credits / answer · {data.usage.period.remaining} left{data.usage.period.reserved>0?` · ${data.usage.period.reserved} reserved`:''} · {mode==='CHAT'?'No web search':'Web sources included'}</p>;
+ return <p className="usage-summary">{selected?.credits??'—'} credits / answer · {Math.min(data.usage.day.remaining,data.usage.period.remaining)} credits left today{data.usage.answers?` · ${data.usage.answers.remaining}/${data.usage.answers.limit} answers left today`:''} · {mode==='CHAT'?'No web search':'Web sources included'}</p>;
 }

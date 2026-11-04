@@ -15,12 +15,12 @@ it('issues one free grant despite repeated logins and preserves existing spend',
  await db.update(schema.usageBuckets).set({settledCredits:4}).where(eq(schema.usageBuckets.userId,p.id));
  await db.execute(sql`SELECT ensure_free_credits(${p.id}::uuid)`);
  const grants=await db.select().from(schema.creditGrants).where(eq(schema.creditGrants.userId,p.id));
- expect(grants).toHaveLength(1);expect(grants[0].credits).toBe(40);
+ expect(grants).toHaveLength(1);expect(grants[0].credits).toBe(4650);
  expect((await db.select().from(schema.usageBuckets).where(eq(schema.usageBuckets.userId,p.id))).map(x=>x.settledCredits)).toEqual([4,4]);
 });
-it('grants six lifetime guest credits and never grants unverified registered accounts',async()=>{
+it('grants enough credits for ten daily guest answers during the trial and never grants unverified registered accounts',async()=>{
  const guest=await person(true,false);await db.execute(sql`SELECT ensure_free_credits(${guest.id}::uuid)`);
- expect((await db.select().from(schema.creditGrants).where(eq(schema.creditGrants.userId,guest.id)))[0].credits).toBe(6);
+ expect((await db.select().from(schema.creditGrants).where(eq(schema.creditGrants.userId,guest.id)))[0].credits).toBe(620);
  const unverified=await person(false,false);await expect(db.execute(sql`SELECT ensure_free_credits(${unverified.id}::uuid)`)).rejects.toThrow();
 });
 it('writes one append-only reservation/charge/release audit per admitted run',async()=>{

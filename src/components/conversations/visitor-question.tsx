@@ -19,7 +19,7 @@ export function VisitorQuestion({guestEnabled,siteKey}: {guestEnabled:boolean;si
         {guestEnabled?<button className="send-button" type="submit" aria-label="Start guest trial"><Icon name="arrow" size={18}/></button>:<GoogleSignIn compact label="Sign in to send"/>}
       </div>
     </form>
-    <p className="usage-summary">{guestEnabled?'Try three answers free, or sign in to save your conversations.':'Sign in to start researching and save your conversations.'}</p>
+    <p className="usage-summary">{guestEnabled?'Try ten answers a day, or sign in to save your conversations.':'Sign in to start researching and save your conversations.'}</p>
     {trial&&<div className="visitor-trial"><GuestSignIn siteKey={siteKey}/></div>}
   </section>;
 }
