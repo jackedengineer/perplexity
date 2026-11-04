@@ -1,5 +1,7 @@
 'use client';
 import {useModelAccess} from '@/components/conversations/model-access';
+import {readReportStream} from './read-report-stream';
+import {ResearchClarification} from './research-clarification';
 import {ResearchReport} from './research-report';
 import {DeleteResearch} from './delete-research';
 import Link from 'next/link';
@@ -8,14 +10,16 @@ import {useEffect,useRef,useState} from 'react';
 import type {JobView,JobEvent} from '@/server/jobs/contracts';
 import './jobs.css';
 type Summary={id:string;state:string;createdAt:string;workflow?:string;question?:string|null};
-const messages:Record<string,string>={QUEUED:'Waiting for a worker',RUNNING:'Worker connected',STEP_STARTED:'Checkpoint started',STEP_COMPLETED:'Checkpoint saved',RECOVERED:'Resuming from saved progress',CANCELLED:'Execution stopped',COMPLETED:'Execution check complete',FAILED:'Execution needs attention',EXPIRED:'Execution window ended',COST_UNKNOWN:'Uncertain cost remains reserved'};
+const messages:Record<string,string>={NEEDS_INPUT:'Waiting for your answers',QUEUED:'Waiting for a worker',RUNNING:'Worker connected',STEP_STARTED:'Checkpoint started',STEP_COMPLETED:'Checkpoint saved',RECOVERED:'Resuming from saved progress',CANCELLED:'Execution stopped',COMPLETED:'Execution check complete',FAILED:'Execution needs attention',EXPIRED:'Execution window ended',COST_UNKNOWN:'Uncertain cost remains reserved'};
 const researchMessages:Record<string,string>={STEP_STARTED:'Working on',STEP_COMPLETED:'Saved',COMPLETED:'Research complete'};
+const researchStepLabel=(step:string)=>step.startsWith('candidate-')?`Independent analysis ${Number(step.slice(10))+1} of 3`:step==='judge'?'Checking claims and composing the report':step.replaceAll('-',' ');
 class JobHttpError extends Error{constructor(message:string,public status:number){super(message);}}
 async function responseBody(response:Response){let body;try{body=await response.json();}catch{throw new JobHttpError('The service could not be reached. Please try again.',response.status);}
  if(!response.ok)throw new JobHttpError(body.error?.message??'Please try again in a moment.',response.status);return body;}
 export function JobConsole({initialJobs,initialId,billingAvailable,deepAvailable=false,environment='TEST'}:{initialJobs:Summary[];initialId:string|null;billingAvailable:boolean;deepAvailable?:boolean;environment?:'TEST'|'LIVE'}){
  const {refresh}=useModelAccess();
  const router=useRouter(),[id,setId]=useState(initialId),[job,setJob]=useState<JobView|null>(null),[events,setEvents]=useState<JobEvent[]>([]);
+ const continuationIntent=useRef<{signature:string;requestId:string}|null>(null);
  const [expanded,setExpanded]=useState(false);
  const test=environment==='TEST',[removedIds,setRemovedIds]=useState<string[]>([]);
  const [question,setQuestion]=useState(''),[mode,setMode]=useState<'research'|'check'>(deepAvailable||!test?'research':'check');
@@ -24,45 +28,61 @@ export function JobConsole({initialJobs,initialId,billingAvailable,deepAvailable
   if(!id)return;const controller=new AbortController();let cursor=0,failures=0,timer:ReturnType<typeof setTimeout>;
   async function poll(){
    try{
-    const body=await responseBody(await fetch(`/api/jobs/${id}?after=${cursor}`,{signal:controller.signal,cache:'no-store'}));
+    const body=await responseBody(await fetch(`/api/jobs/${id}?after=${cursor}&report=stream`,{signal:controller.signal,cache:'no-store'}));
     if(controller.signal.aborted)return;
     const incoming=body.events as JobEvent[];cursor=incoming.at(-1)?.sequence??cursor;
-    failures=0;setJob(body.job);setEvents(previous=>{const before=previous.filter(e=>e.sequence<=(incoming[0]?.sequence??Infinity)-1);return [...before,...incoming];});setError('');
-    if(['QUEUED','RUNNING'].includes(body.job.state)||cursor<body.job.cursor)timer=setTimeout(poll,document.hidden?10000:2000);else refresh();
-   }catch(e){if(!controller.signal.aborted){const reconnect=!(e instanceof JobHttpError)||[408,429,500,502,503,504].includes(e.status);setError(reconnect?'Connection interrupted. Reconnecting to saved progress…':e instanceof Error?e.message:'Connection interrupted. Your job is saved.');if(reconnect&&failures++<5)timer=setTimeout(poll,Math.min(15000,2000*2**failures));}}
+    setJob(body.job);setEvents(previous=>{const before=previous.filter(e=>e.sequence<=(incoming[0]?.sequence??Infinity)-1);return [...before,...incoming];});setError('');
+    if(['QUEUED','RUNNING'].includes(body.job.state)||cursor<body.job.cursor){failures=0;timer=setTimeout(poll,document.hidden?10000:2000);}else {
+     if(body.job.state==='COMPLETED'&&body.job.workflow.startsWith('deep-research-')&&!body.job.report)await readReportStream(id!,controller.signal,report=>setJob((current)=>current?.id===id?{...current,report}:current));
+     failures=0;
+     refresh();
+    }
+   }catch(e){if(!controller.signal.aborted){
+    const reconnect=!(e instanceof JobHttpError)||[408,429,500,502,503,504].includes(e.status),retryAutomatically=reconnect&&failures<5;
+    setError(retryAutomatically?'Connection interrupted. Reconnecting to saved progress…':reconnect?'Connection interrupted. Your job is saved.':e instanceof Error?e.message:'Connection interrupted. Your job is saved.');
+    if(retryAutomatically){failures++;timer=setTimeout(poll,Math.min(15000,2000*2**failures));}
+   }}
   }
   void poll();return()=>{controller.abort();clearTimeout(timer);};
  },[id,retry,refresh]);
  async function start(){
   if(busy)return;setBusy(true);setError('');intent.current??=crypto.randomUUID();
   try{
-   const body=await responseBody(await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(mode==='research'?{version:1,workflow:'deep-research-v1',question,locale:'en',requestId:intent.current}:{version:1,workflow:'execution-check-v1',requestId:intent.current})}));
+   const body=await responseBody(await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(mode==='research'?{version:1,workflow:'deep-research-v2',question,locale:'en',requestId:intent.current}:{version:1,workflow:'execution-check-v1',requestId:intent.current})}));
    setEvents([]);setJob(null);setId(body.id);router.replace(`/jobs?job=${body.id}`,{scroll:false});intent.current=null;
   }catch(e){setError(e instanceof Error?e.message:'Could not start. Retry uses the same request.');}finally{setBusy(false);}
  }
  async function cancel(){if(!id||busy)return;setBusy(true);setError('');try{
   const body=await responseBody(await fetch(`/api/jobs/${id}/cancel`,{method:'POST'}));setJob(body.job);setRetry(n=>n+1);
  }catch(e){setError(e instanceof Error?e.message:'Could not confirm cancellation. Retry Stop.');}finally{setBusy(false);}}
+ async function continueResearch(answers:{id:'Q1'|'Q2';answer:string}[]){
+  if(!job||busy)return;setBusy(true);setError('');const signature=JSON.stringify({id:job.id,answers});
+  if(continuationIntent.current?.signature!==signature)continuationIntent.current={signature,requestId:crypto.randomUUID()};
+  try{const body=await responseBody(await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:1,workflow:'deep-research-v2',question:job.question,locale:job.locale??navigator.language,requestId:continuationIntent.current.requestId,continuation:{jobId:job.id,answers}})}));
+   setEvents([]);setJob(null);setId(body.id);router.replace(`/jobs?job=${body.id}`,{scroll:false});continuationIntent.current=null;
+  }catch(e){setError(e instanceof Error?e.message:'Could not save your answers. Please retry.');}finally{setBusy(false);}
+ }
  const active=job&&['QUEUED','RUNNING'].includes(job.state);
- const compact=job?.workflow==='deep-research-v1'&&events.length>6,visibleEvents=compact&&!expanded?events.slice(-6):events;
- return <section className="jobs-page" aria-labelledby="jobs-heading">
+ const compact=job?.workflow.startsWith('deep-research-')&&events.length>6,visibleEvents=compact&&!expanded?events.slice(-6):events;
+ return <main id="main" className="jobs-page" aria-labelledby="jobs-heading">
   <header><span className="jobs-eyebrow">{test?'PRO · TEST ENVIRONMENT':'PRO · PRIVATE RESEARCH'}</span><h1 id="jobs-heading">{deepAvailable||!test?'Deep Research':'Durable execution'}</h1><p>Your work can keep going when you leave. Saved checkpoints let a worker resume safely.</p></header>
   {deepAvailable&&test&&<div className="deep-modes" role="group" aria-label="Work type"><button aria-pressed={mode==='research'} onClick={()=>setMode('research')} disabled={busy}>Deep Research</button><button aria-pressed={mode==='check'} onClick={()=>setMode('check')} disabled={busy}>Execution check</button></div>}
-  <section className="jobs-card" aria-labelledby="execution-title"><div className="jobs-card-heading"><div><h2 id="execution-title">{mode==='research'?'Explore a question in depth':'Execution check'}</h2><p>{mode==='research'?'Two research rounds, selected-page reading, and a cited report.':'Tests saved progress, recovery and Stop. No AI, web searches or browser actions.'}</p></div><span className="jobs-badge">{test?'Sandbox':'Pro'}</span></div>
+  <section className="jobs-card" aria-labelledby="execution-title"><div className="jobs-card-heading"><div><h2 id="execution-title">{mode==='research'?'Explore a question in depth':'Execution check'}</h2><p>{mode==='research'?'Three independent analyses, one evidence judge, and a cited report.':'Tests saved progress, recovery and Stop. No AI, web searches or browser actions.'}</p></div><span className="jobs-badge">{test?'Sandbox':'Pro'}</span></div>
    {mode==='research'?<div className="deep-composer"><label htmlFor="research-question">Research question</label><textarea id="research-question" value={question} maxLength={1000} rows={4} placeholder="What would you like to understand? Include your constraints and timeframe." disabled={busy} onChange={e=>{setQuestion(e.target.value);intent.current=null;}}/><small>{question.length}/1,000 · {test?'Pro test access':'Verified Pro access'} · up to 15 minutes</small></div>:<p className="jobs-note">This check does not generate a research report or perform a task.</p>}
    {!test&&!deepAvailable&&<p className="jobs-note" role="status">New research is paused. Your saved reports and Stop remain available.</p>}
    <div className="jobs-actions"><button className="jobs-primary" onClick={start} disabled={busy||!!active||!!id&&!job||mode==='research'&&(!question.trim()||!deepAvailable)}>{busy&&!active?'Starting…':mode==='research'?'Start research':'Run execution check'}</button>{billingAvailable&&<Link href="/billing">{test?'Pro test subscription ↗':'Pro billing ↗'}</Link>}</div>
   </section>
-  {id&&<section className="jobs-card" aria-labelledby="progress-title" aria-busy={!job&&!error}><div className="jobs-card-heading"><div><h2 id="progress-title">{job?.workflow==='deep-research-v1'&&job.state==='COMPLETED'?'Research report ready':job?messages[job.state]??job.state:'Loading saved progress…'}</h2><p>Closing this page does not cancel the job.</p></div>{active&&<button className="jobs-stop" disabled={busy} onClick={cancel}>{busy?'Stopping…':'Stop'}</button>}</div>
+  {id&&<section className="jobs-card" aria-labelledby="progress-title" aria-busy={!job&&!error}><div className="jobs-card-heading"><div><h2 id="progress-title">{job?.workflow.startsWith('deep-research-')&&job.state==='COMPLETED'?'Research report ready':job?messages[job.state]??job.state:'Loading saved progress…'}</h2><p>Closing this page does not cancel the job.</p></div>{active&&<button className="jobs-stop" disabled={busy} onClick={cancel}>{busy?'Stopping…':'Stop'}</button>}</div>
    {job?.notice&&<p className="jobs-note" role="status">{job.notice}</p>}
    {job?.question&&<p className="deep-question">{job.question}</p>}
-   <ol className="jobs-timeline" aria-label="Saved progress">{visibleEvents.map(event=><li key={event.sequence}><span className="jobs-dot"/><div>{job?.workflow==='deep-research-v1'?(researchMessages[event.code]??messages[event.code]):messages[event.code]}{event.step&&<small>{event.step.replaceAll('-',' ')}</small>}</div><time dateTime={event.createdAt}>{new Date(event.createdAt).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</time></li>)}</ol>{compact&&<button className="jobs-progress-toggle" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}>{expanded?'Show recent updates':`Show all ${events.length} updates`}</button>}
+   <ol className="jobs-timeline" aria-label="Saved progress">{visibleEvents.map(event=><li key={event.sequence}><span className="jobs-dot"/><div>{job?.workflow.startsWith('deep-research-')?(researchMessages[event.code]??messages[event.code]):messages[event.code]}{event.step&&<small>{researchStepLabel(event.step)}</small>}</div><time dateTime={event.createdAt}>{new Date(event.createdAt).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</time></li>)}</ol>{compact&&<button className="jobs-progress-toggle" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}>{expanded?'Show recent updates':`Show all ${events.length} updates`}</button>}
    {job?.state==='COMPLETED'&&job.workflow==='execution-check-v1'&&<p className="jobs-receipt">All three checkpoints are saved. This was an execution check; no AI answer was generated.</p>}
    {job&&job.heldMicroUsd!=='0'&&<p className="jobs-note">An uncertain provider cost remains reserved for reconciliation.</p>}
   </section>}
+  {job?.clarification&&<ResearchClarification key={job.id} value={job.clarification} busy={busy} onContinue={continueResearch}/>}
   {job?.report&&<ResearchReport report={job.report}/>}
-  {job?.workflow==='deep-research-v1'&&<DeleteResearch key={job.id} id={job.id} disabled={busy} onDeleted={()=>{setRemovedIds(ids=>[...ids,job.id]);setId(null);setJob(null);setEvents([]);router.replace('/jobs',{scroll:false});router.refresh();}}/>}
+  {job?.workflow.startsWith('deep-research-')&&<DeleteResearch key={job.id} id={job.id} disabled={busy} onDeleted={()=>{setRemovedIds(ids=>[...ids,job.id]);setId(null);setJob(null);setEvents([]);router.replace('/jobs',{scroll:false});router.refresh();}}/>}
   {error&&<div className="jobs-error" role="alert"><p>{error}</p>{id&&<button onClick={()=>setRetry(n=>n+1)}>Reconnect to saved progress</button>}</div>}
-  {initialJobs.some(j=>!removedIds.includes(j.id))&&<section className="jobs-history"><h2>Recent work</h2>{initialJobs.filter(j=>!removedIds.includes(j.id)).map(j=><Link key={j.id} href={`/jobs?job=${j.id}`} onClick={()=>{setEvents([]);setJob(null);setId(j.id);setRetry(n=>n+1);}}><span title={j.question??undefined}>{j.question??(j.workflow==='deep-research-v1'?'Deep Research':'Execution check')}</span><span>{j.id===job?.id?job.state:j.state}<small>{new Date(j.createdAt).toLocaleDateString('en-GB',{timeZone:'UTC',day:'numeric',month:'short',year:'numeric'})}</small></span></Link>)}</section>}
- </section>;
+  {initialJobs.some(j=>!removedIds.includes(j.id))&&<section className="jobs-history"><h2>Recent work</h2>{initialJobs.filter(j=>!removedIds.includes(j.id)).map(j=><Link key={j.id} href={`/jobs?job=${j.id}`} onClick={()=>{setEvents([]);setJob(null);setId(j.id);setRetry(n=>n+1);}}><span title={j.question??undefined}>{j.question??(j.workflow?.startsWith('deep-research-')?'Deep Research':'Execution check')}</span><span>{j.id===job?.id?job.state:j.state}<small>{new Date(j.createdAt).toLocaleDateString('en-GB',{timeZone:'UTC',day:'numeric',month:'short',year:'numeric'})}</small></span></Link>)}</section>}
+ </main>;
 }

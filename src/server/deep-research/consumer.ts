@@ -3,7 +3,7 @@ import type {JobDatabase} from '@/server/jobs/store';
 import {JobError} from '@/server/jobs/contracts';
 import {claimJob,startStep,completeStep,completeJob,failJob,heartbeat} from '@/server/jobs/worker';
 import {readCheckpoint,checkpointStops} from './checkpoints';
-import {deepResearch} from './contracts';
+import {manifestFor} from '@/server/jobs/contracts';
 import {loadResearch,researchExecutor} from './executor';
 import {createDeepProviders,type DeepProviders} from './providers';
 import {durableJobs} from '@/db/schema';
@@ -22,7 +22,7 @@ export async function consumeResearch(db:JobDatabase,id:string,options:{signal?:
   const snapshot=await loadResearch(db,id);
   const providers=options.providers??createDeepProviders(snapshot,options.providerEnvironment);
   const execute=researchExecutor(db,id,snapshot,providers);
-  for(const step of deepResearch.steps){
+  for(const step of manifestFor(snapshot.version).steps){
    if(signal.aborted)throw new JobError('STALE');
    if(await startStep(db,lease,step.key)==='DONE'){
     if(checkpointStops(await readCheckpoint(db,id,step.key))){await failJob(db,lease);return 'FAILED' as const;}
@@ -31,8 +31,9 @@ export async function consumeResearch(db:JobDatabase,id:string,options:{signal?:
    currentStep=step.key;const started=performance.now();
    const result=await execute(step.key,{signal,deadlineAt:job.deadlineAt});
    if(signal.aborted)throw new JobError('STALE');
-   await completeStep(db,lease,step.key,result.cost,result.value,!!result.stop);
-   console.info(JSON.stringify({event:'jobs.step',jobId:id,step:step.key,outcome:result.stop?'DENIED':'SUCCEEDED',costMicroUsd:result.cost.toString(),durationMs:Math.round(performance.now()-started)}));
+   await completeStep(db,lease,step.key,result.cost,result.value,result.needsInput?'NEEDS_INPUT':!!result.stop);
+   console.info(JSON.stringify({event:'jobs.step',jobId:id,step:step.key,outcome:result.needsInput?'NEEDS_INPUT':result.stop?'DENIED':'SUCCEEDED',costMicroUsd:result.cost.toString(),durationMs:Math.round(performance.now()-started)}));
+   if(result.needsInput)return 'NEEDS_INPUT' as const;
    if(result.stop)return 'FAILED' as const;
   }
   await completeJob(db,lease);return 'COMPLETED' as const;

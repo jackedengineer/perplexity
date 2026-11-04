@@ -1,3 +1,7 @@
+import {readContinuation} from '@/server/deep-research/continuation';
+import {scopeDecision} from '@/server/deep-research/scope';
+import {CONSENSUS_MODELS} from '@/server/deep-research/consensus-models';
+import {resolveResearchTime} from '@/server/deep-research/time';
 import {PRO_OFFER} from '@/lib/pro-offer';
 import {createHash,randomUUID} from 'node:crypto';
 import {and,eq,gt,inArray,isNull,lte,or,sql} from 'drizzle-orm';
@@ -6,18 +10,18 @@ import {JobError,manifestFor,jobSubmission,type JobView,type JobEvent,type JobSt
 import {SAFETY_RESPONSES} from '@/server/safety/responses';
 import {presentAnswer} from '@/server/answers/presentation';
 import {inspectInput} from '@/server/safety/deterministic';
-import {researchModels,researchReport} from '@/server/deep-research/contracts';
+import {researchModels,researchReport,researchSnapshot} from '@/server/deep-research/contracts';
 import {readCheckpoint} from '@/server/deep-research/checkpoints';
 import {appendEvent,databaseNow,ownerFor,type JobDatabase} from './store';
 import type {JobEnvironment} from './configuration';
 export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetKey:string,models?:import('zod').infer<typeof researchModels>,environment:JobEnvironment='TEST',beforeCommit?:()=>Promise<void>){
  const parsed=jobSubmission.safeParse(raw);if(!parsed.success||!budgetKey)throw new JobError('INVALID_INPUT');
  const input=parsed.data,manifest=manifestFor(input.workflow);
- if(environment==='LIVE'&&(input.workflow!=='deep-research-v1'||!budgetKey.startsWith('live-')))throw new JobError('INVALID_INPUT');
- if(input.workflow==='deep-research-v1'&&!models)throw new JobError('DISABLED');
- if(input.workflow==='deep-research-v1'){const blocked=inspectInput({text:input.question,context:[]});if(blocked)throw new JobError(blocked==='ACCIDENTAL_SECRET'?'REDACT_SECRET':'INPUT_BLOCKED');}
+ if(environment==='LIVE'&&(input.workflow==='execution-check-v1'||!budgetKey.startsWith('live-')))throw new JobError('INVALID_INPUT');
+ if(input.workflow!=='execution-check-v1'&&!models)throw new JobError('DISABLED');
+ if(input.workflow!=='execution-check-v1'){const blocked=inspectInput({text:input.question,context:[]});if(blocked)throw new JobError(blocked==='ACCIDENTAL_SECRET'?'REDACT_SECRET':'INPUT_BLOCKED');}
  // Preserve historical TEST intent hashes; LIVE intents cannot replay them.
- const intent=input.workflow==='deep-research-v1'?{version:input.version,workflow:input.workflow,question:input.question,locale:input.locale}:{version:input.version,workflow:input.workflow};
+ const intent=input.workflow!=='execution-check-v1'?{version:input.version,workflow:input.workflow,question:input.question,locale:input.locale,...(input.workflow==='deep-research-v2'&&input.continuation?{continuation:input.continuation}:{})}:{version:input.version,workflow:input.workflow};
  const fingerprint=createHash('sha256').update(JSON.stringify(environment==='LIVE'?{environment,...intent}:intent)).digest('hex');
  return db.transaction(async tx=>{
   await tx.execute(sql`SET LOCAL lock_timeout='2s'`);
@@ -27,6 +31,10 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
   if(prior){if(prior.deletedAt)throw new JobError('NOT_FOUND');if(prior.fingerprint!==fingerprint)throw new JobError('CONFLICT');if(['QUEUED','RUNNING'].includes(prior.state))await beforeCommit?.();return prior.id;}
   if((await tx.select({id:jobs.id}).from(jobs).where(and(eq(jobs.userId,owner),inArray(jobs.state,['QUEUED','RUNNING']))).limit(1)).length)throw new JobError('CONFLICT');
   const now=await databaseNow(tx);
+  const context=input.workflow==='deep-research-v2'?await readContinuation(tx,owner,environment,input.question,input.continuation):undefined;
+  if(context){const blocked=inspectInput({text:input.workflow==='deep-research-v2'?input.question:'',context:context.clarifications.map(c=>({role:'USER' as const,text:c.answer}))});if(blocked)throw new JobError(blocked==='ACCIDENTAL_SECRET'?'REDACT_SECRET':'INPUT_BLOCKED');}
+  let time:ReturnType<typeof resolveResearchTime>|undefined;
+  if(input.workflow==='deep-research-v2'){try{time=resolveResearchTime([input.question,...context!.clarifications.map(c=>c.answer)].join(' '),now);}catch{throw new JobError('INVALID_INPUT');}}
   const [period]=await tx.select().from(periods).where(and(eq(periods.userId,owner),eq(periods.environment,environment),eq(periods.state,'ACTIVE'),lte(periods.startsAt,now),gt(periods.endsAt,now)))
    .orderBy(periods.endsAt,periods.id).limit(1).for('update');
   if(!period)throw new JobError('PAYMENT_REQUIRED');
@@ -50,7 +58,7 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
   const [job]=await tx.insert(jobs).values({userId:owner,requestId:input.requestId,fingerprint,workflow:input.workflow,periodId:period.id,createdAt:now,deadlineAt:new Date(Math.min(now.getTime()+manifest.deadlineMs,period.endsAt.getTime(),...windows.map(w=>w.endsAt.getTime())))}).returning();
   await tx.insert(reservations).values({jobId:job.id,budgetKey,operatorPeriodId:month.id,operatorDayId:day.id,reservedMicroUsd:reserve});
   await tx.insert(steps).values(manifest.steps.map(s=>({jobId:job.id,...s})));
-  if(input.workflow==='deep-research-v1')await tx.insert(jobResearchInputs).values({jobId:job.id,snapshot:{question:input.question,locale:input.locale,models:researchModels.parse(models),policy:'v1',version:'deep-research-v1'}});
+  if(input.workflow!=='execution-check-v1'){const snapshot=researchSnapshot.parse({question:input.question,locale:input.locale,models:researchModels.parse(input.workflow==='deep-research-v2'?{...models,planner:CONSENSUS_MODELS.candidates[2],answer:CONSENSUS_MODELS.judge}:models),...(input.workflow==='deep-research-v2'?{policy:'v2' as const,version:'deep-research-v2' as const,consensus:{models:CONSENSUS_MODELS,time:time!},...context}:{policy:'v1' as const,version:'deep-research-v1' as const})});if(Buffer.byteLength(JSON.stringify(snapshot))>10500)throw new JobError('INVALID_INPUT');await tx.insert(jobResearchInputs).values({jobId:job.id,snapshot});}
   await tx.insert(outbox).values({jobId:job.id});await appendEvent(tx,job.id,'QUEUED');
   // A failed external wake-up rolls back the whole admission, rather than
   // accepting work whose dispatch hint was never durably recorded.
@@ -59,14 +67,16 @@ export async function admitJob(db:JobDatabase,subject:string,raw:unknown,budgetK
  });
 }
 export async function readJob(db:JobDatabase,subject:string,id:string):Promise<JobView>{
- const [row]=await db.select({job:jobs,reservation:reservations,question:sql<string|null>`${jobResearchInputs.snapshot}->>'question'`}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))
+ const [row]=await db.select({job:jobs,reservation:reservations,question:sql<string|null>`${jobResearchInputs.snapshot}->>'question'`,locale:sql<string|null>`${jobResearchInputs.snapshot}->>'locale'`}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))
   .innerJoin(reservations,eq(reservations.jobId,jobs.id)).leftJoin(jobResearchInputs,eq(jobResearchInputs.jobId,jobs.id)).where(and(eq(jobs.id,id),eq(appUsers.authSubject,subject),isNull(jobs.deletedAt))).limit(1);
  if(!row)throw new JobError('NOT_FOUND');const {job,reservation}=row;
  let notice:string|undefined;
  if(job.state==='FAILED'){const [failure]=await db.select({code:sql<string>`${jobCheckpoints.value}->>'notice'`}).from(jobCheckpoints).where(and(eq(jobCheckpoints.jobId,id),sql`${jobCheckpoints.value}->>'notice' IS NOT NULL`)).orderBy(sql`${jobCheckpoints.createdAt} DESC`).limit(1);notice=Object.values(SAFETY_RESPONSES).find(r=>r.code===failure?.code)?.text;}
- const privateReport=job.workflow==='deep-research-v1'&&job.state==='COMPLETED'?researchReport.parse(await readCheckpoint(db,id,'publish')):undefined;
- const report=privateReport?{question:privateReport.question,createdAt:privateReport.createdAt,sections:privateReport.sections.map(s=>({title:s.title,markdown:s.answer.markdown,answer:presentAnswer(s.answer)}))}:undefined;
- return {...(notice?{notice}:{}),...(row.question?{question:row.question}:{}),...(report?{report}:{}),id:job.id,workflow:job.workflow,state:job.state as JobState,createdAt:job.createdAt.toISOString(),deadlineAt:job.deadlineAt.toISOString(),cursor:job.nextEvent-1,heldMicroUsd:reservation.heldMicroUsd.toString(),spentMicroUsd:reservation.spentMicroUsd.toString()};
+ const privateReport=job.workflow.startsWith('deep-research-')&&job.state==='COMPLETED'?researchReport.parse(await readCheckpoint(db,id,'publish')):undefined;
+ let clarification;
+ if(job.state==='NEEDS_INPUT'){const scope=scopeDecision.parse(await readCheckpoint(db,id,'plan'));const [input]=await db.select().from(jobResearchInputs).where(eq(jobResearchInputs.jobId,id));if(scope.action!=='CLARIFY'||input.snapshot.version!=='deep-research-v2')throw new JobError('UNAVAILABLE');clarification={questions:scope.questions,canContinue:(input.snapshot.clarificationRounds??0)<2};}
+ const report=privateReport?{...(privateReport.brief?{brief:privateReport.brief}:{}),...(privateReport.consensus?{consensus:privateReport.consensus}:{}),question:privateReport.question,createdAt:privateReport.createdAt,sections:privateReport.sections.map(s=>({title:s.title,markdown:s.answer.markdown,answer:presentAnswer(s.answer)}))}:undefined;
+ return {...(row.locale?{locale:row.locale}:{}),...(clarification?{clarification}:{}),...(notice?{notice}:{}),...(row.question?{question:row.question}:{}),...(report?{report}:{}),id:job.id,workflow:job.workflow,state:job.state as JobState,createdAt:job.createdAt.toISOString(),deadlineAt:job.deadlineAt.toISOString(),cursor:job.nextEvent-1,heldMicroUsd:reservation.heldMicroUsd.toString(),spentMicroUsd:reservation.spentMicroUsd.toString()};
 }
 export async function listJobs(db:JobDatabase,subject:string){
  return db.select({id:jobs.id,state:jobs.state,createdAt:jobs.createdAt,workflow:jobs.workflow,question:sql<string|null>`${jobResearchInputs.snapshot}->>'question'`}).from(jobs).innerJoin(appUsers,eq(jobs.userId,appUsers.id))

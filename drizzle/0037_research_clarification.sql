@@ -1,0 +1,4 @@
+ALTER TABLE "durable_jobs" DROP CONSTRAINT "job_snapshot_valid";--> statement-breakpoint
+ALTER TABLE "job_events" DROP CONSTRAINT "job_event_valid";--> statement-breakpoint
+ALTER TABLE "durable_jobs" ADD CONSTRAINT "job_snapshot_valid" CHECK ("durable_jobs"."workflow" IN ('execution-check-v1','deep-research-v1','deep-research-v2') AND "durable_jobs"."fingerprint" ~ '^[a-f0-9]{64}$' AND "durable_jobs"."generation">=0 AND "durable_jobs"."next_event">0 AND "durable_jobs"."deadline_at">"durable_jobs"."created_at" AND "durable_jobs"."state" IN ('QUEUED','RUNNING','COMPLETED','CANCELLED','FAILED','EXPIRED','NEEDS_INPUT'));--> statement-breakpoint
+ALTER TABLE "job_events" ADD CONSTRAINT "job_event_valid" CHECK ("job_events"."sequence">0 AND "job_events"."code" IN ('QUEUED','RUNNING','STEP_STARTED','STEP_COMPLETED','RECOVERED','CANCELLED','COMPLETED','FAILED','EXPIRED','COST_UNKNOWN','NEEDS_INPUT'));
