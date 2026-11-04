@@ -1,6 +1,7 @@
 'use client';
 import {useModelAccess} from '@/components/conversations/model-access';
 import {readReportStream} from './read-report-stream';
+import {ResearchClarification} from './research-clarification';
 import {ResearchReport} from './research-report';
 import {DeleteResearch} from './delete-research';
 import Link from 'next/link';
@@ -9,7 +10,7 @@ import {useEffect,useRef,useState} from 'react';
 import type {JobView,JobEvent} from '@/server/jobs/contracts';
 import './jobs.css';
 type Summary={id:string;state:string;createdAt:string;workflow?:string;question?:string|null};
-const messages:Record<string,string>={QUEUED:'Waiting for a worker',RUNNING:'Worker connected',STEP_STARTED:'Checkpoint started',STEP_COMPLETED:'Checkpoint saved',RECOVERED:'Resuming from saved progress',CANCELLED:'Execution stopped',COMPLETED:'Execution check complete',FAILED:'Execution needs attention',EXPIRED:'Execution window ended',COST_UNKNOWN:'Uncertain cost remains reserved'};
+const messages:Record<string,string>={NEEDS_INPUT:'Waiting for your answers',QUEUED:'Waiting for a worker',RUNNING:'Worker connected',STEP_STARTED:'Checkpoint started',STEP_COMPLETED:'Checkpoint saved',RECOVERED:'Resuming from saved progress',CANCELLED:'Execution stopped',COMPLETED:'Execution check complete',FAILED:'Execution needs attention',EXPIRED:'Execution window ended',COST_UNKNOWN:'Uncertain cost remains reserved'};
 const researchMessages:Record<string,string>={STEP_STARTED:'Working on',STEP_COMPLETED:'Saved',COMPLETED:'Research complete'};
 const researchStepLabel=(step:string)=>step.startsWith('candidate-')?`Independent analysis ${Number(step.slice(10))+1} of 3`:step==='judge'?'Checking claims and composing the report':step.replaceAll('-',' ');
 class JobHttpError extends Error{constructor(message:string,public status:number){super(message);}}
@@ -18,6 +19,7 @@ async function responseBody(response:Response){let body;try{body=await response.
 export function JobConsole({initialJobs,initialId,billingAvailable,deepAvailable=false,environment='TEST'}:{initialJobs:Summary[];initialId:string|null;billingAvailable:boolean;deepAvailable?:boolean;environment?:'TEST'|'LIVE'}){
  const {refresh}=useModelAccess();
  const router=useRouter(),[id,setId]=useState(initialId),[job,setJob]=useState<JobView|null>(null),[events,setEvents]=useState<JobEvent[]>([]);
+ const continuationIntent=useRef<{signature:string;requestId:string}|null>(null);
  const [expanded,setExpanded]=useState(false);
  const test=environment==='TEST',[removedIds,setRemovedIds]=useState<string[]>([]);
  const [question,setQuestion]=useState(''),[mode,setMode]=useState<'research'|'check'>(deepAvailable||!test?'research':'check');
@@ -53,6 +55,13 @@ export function JobConsole({initialJobs,initialId,billingAvailable,deepAvailable
  async function cancel(){if(!id||busy)return;setBusy(true);setError('');try{
   const body=await responseBody(await fetch(`/api/jobs/${id}/cancel`,{method:'POST'}));setJob(body.job);setRetry(n=>n+1);
  }catch(e){setError(e instanceof Error?e.message:'Could not confirm cancellation. Retry Stop.');}finally{setBusy(false);}}
+ async function continueResearch(answers:{id:'Q1'|'Q2';answer:string}[]){
+  if(!job||busy)return;setBusy(true);setError('');const signature=JSON.stringify({id:job.id,answers});
+  if(continuationIntent.current?.signature!==signature)continuationIntent.current={signature,requestId:crypto.randomUUID()};
+  try{const body=await responseBody(await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:1,workflow:'deep-research-v2',question:job.question,locale:job.locale??navigator.language,requestId:continuationIntent.current.requestId,continuation:{jobId:job.id,answers}})}));
+   setEvents([]);setJob(null);setId(body.id);router.replace(`/jobs?job=${body.id}`,{scroll:false});continuationIntent.current=null;
+  }catch(e){setError(e instanceof Error?e.message:'Could not save your answers. Please retry.');}finally{setBusy(false);}
+ }
  const active=job&&['QUEUED','RUNNING'].includes(job.state);
  const compact=job?.workflow.startsWith('deep-research-')&&events.length>6,visibleEvents=compact&&!expanded?events.slice(-6):events;
  return <main id="main" className="jobs-page" aria-labelledby="jobs-heading">
@@ -70,6 +79,7 @@ export function JobConsole({initialJobs,initialId,billingAvailable,deepAvailable
    {job?.state==='COMPLETED'&&job.workflow==='execution-check-v1'&&<p className="jobs-receipt">All three checkpoints are saved. This was an execution check; no AI answer was generated.</p>}
    {job&&job.heldMicroUsd!=='0'&&<p className="jobs-note">An uncertain provider cost remains reserved for reconciliation.</p>}
   </section>}
+  {job?.clarification&&<ResearchClarification key={job.id} value={job.clarification} busy={busy} onContinue={continueResearch}/>}
   {job?.report&&<ResearchReport report={job.report}/>}
   {job?.workflow.startsWith('deep-research-')&&<DeleteResearch key={job.id} id={job.id} disabled={busy} onDeleted={()=>{setRemovedIds(ids=>[...ids,job.id]);setId(null);setJob(null);setEvents([]);router.replace('/jobs',{scroll:false});router.refresh();}}/>}
   {error&&<div className="jobs-error" role="alert"><p>{error}</p>{id&&<button onClick={()=>setRetry(n=>n+1)}>Reconnect to saved progress</button>}</div>}

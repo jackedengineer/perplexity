@@ -12,7 +12,7 @@ export async function readReportStream(id:string,signal:AbortSignal,onReport:(re
    for(let newline;(newline=pending.indexOf('\n'))>=0;){
     const frame=JSON.parse(pending.slice(0,newline)) as ReportFrame;pending=pending.slice(newline+1);
     if(done)throw Error('Unexpected report frame');
-    if(frame.type==='meta'&&!report)report={question:frame.question,createdAt:frame.createdAt,consensus:frame.consensus,sections:[]};
+    if(frame.type==='meta'&&!report)report={question:frame.question,createdAt:frame.createdAt,consensus:frame.consensus,brief:frame.brief,sections:[]};
     else if(frame.type==='section'&&report&&frame.index===report.sections.length&&frame.index<3){report={...report,sections:[...report.sections,frame.section]};onReport(report);}
     else if(frame.type==='done'&&report?.sections.length===3)done=true;
     else throw Error('Invalid report sequence');
