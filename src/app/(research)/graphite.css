@@ -188,7 +188,7 @@ body:has(.research-shell) { background: #191919; }
 .workspace-auth-error { flex-shrink: 0; padding: 12px 24px; color: #f4b6ad; font-size: 12px; }
 
 /* Saved turns, pending questions and status share the composer's reading column. */
-.active-thread .thread-content { padding: 28px 32px; }
+.active-thread .thread-content { padding: 28px 32px; scrollbar-gutter: stable both-edges; }
 .thread-flow { width: min(720px,100%); margin-inline: auto; }
 .active-thread .thread-flow .history-stack,
 .thread-flow .research-progress,

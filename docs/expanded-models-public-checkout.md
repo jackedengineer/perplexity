@@ -70,3 +70,10 @@ That candidate's Cloudflare CI passed; merchant-page CI failed on an outdated
 pilot-notice assertion. Public privacy/terms notices and the assertion now agree,
 and the privacy page names the actual Cloudflare production worker. Final-head
 CI/browser tests and refreshed reviews remain required after these corrections.
+
+CI on `a15d7e6` found a five-pixel desktop alignment offset on hosts with
+classic scrollbars. Reserving matching gutters on both sides keeps the answer
+column centered with the composer. The existing geometric assertions remain
+unchanged. The sign-in failure assertion now targets its error text rather than
+also matching Next.js's empty route-announcement alert. Both reviews on that
+candidate were clean; the corrected commit requires fresh CI and review evidence.

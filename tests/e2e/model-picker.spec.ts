@@ -181,6 +181,6 @@ test('visitor upgrade sends Google the billing return destination',async({page})
  });
  await page.goto('/upgrade-preview?signedOut=1');
  await page.getByRole('button',{name:'Sign in to upgrade · ₹999'}).click();
- await expect(page.getByRole('alert')).toContainText('We couldn’t sign you in');
+ await expect(page.getByRole('alert').filter({hasText:'We couldn’t sign you in'})).toBeVisible();
  expect(destination).toBe('/billing');
 });
