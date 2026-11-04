@@ -1,6 +1,6 @@
 import {beforeAll,afterAll,expect,it,vi} from 'vitest';
 import {eq} from 'drizzle-orm';
-import {appUsers,user,operatorUsageBuckets,billingCheckouts} from '@/db/schema';
+import {appUsers,user,operatorUsageBuckets,billingCheckouts,jobPeriods} from '@/db/schema';
 import {startCheckout} from '@/server/payments/billing';
 import {liveOffer} from '@/server/payments/offer';
 import type {RazorpayApi} from '@/server/payments/razorpay';
@@ -33,4 +33,25 @@ it('opens independent public checkouts without granting access or changing infer
  expect(retry.state).toBe('READY');expect(create).toHaveBeenCalledTimes(3);
  expect(await f.db.select().from(operatorUsageBuckets)).toEqual(before);
  expect((await f.db.select().from(billingCheckouts).where(eq(billingCheckouts.environment,'LIVE'))).filter(r=>r.state==='READY')).toHaveLength(2);
+});
+
+it('blocks repeat buying only for the owner whose completed payment lacks an invoice',async()=>{
+ const subscriptionId='sub_public_completed',planId='plan_public_completed';
+ await f.db.insert(billingCheckouts).values({userId:f.owner,requestId:crypto.randomUUID(),priceKey:liveOffer.priceKey,environment:'LIVE',planId,subscriptionId,state:'COMPLETED'});
+ const unexpected=async()=>{throw Error('Unexpected provider action');};
+ const create=vi.fn<RazorpayApi['create']>(async(id,plan)=>({id:'sub_'+id.replaceAll('-',''),plan_id:plan,status:'created',quantity:1,notes:{checkoutId:id,priceKey:liveOffer.priceKey}}));
+ const api:RazorpayApi={keyId:'rzp_live_synthetic',create,plan:async()=>({id:planId,period:'monthly',interval:1,item:{amount:99900,currency:'INR'}}),cancel:unexpected,subscription:unexpected,payment:unexpected,invoices:unexpected,subscriptions:unexpected};
+ const policy={budgetKey:f.key,providerExpiresAt:new Date(Date.now()+86400000),publicCheckout:true};
+ const input={requestId:crypto.randomUUID(),priceKey:liveOffer.priceKey};
+ await expect(startCheckout(f.db,f.subject,input,planId,api,policy)).rejects.toMatchObject({code:'CONFLICT'});
+ expect(create).not.toHaveBeenCalled();
+ const other=crypto.randomUUID();
+ await f.db.insert(user).values({id:other,name:'Independent buyer',email:other+'@example.test',emailVerified:true});
+ await f.db.insert(appUsers).values({authSubject:other});
+ expect((await startCheckout(f.db,other,{...input,requestId:crypto.randomUUID()},planId,api,policy)).state).toBe('READY');
+ // Once its invoice has been reconciled and the paid period has ended, this
+ // owner can purchase again. A terminal checkout alone was not that evidence.
+ await f.db.insert(jobPeriods).values({userId:f.owner,subscriptionId,environment:'LIVE',paymentId:'pay_public_completed',invoiceId:'inv_public_completed',startsAt:new Date(Date.now()-32*86400000),endsAt:new Date(Date.now()-86400000),jobLimit:7});
+ expect((await startCheckout(f.db,f.subject,input,planId,api,policy)).state).toBe('READY');
+ expect(create).toHaveBeenCalledTimes(2);
 });
