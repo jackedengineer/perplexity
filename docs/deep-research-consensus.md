@@ -1,7 +1,7 @@
 # Deep Research v2: evidence-led self-consistency
 
 New submissions use `deep-research-v2`. Existing v1 jobs, checkpoints and reports
-retain their original executor and reservations. Apply migration 0036 before
+retain their original executor and reservations. Apply migrations 0036 and 0037 before
 routing new submissions to an upgraded web/worker deployment. This branch does
 not deploy production or change any provider key, account quota or operator limit.
 
@@ -9,7 +9,9 @@ not deploy production or change any provider key, account quota or operator limi
 
 1. Freeze the original question, locale, UTC reference date, temporal scope and
    server-selected models in the admission transaction. Reserve all steps first.
-2. Plan three complementary searches, inspect initial evidence, then perform three
+2. Scope the request, asking focused clarification questions when ambiguity would
+   materially change the answer (see below). Plan three complementary searches,
+   inspect initial evidence, then perform three
    gap/counter-evidence searches and extract two selected pages.
 3. Independently generate three private claim sets against the same bounded
    evidence package. Candidates cannot see each other's outputs. Each claim must
@@ -30,6 +32,40 @@ or fallback providers. Recovery replays completed checkpoints and never reissues
 an uncertain call. Cancellation fences publication and keeps unknown-cost holds.
 An unavailable candidate or unsupported report fails closed rather than silently
 reducing the ensemble to two models or inventing missing evidence.
+
+## Imprecise questions and clarification
+
+The first paid planning step emits a Zod-validated `RESEARCH` or `CLARIFY`
+decision. Broad but answerable topics proceed with a balanced scope; missing
+comparison subjects, unresolved references or materially different possible goals
+ask one or two short questions. Each supports suggested choices and free text.
+A rewritten objective must preserve the original request. Explicit constraints
+quote the original question or a saved user answer verbatim; invented constraint
+quotes are rejected. Assumptions are limited to disclosed broad-overview,
+balanced-comparison and current-as-of-admission categories. This checks provenance,
+not semantic completeness: the model can still misinterpret a request.
+
+`CLARIFY` atomically saves the questions, settles the known planning receipt and
+moves the job to `NEEDS_INPUT`. No searches, candidate or judge calls have run.
+Unused reservations are released and no completed-report credit is consumed.
+Clarification planning still costs money and counts toward the existing LIVE
+started-attempt ceiling; no quota or paid-attempt allowance is increased.
+
+Continuing creates an ordinary newly reserved job. The server checks the parent
+owner, billing environment, saved question IDs and unchanged original question.
+It restores history from the database rather than accepting a client-written
+rewrite. The original request and answers reach planning, evidence ranking,
+candidates, judging and output checks. Date handling also includes the answers. Source restrictions and ranking use only
+the original request and user answers, never model-written clarification questions.
+Repeated HTTP submission uses the same request ID. At most two clarification
+follow-ups are permitted; unresolved ambiguity then asks for a clearer new request.
+Waiting jobs hold no worker lease, are not redispatched by recovery, and retain
+their private questions until deletion. Completed reports disclose their scope.
+
+Initial scoping remains within its $0.012 reservation: at most 18,000 request
+bytes and 1,400 output tokens at the pinned maximum prices. Refinement keeps its
+existing limits. Development migration 0037 adds the new job/event state;
+production application remains pending alongside 0036.
 
 ## Selected routes and ceilings
 
@@ -90,6 +126,12 @@ report and survives replay across midnight.
   an audited count of 42 from a preliminary 45 and avoid inferring treatment
   quality from the count. Exact quotes and final citations pass validation.
 - Live planner sample preserves explicit 2024 scope and the named database subjects.
+- Live scope samples correctly ask about an unspecified choice, research a broad
+  renewable-energy question without needless clarification, and preserve SQLite,
+  PostgreSQL, 2024 and a no-cloud constraint supplied in a clarification answer.
+  Three calls cost $0.001491 in total. An earlier HTTP 503 is retained as failed
+  availability evidence with a conservative $0.012 unknown-cost reservation;
+  only one explicit bounded recheck was made. This is not a reliability guarantee.
 - Adversarial live judge evaluation: two candidates incorrectly assert an audited
   count of 45 while a third asserts 42. The final judge rejects the incorrect
   majority as unsupported, preserves 42, addresses the quality limitation and
@@ -118,7 +160,12 @@ at least $0.06 headroom, allows exactly one judge call, and writes an aggregate
 result under ignored `.artifacts/consensus`. The final check cost $0.004685. It is
 excluded from ordinary CI and never automatically retries a failed sample.
 
+Reproduce scope samples only with explicit spending authorization:
+`LIVE_RESEARCH_SCOPE=1 pnpm exec vitest run --config vitest.research-scope-live.config.ts`.
+The harness verifies the unchanged $1 daily key cap and at least $0.036 headroom,
+limits the run to three calls, retains uncertain costs and never retries itself.
+
 For rollback, stop new admissions and drain/recover v2 jobs before rolling web or
-workers back to code that cannot execute them. Keep migration 0036: it is additive
-and retaining the constraint avoids discarding v2 history. No secrets or raw
+workers back to code that cannot execute them. Keep migrations 0036 and 0037: they are additive
+and retaining the constraints avoids discarding v2 history. No secrets or raw
 production prompts belong in committed evaluation artifacts.

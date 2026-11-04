@@ -911,18 +911,28 @@ branch/PR candidate, not an activation or production deployment.
   exact quotes, exhaustive adjudication and canonical citation validation.
 - [x] Versioned v1/v2 execution, unchanged ownership/entitlements, atomic step
   reservations, cancellation fencing, receipt reconciliation and checkpoint replay.
-- [x] Development Neon migration 0036 and real database-backed browser execution
+- [x] Development Neon migrations 0036/0037 and real database-backed browser execution
   with deterministic providers; saved cancellation persists after navigation.
 - [x] Desktop/mobile browser checks: progress replay, approved section delivery,
   citations, report export, reduced motion, accessibility and reachable scrolling.
 - [x] Bounded live checks for all selected providers, historical planner scope and
   an adversarial incorrect-majority judge case. No cap or production setting changed.
 - [x] Cloudflare build and offline Worker browser regressions pass.
-- [x] Validation record: 955 offline tests, lint/types, six desktop/mobile research
+- [x] Validation record: 965 offline tests, lint/types, eight desktop/mobile research
   checks and 26 credential-free Worker browser checks. The research checks include
   a truncated-stream regression proving automatic delivery reconnects stop.
+  A final overlapping build/browser run hit one 10-second PGlite setup timeout
+  (959 passed, six skipped); all six rate-limit tests passed when rerun separately.
+  No timeout or assertion was weakened.
+- [x] Ambiguous requests ask focused questions before searching; saved answers
+  preserve original intent and owner scope through rewriting and adjudication.
+  Clarification settles planning cost without consuming a completed-report credit;
+  existing paid-start limits and budgets remain enforced.
+- [x] Three bounded live scoping samples pass; earlier provider 503 remains recorded.
+  Real development browser verified clarification → continuation → cited report
+  with deterministic providers. Desktop/mobile verify reload and idempotent retry.
 - [ ] CI and independent code/security reviews on the final PR candidate.
-- [ ] Apply production migration 0036 before deploying matching web/worker code.
+- [ ] Apply production migrations 0036/0037 before deploying matching web/worker code.
 - [ ] Hosted all-live research acceptance, broader independent quality calibration
   and multilingual coverage before claiming a measured accuracy improvement.
 
