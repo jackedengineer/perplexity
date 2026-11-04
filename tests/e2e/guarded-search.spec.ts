@@ -94,7 +94,7 @@ test("a public question shows guarded progress, committed citations and exact re
     // Same HTTP intent recovers the existing answer rather than another provider attempt.
     const [run]=await f.owner.select().from(schema.runs).where(eq(schema.runs.clientRequestId,submitted.clientRequestId));
     const beforeCalls=await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,run.id));
-    expect(beforeCalls.filter(call=>call.stage!=="EXTRACT").map(call=>call.stage).sort()).toEqual(["INPUT_SAFETY","PLANNER","QUERY_SAFETY","SEARCH","EVIDENCE_SAFETY","ANSWER","OUTPUT_SAFETY"].sort());
+    expect(beforeCalls.filter(call=>call.stage!=="EXTRACT").map(call=>call.stage).sort()).toEqual(["PLANNER","SEARCH","ANSWER"].sort());
     expect(beforeCalls.filter(call=>call.stage==="EXTRACT").length).toBeLessThanOrEqual(1);
     expect(beforeCalls.length).toBeLessThanOrEqual(8); // Extraction is optional under the absolute deadline.
     const duplicate=await context.request.post("/api/chat",{headers:{Origin:"http://localhost:3001"},data:submitted});expect(duplicate.status()).toBe(200);expect(await duplicate.text()).toContain('"type":"data-answer"');
@@ -139,7 +139,7 @@ for(const scenario of ["input-block","output-block","invalid-citation","search-f
     const errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));await observeChatWire(page);
     try {
       buckets=await provision(f,identity.id);await page.goto("/workspace");
-      await page.getByRole("textbox",{name:"Ask a question"}).fill(`t11-${scenario}: explain rainbow formation`);
+      await page.getByRole("textbox",{name:"Ask a question"}).fill(scenario==="input-block"?"sk-or-v1-"+"a".repeat(64):`t11-${scenario}: explain rainbow formation`);
       const request=page.waitForRequest(request=>request.url().endsWith("/api/chat"));
       await page.getByRole("button",{name:"Submit question"}).click();const submitted=(await request).postDataJSON();
       await expect.poll(()=>page.evaluate(()=>window.t11Received.length),{timeout:60000}).toBe(1);
@@ -155,7 +155,7 @@ for(const scenario of ["input-block","output-block","invalid-citation","search-f
         await expect(page.locator(".research-failure [role=alert]")).toBeVisible();expect(bytes).toContain('"type":"error"');expect(bytes).not.toContain('"type":"text-delta"');
         await expect(page.locator(".answer-prose")).toHaveCount(0);
       }
-      if(scenario==="input-block"){expect(calls.map(call=>call.stage)).toEqual(["INPUT_SAFETY"]);expect(bytes).not.toContain('"type":"data-stage"');}
+      if(scenario==="input-block"){expect(calls).toHaveLength(0);expect(bytes).not.toContain('"type":"data-stage"');}
       if(scenario==="invalid-citation")expect(calls.some(call=>call.stage==="OUTPUT_SAFETY")).toBe(false);
       if(scenario==="search-failure"||scenario==="search-deadline")expect(calls.some(call=>call.stage==="ANSWER")).toBe(false);
       if(scenario==="search-deadline"){

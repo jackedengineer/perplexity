@@ -18,7 +18,7 @@ it('runs real citation validation on frozen reference answers including invalid 
 it('reports the offline baseline without inventing semantic or human quality scores',async()=>{
  const {evaluateOffline}=await import('../../evals/report');
  const report=await evaluateOffline('a'.repeat(40),'evals/cases');
- expect(report.safety.criticalStatus).toBe('PASS');expect(report.safety.pending).toBe(72);
+ expect(report.safety.criticalStatus).toBe('PASS');expect(report.safety.pending).toBe(80);
  expect(report.frozenCitations).toEqual({numerator:24,denominator:24,rate:1});
  expect(report.safety.falseRefusals.rate).toBeNull();expect(report.answers.supportedClaims.rate).toBeNull();
  expect(report.safety.releaseStatus).toBe('PENDING');expect(report.answers.releaseStatus).toBe('PENDING');

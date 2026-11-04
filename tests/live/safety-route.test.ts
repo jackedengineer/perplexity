@@ -66,7 +66,7 @@ it('checks every semantic safety fixture within the approved non-resetting key c
       before, calls, httpStatuses, bookedMicroUsd: String(booked), observations }, null, 2), { mode: 0o600 });
   }
   await writeFile(`${directory}/cap-after.json`, JSON.stringify(await metadata()), { mode: 0o600 });
-  expect(observations).toHaveLength(72);
+  expect(observations).toHaveLength(semantic.length);
   for (const observation of observations) {
     expect({ decision: observation.actual, categories: observation.categoryMatch }, String(observation.id))
       .toEqual({ decision: observation.expected, categories: true });

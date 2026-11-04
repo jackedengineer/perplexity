@@ -28,14 +28,14 @@ for(const kind of ['rate','quota'] as const)test(`${kind} denial has a usable fi
   await page.screenshot({path:`.artifacts/t19-${kind}-${info.project.name}.png`});
  }finally{await page.goto('/workspace');await identity.cleanup();await f.close();}
 });
-for(const stage of ['answer','safety'] as const)test(`a ${stage} stage deadline stays visible and same-intent retries cannot restart paid stages`,async({page,context},info)=>{
+for(const stage of ['answer','planner'] as const)test(`a ${stage} stage deadline stays visible and same-intent retries cannot restart paid stages`,async({page,context},info)=>{
  const identity=await identityFixture(context,'Deadline Tester'),f=createNeonFixture();let operatorIds:string[]=[];
  try{
   const [profile]=await f.owner.insert(schema.appUsers).values({authSubject:identity.id}).returning();
   const window={startsAt:new Date(Date.now()-86400000),endsAt:new Date(Date.now()+86400000)};
   await f.owner.execute(sql`SELECT ensure_free_credits(${profile.id}::uuid)`);
   operatorIds=(await f.owner.insert(schema.operatorUsageBuckets).values((['PERIOD','DAY'] as const).map(kind=>({budgetKey:process.env.T11_TEST_BUDGET_KEY!,kind,...window,providerLimitMicroUsd:100000n}))).returning({id:schema.operatorUsageBuckets.id})).map(r=>r.id);
-  await page.goto('/workspace');await page.getByRole('textbox',{name:'Ask a question'}).fill(`${stage==='safety'?'t19-safety-deadline':'t19-deadline'} Explain why rainbows form.`);
+  await page.goto('/workspace');await page.getByRole('textbox',{name:'Ask a question'}).fill(`${stage==='planner'?'t19-planner-deadline':'t19-deadline'} Explain why rainbows form.`);
   const pending=page.waitForResponse(r=>r.url().endsWith('/api/chat'));await page.getByRole('button',{name:'Submit question'}).click();
   const response=await pending,runId=response.headers()['x-run-id'],body=response.request().postDataJSON();expect(response.status()).toBe(200);expect(runId).toBeTruthy();
   const [initial]=await f.owner.select().from(schema.runs).where(eq(schema.runs.id,runId));
@@ -43,7 +43,7 @@ for(const stage of ['answer','safety'] as const)test(`a ${stage} stage deadline 
   const status=await context.request.get(`/api/runs/${runId}`);expect(await status.json()).toMatchObject({state:'UNAVAILABLE',terminalReason:'TIMED_OUT'});
   await expect(page.getByRole('main').getByRole('alert')).toContainText('This research request timed out.');
   const before=await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,runId));
-  expect(before.some(c=>c.stage==='OUTPUT_SAFETY')).toBe(false);expect(before.find(c=>c.stage===(stage==='safety'?'INPUT_SAFETY':'ANSWER'))?.status).toBe('UNKNOWN');
+  expect(before.some(c=>c.stage==='OUTPUT_SAFETY')).toBe(false);expect(before.find(c=>c.stage===(stage==='planner'?'PLANNER':'ANSWER'))?.status).toBe('UNKNOWN');
   await expect(page.locator('.answer-prose')).toHaveCount(0);
   const replay=await context.request.post('/api/chat',{headers:{Origin:'http://localhost:3001'},data:body});await replay.text();
   expect(await f.owner.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,runId))).toHaveLength(before.length);
