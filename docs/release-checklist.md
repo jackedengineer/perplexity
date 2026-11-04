@@ -899,3 +899,34 @@ This candidate supersedes the one-person purchase policy above only when
 Public purchasing does not replenish or bypass inference budgets. The owner has
 chosen manual funding; existing $5 paid funding, separate verification allowance,
 recorded spend, unknown-cost holds and expiry dates stay unchanged.
+
+### Deep Research consensus candidate — 4 November 2026
+
+See [design, limits and verification](deep-research-consensus.md). This is a new
+branch/PR candidate, not an activation or production deployment.
+
+- [x] Freeze temporal scope at admission; distinguish event/publication dates,
+  evergreen/current topics and forecasts. Invalid dates reject before reservation.
+- [x] Three independent model/provider analyses and a fourth evidence judge;
+  exact quotes, exhaustive adjudication and canonical citation validation.
+- [x] Versioned v1/v2 execution, unchanged ownership/entitlements, atomic step
+  reservations, cancellation fencing, receipt reconciliation and checkpoint replay.
+- [x] Development Neon migration 0036 and real database-backed browser execution
+  with deterministic providers; saved cancellation persists after navigation.
+- [x] Desktop/mobile browser checks: progress replay, approved section delivery,
+  citations, report export, reduced motion, accessibility and reachable scrolling.
+- [x] Bounded live checks for all selected providers, historical planner scope and
+  an adversarial incorrect-majority judge case. No cap or production setting changed.
+- [x] Cloudflare build and offline Worker browser regressions pass.
+- [x] Validation record: 955 offline tests, lint/types, six desktop/mobile research
+  checks and 26 credential-free Worker browser checks. The research checks include
+  a truncated-stream regression proving automatic delivery reconnects stop.
+- [ ] CI and independent code/security reviews on the final PR candidate.
+- [ ] Apply production migration 0036 before deploying matching web/worker code.
+- [ ] Hosted all-live research acceptance, broader independent quality calibration
+  and multilingual coverage before claiming a measured accuracy improvement.
+
+The entire v2 manifest reserves $0.279, within the existing paid ceiling when
+capacity remains. No automatic retry or fallback spends around failed routes.
+Final delivery streams **approved** report sections with word reveal; raw judge
+tokens and private candidate analyses are withheld until validation/publication.
