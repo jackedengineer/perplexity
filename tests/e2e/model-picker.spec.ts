@@ -59,6 +59,23 @@ test('favorites persist and model search has an empty state',async({page})=>{
  await expect(page.getByRole('status')).toContainText('No models match');
 });
 
+test('delayed picker autofocus never steals an existing keyboard selection',async({page})=>{
+ await fixture(page,false,'/?saved=1');
+ await page.getByRole('button',{name:'Try another model',exact:true}).click();
+ const revision=page.getByRole('dialog',{name:'Try another model',exact:true});
+ await page.clock.install();await page.clock.pauseAt(new Date());
+ await revision.getByRole('button',{name:'Answer model: Qwen3 30B'}).click();
+ const search=page.getByRole('textbox',{name:'Search models'});
+ await search.fill('Gemini');await search.press('ArrowDown');
+ const choice=page.getByRole('button',{name:'Gemini 2.5 Flash Lite Lightweight and fast · Google 2 credits per answer',exact:true});
+ await expect(choice).toBeFocused();
+ // Release the delayed opening frame after the user has already moved focus.
+ await page.clock.runFor(32);
+ await expect(choice).toBeFocused();
+ await choice.press('Enter');
+ await expect(revision.getByRole('button',{name:'Answer model: Gemini 2.5 Flash Lite',exact:true})).toBeVisible();
+});
+
 test('retry picks another model and keeps the original turn',async({page})=>{
  await fixture(page,false,'/?saved=1');
  await page.getByRole('button',{name:'Try another model',exact:true}).click();

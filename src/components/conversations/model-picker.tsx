@@ -32,7 +32,11 @@ export function ModelPicker({models,value,onSelect,disabled,favorites=[],onFavor
  }
  useEffect(()=>{
   if(!position)return;
-  const frame=requestAnimationFrame(()=>menu.current?.querySelector<HTMLInputElement>('input')?.focus());
+  const frame=requestAnimationFrame(()=>{
+   const popup=menu.current;
+   // A fast keyboard selection can precede this frame. Keep the user's focus.
+   if(popup&&!popup.contains(document.activeElement))popup.querySelector<HTMLInputElement>('input')?.focus();
+  });
   function outside(e:PointerEvent){if(!menu.current?.contains(e.target as Node)&&!trigger.current?.contains(e.target as Node))setPosition(null);}
   function dismiss(){setPosition(null);}
   document.addEventListener('pointerdown',outside);window.addEventListener('resize',dismiss);
