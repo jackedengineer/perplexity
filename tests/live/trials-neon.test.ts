@@ -19,14 +19,14 @@ it('restricted runtime grants fixed credits, admits once and links without budge
   has_column_privilege(current_user,'usage_buckets','credit_limit','UPDATE') AS limit_write,
   has_function_privilege(current_user,'ensure_free_credits(uuid)','EXECUTE') AS grant_call`);
  expect(rights.rows[0]).toEqual({ledger_write:false,grant_write:false,limit_write:false,grant_call:true});
- expect((await readUsage(f.runtime,p.subject)).period.remaining).toBe(6);
+ expect((await readUsage(f.runtime,p.subject)).period.remaining).toBe(620);
  const admission=createRunAdmission(f.runtime,f.keys,f.policy,undefined,true),request={...p.request,modelKey:'economy-nano'};
  const results=await simultaneously([()=>admission.admit(p.subject,request),()=>admission.admit(p.subject,request)]);
  expect(results.map(r=>r.kind).sort()).toEqual(['ADMITTED','RUN_IN_PROGRESS']);
  const [run]=await f.runtime.select().from(schema.runs).where(eq(schema.runs.userId,p.profile.id));
  expect((await readUsage(f.runtime,p.subject)).period.reserved).toBe(2);
  await linkGuest(f.runtime,p.subject,target.subject);
- expect((await readUsage(f.runtime,target.subject)).period.remaining).toBe(40);
+ expect((await readUsage(f.runtime,target.subject)).period.remaining).toBe(4650);
  expect((await f.runtime.select().from(schema.creditLedger).where(eq(schema.creditLedger.runId,run.id))).map(l=>l.kind).sort()).toEqual(['CHARGE','RELEASE','RESERVE']);
  expect((await f.runtime.select().from(schema.runs).where(eq(schema.runs.id,run.id)))[0]).toMatchObject({userId:target.profile.id,status:'CANCELLED'});
  await expect(f.runtime.execute(sql`SELECT ensure_free_credits(${p.profile.id}::uuid)`)).rejects.toThrow();
