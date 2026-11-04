@@ -1,17 +1,19 @@
 import {z} from 'zod';
+import {consensusMetadata} from './consensus-contracts';
 import {questionTextSchema,localeSchema} from '@/server/contracts/chat';
 import {approvedPayloadSchema} from '@/server/contracts/answer';
 import {searchQuerySchema} from '@/server/search/limits';
 export const researchInput=z.strictObject({question:questionTextSchema.pipe(z.string().max(1000)),locale:localeSchema});
 export const researchModels=z.strictObject({safety:z.strictObject({modelId:z.string().max(128),provider:z.string().max(64)}),
  planner:z.strictObject({modelId:z.string().max(128),provider:z.string().max(64)}),answer:z.strictObject({modelId:z.string().max(128),provider:z.string().max(64)})});
-export const researchSnapshot=researchInput.extend({models:researchModels,policy:z.literal('v1'),version:z.literal('deep-research-v1')});
+const legacySnapshot=researchInput.extend({models:researchModels,policy:z.literal('v1'),version:z.literal('deep-research-v1')});
+export const researchSnapshot=z.discriminatedUnion('version',[legacySnapshot, researchInput.extend({models:researchModels,policy:z.literal('v2'),version:z.literal('deep-research-v2'),consensus:consensusMetadata})]);
 export type ResearchSnapshot=z.infer<typeof researchSnapshot>;
 export const researchPlan=z.strictObject({queries:z.array(searchQuerySchema).length(3),focus:z.string().min(1).max(800)})
  .refine(p=>new Set(p.queries.map(q=>q.trim().toLowerCase())).size===3);
 export const sectionNames=['Summary','Analysis','Limitations and conflicting evidence'] as const;
 export const researchReport=z.strictObject({version:z.literal(1),question:researchInput.shape.question,createdAt:z.iso.datetime(),
- sections:z.array(z.strictObject({title:z.enum(sectionNames),answer:approvedPayloadSchema})).length(3)})
+ consensus:consensusMetadata.optional(),sections:z.array(z.strictObject({title:z.enum(sectionNames),answer:approvedPayloadSchema})).length(3)})
  .refine(r=>r.sections.every((s,i)=>s.title===sectionNames[i]&&s.answer.kind==='ANSWER'));
 export type ResearchReport=z.infer<typeof researchReport>;
 const step=(key:string,kind:'SYSTEM'|'MODEL'|'SEARCH',capMicroUsd:bigint)=>({key,kind,capMicroUsd});

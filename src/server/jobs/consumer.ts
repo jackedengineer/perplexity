@@ -9,7 +9,7 @@ import type {JobDatabase} from './store';
 import type {JobEnvironment} from './configuration';
 export async function consumeJob(db:JobDatabase,rawId:string,options:{stepMs?:number;signal?:AbortSignal;budgetKey?:string;environment?:JobEnvironment;providerEnvironment?:Record<string,string|undefined>}={}){
  const id=jobId.parse(rawId);const [job]=await db.select({workflow:durableJobs.workflow}).from(durableJobs).where(eq(durableJobs.id,id));
- if(job?.workflow==='deep-research-v1')return consumeResearch(db,id,options);
+ if(job?.workflow.startsWith('deep-research-'))return consumeResearch(db,id,options);
  const lease=await claimJob(db,id,options.budgetKey,options.environment);if(!lease)return 'DUPLICATE' as const;
  try{
   for(const step of executionCheck.steps){
