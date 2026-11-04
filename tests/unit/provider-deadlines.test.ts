@@ -16,3 +16,17 @@ it('caller cancellation during search is not reported as deadline expiry',async(
  const provider=recordSearchProvider(calls,{search:async()=>{incoming.abort();throw new Error('PRIVATE');}});
  await expect(provider.search('Synthetic',{signal:incoming.signal,deadlineAt:new Date(Date.now()+45000)})).rejects.toMatchObject({code:'CONFLICT'});
 });
+
+import {recordPlannerProvider} from '@/server/runs/provider-calls';
+it('preserves planner expiry as a deadline while recording its unknown cost once',async()=>{
+ vi.useFakeTimers();const calls=ledger();
+ const provider=recordPlannerProvider(calls,{modelId:'test/planner',plan:(_input,{signal})=>new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('PRIVATE')),{once:true}))});
+ const pending=provider.plan({original:{id:randomUUID(),text:'Synthetic planner question'},context:[],now:new Date().toISOString(),timezone:'UTC',locale:'en'},{signal:new AbortController().signal,deadlineAt:new Date(Date.now()+45000)}).catch(error=>error);
+ await vi.advanceTimersByTimeAsync(100);expect(await pending).toMatchObject({code:'DEADLINE_EXCEEDED'});
+ expect(calls.begin).toHaveBeenCalledOnce();expect(calls.finish).toHaveBeenCalledExactlyOnceWith(expect.any(String),'UNKNOWN',undefined);
+});
+it('planner caller cancellation is distinct from a provider deadline',async()=>{
+ const incoming=new AbortController(),calls=ledger();
+ const provider=recordPlannerProvider(calls,{modelId:'test/planner',plan:async()=>{incoming.abort();throw new Error('PRIVATE');}});
+ await expect(provider.plan({original:{id:randomUUID(),text:'Synthetic'},context:[],now:new Date().toISOString(),timezone:'UTC',locale:'en'},{signal:incoming.signal,deadlineAt:new Date(Date.now()+45000)})).rejects.toMatchObject({code:'CONFLICT'});
+});

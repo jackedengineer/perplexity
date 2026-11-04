@@ -83,7 +83,12 @@ export function recordPlannerProvider(calls:ReturnType<typeof createProviderCall
    if(budget.signal.aborted){await calls.finish(claim.id,'SKIPPED',noUsage);throw new Error('No dispatch');}
    const result=await provider.plan(input,{signal:budget.signal,deadlineAt:claim.deadlineAt});await calls.finish(claim.id,result.engine==='CONTEXT_RULE'?'SKIPPED':'SUCCEEDED',result.usage);
    if(budget.signal.aborted)throw new Error('Deadline');return result;
-  }catch(error){try{await calls.finish(claim.id,'UNKNOWN',provider.usage?.());}catch{}throw error;}finally{budget.stop();}
+  }catch(error){
+   try{await calls.finish(claim.id,'UNKNOWN',provider.usage?.());}catch{}
+   if(budget.expired)throw new AdmissionError('DEADLINE_EXCEEDED');
+   if(options.signal.aborted)throw new AdmissionError('CONFLICT');
+   throw error;
+  }finally{budget.stop();}
  }};
 }
 export function recordExtractProvider(calls:ReturnType<typeof createProviderCalls>,provider:import('@/server/search/extract').ExtractProvider):import('@/server/search/extract').ExtractProvider{
