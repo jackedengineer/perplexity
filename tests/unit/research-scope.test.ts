@@ -11,5 +11,6 @@ it('preserves ordinary multiline clarification text through submission and saved
  const {researchContinuation,clarificationHistory}=await import('@/server/deep-research/scope');const answer='SQLite and PostgreSQL\nAn offline notes application';
  expect(researchContinuation.parse({jobId:crypto.randomUUID(),answers:[{id:'Q1',answer}]}).answers[0].answer).toBe(answer);
  expect(clarificationHistory.parse([{question:'Which options and application?',answer}])[0].answer).toBe(answer);
+ const brief=scope();brief.brief.constraints=[{source:'answer-1',quote:answer}];expect(validateScope(brief,{question:'Compare databases',clarifications:[{question:'Which options?',answer}]}).brief?.constraints[0].quote).toBe(answer);
  expect(clarificationHistory.safeParse([{question:'Which options?',answer:'SQLite\u0000Postgres'}]).success).toBe(false);
 });

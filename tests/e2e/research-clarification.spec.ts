@@ -7,7 +7,7 @@ test('replays focused questions and resumes the original research with idempoten
  await page.route('**/api/jobs**',async route=>{
   const request=route.request(),url=new URL(request.url());
   if(request.method()==='POST'){
-   const body=request.postDataJSON();expect(body.question).toBe(original);expect(body.continuation).toEqual({jobId:parent,answers:[{id:'Q1',answer:'SQLite and PostgreSQL for offline notes'}]});
+   const body=request.postDataJSON();expect(body.question).toBe(original);expect(body.continuation).toEqual({jobId:parent,answers:[{id:'Q1',answer:'SQLite and PostgreSQL\nAn offline notes application'}]});
    if(attempts++===0){requestId=body.requestId;await route.fulfill({status:503,json:{error:{message:'Please retry your saved answers.'}}});return;}
    expect(body.requestId).toBe(requestId);await route.fulfill({status:202,json:{id:child}});return;
   }
@@ -19,6 +19,7 @@ test('replays focused questions and resumes the original research with idempoten
   await expect(page.getByRole('button',{name:'Continue research',exact:true})).toBeDisabled();
   await page.getByRole('button',{name:'SQLite and PostgreSQL for offline notes',exact:true}).click();
   await expect(page.getByLabel('Which databases and application are you comparing?',{exact:true})).toHaveValue('SQLite and PostgreSQL for offline notes');
+  await page.getByLabel('Which databases and application are you comparing?',{exact:true}).fill('SQLite and PostgreSQL\nAn offline notes application');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations).toEqual([]);
   await page.screenshot({path:`.artifacts/research-clarification-${info.project.name}.png`,fullPage:true});
