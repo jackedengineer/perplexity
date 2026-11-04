@@ -31,10 +31,12 @@ export function researchExecutor(db:JobDatabase,id:string,snapshot:ResearchSnaps
  const saved=(key:string)=>readCheckpoint(db,id,key);
  async function searches(count:number){return rowsSchema.parse((await Promise.all(Array.from({length:count},(_,i)=>saved(`search-${i+1}`)))).flatMap(v=>rowsSchema.parse(v)));}
  const clarifications=snapshot.version==='deep-research-v2'?snapshot.clarifications:undefined;
+ // Model-written clarification questions must not become source restrictions.
+ const userContext=[snapshot.question,...(clarifications??[]).map(c=>c.answer)].join('\n');
  const originalContext=clarifications?.length?snapshot.question+'\nUser clarification answers: '+JSON.stringify(clarifications):snapshot.question;
  const time=snapshot.version==='deep-research-v2'?snapshot.consensus.time:undefined;
- const preferences={freshness:(time?time.kind==='CURRENT':!!freshnessTimeRange(snapshot.question))?'RECENT' as const:'ANY' as const,...researchSourcePolicy(originalContext)};
- const rank=(rows:RankedResult[])=>rankEvidenceResults(rows.filter(row=>{if(preferences.domainMode!=='restrict')return true;const url=canonicalSourceUrl(row.url);return !!url&&preferences.preferredDomains.some(domain=>new URL(url).hostname===domain||new URL(url).hostname.endsWith('.'+domain));}),originalContext,time?new Date(time.asOf):new Date(),preferences,30);
+ const preferences={freshness:(time?time.kind==='CURRENT':!!freshnessTimeRange(snapshot.question))?'RECENT' as const:'ANY' as const,...researchSourcePolicy(userContext)};
+ const rank=(rows:RankedResult[])=>rankEvidenceResults(rows.filter(row=>{if(preferences.domainMode!=='restrict')return true;const url=canonicalSourceUrl(row.url);return !!url&&preferences.preferredDomains.some(domain=>new URL(url).hostname===domain||new URL(url).hostname.endsWith('.'+domain));}),userContext,time?new Date(time.asOf):new Date(),preferences,30);
  const evidence=async(key:string)=>{const value=validateEvidence(await saved(key));if(!value||!value.sources.length)throw new JobError('UNAVAILABLE');return value;};
  async function query(index:number){const plan=readSearchPlan(await saved(index<=3?'plan':'refine'));return plan.queries[(index-1)%3];}
  const known=(value:unknown,cost:bigint|null|undefined,stop=false):StepResult=>{
