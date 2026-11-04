@@ -22,7 +22,7 @@ Migration 0033 adds accounting version 3 without rewriting historical runs, call
 
 ## Public purchasing policy
 
-The owner explicitly requested open checkout, manual funding and no funding messages in customer-facing UI. `PAID_CHECKOUT_ACCESS=PUBLIC` removes the one-person seat, prepaid-capacity, delivery-window and pilot-specific daily-intent restrictions from purchasing. Existing per-owner open-intent uniqueness, idempotency, request rate limits, verified Google identity, captured-payment verification and signed webhooks remain. Public billing status does not depend on a successful best-effort worker wake hint.
+The owner explicitly requested open checkout, manual funding and no funding messages in customer-facing UI. `PAID_CHECKOUT_ACCESS=PUBLIC` removes the one-person seat, prepaid-capacity and delivery-window restrictions from purchasing. The per-owner rolling 24-hour creation cooldown remains after unpaid cancellation; reading or resuming the original request stays idempotent, and other buyers remain eligible. Existing per-owner open-intent uniqueness, request rate limits, verified Google identity, captured-payment verification and signed webhooks remain. Public billing status does not depend on a successful best-effort worker wake hint.
 
 This is a sales-policy change, not new inference funding. The $5 paid operator/key ceilings, the separate existing verification envelope, unknown-cost holds and job admission limits remain intact. Paid work can pause at those runtime limits until the owner replenishes/renews them. A subscription remains one billing month for ₹999 and seven completed reports, at most fourteen started attempts, with no automatic renewal. No real charge or mandate was completed during verification.
 
