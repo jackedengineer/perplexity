@@ -35,14 +35,14 @@ async function settle(tx:JobTransaction,job:Job,state:JobState){
  await tx.update(steps).set({state:'SKIPPED',finishedAt:now}).where(and(eq(steps.jobId,job.id),eq(steps.state,'PENDING')));
  // LIVE sells completed reports. Failed/stopped attempts retain their actual
  // provider spend and unknown holds above, without consuming a report credit.
- const charged=state==='COMPLETED'||period.environment==='TEST'&&all.some(s=>s.startedAt!==null||s.state==='STARTED'||s.state==='UNKNOWN');
+ const charged=state==='COMPLETED'||state!=='NEEDS_INPUT'&&period.environment==='TEST'&&all.some(s=>s.startedAt!==null||s.state==='STARTED'||s.state==='UNKNOWN');
  await tx.update(periods).set({reservedJobs:sql`${periods.reservedJobs}-1`,spentJobs:sql`${periods.spentJobs}+${charged?1:0}`}).where(eq(periods.id,job.periodId));
  const finished=await tx.update(jobs).set({state,generation:job.generation+1,leaseUntil:null,updatedAt:now})
   .where(and(eq(jobs.id,job.id),state==='COMPLETED'?and(gt(jobs.deadlineAt,sql`clock_timestamp()`),gt(jobs.leaseUntil,sql`clock_timestamp()`)):undefined)).returning({id:jobs.id});
  if(!finished.length)throw new JobError('STALE');
  await tx.update(outbox).set({state:'DELIVERED',leaseUntil:null,leaseToken:null}).where(eq(outbox.jobId,job.id));
  if(held>0n)await appendEvent(tx,job.id,'COST_UNKNOWN');
- await appendEvent(tx,job.id,state==='COMPLETED'?'COMPLETED':state==='CANCELLED'?'CANCELLED':state==='EXPIRED'?'EXPIRED':'FAILED');
+ await appendEvent(tx,job.id,state==='COMPLETED'?'COMPLETED':state==='CANCELLED'?'CANCELLED':state==='EXPIRED'?'EXPIRED':state==='NEEDS_INPUT'?'NEEDS_INPUT':'FAILED');
 }
 export async function claimJob(db:JobDatabase,id:string,budgetKey?:string,environment:JobEnvironment='TEST'):Promise<JobLease|null>{
  return db.transaction(async tx=>{
@@ -79,7 +79,7 @@ export async function startStep(db:JobDatabase,lease:JobLease,key:string){
   await appendEvent(tx,lease.jobId,'STEP_STARTED',key);return 'START' as const;
  });
 }
-export async function completeStep(db:JobDatabase,lease:JobLease,key:string,cost:bigint,value?:unknown,stop=false){
+export async function completeStep(db:JobDatabase,lease:JobLease,key:string,cost:bigint,value?:unknown,stop:boolean|'NEEDS_INPUT'=false){
  return db.transaction(async tx=>{
   const {now,job}=await validateLease(tx,lease);
   const [step]=await tx.select().from(steps).where(and(eq(steps.jobId,lease.jobId),eq(steps.key,key)));
@@ -90,7 +90,7 @@ export async function completeStep(db:JobDatabase,lease:JobLease,key:string,cost
   await tx.update(steps).set({state:'SUCCEEDED',costMicroUsd:cost,finishedAt:now}).where(and(eq(steps.jobId,lease.jobId),eq(steps.key,key)));
   await appendEvent(tx,lease.jobId,'STEP_COMPLETED',key);
   // A denial checkpoint must never become replayable independently of failure.
-  if(stop)await settle(tx,job,'FAILED');
+  if(stop)await settle(tx,job,stop==='NEEDS_INPUT'?'NEEDS_INPUT':'FAILED');
  });
 }
 export async function completeJob(db:JobDatabase,lease:JobLease){

@@ -31,8 +31,9 @@ export async function consumeResearch(db:JobDatabase,id:string,options:{signal?:
    currentStep=step.key;const started=performance.now();
    const result=await execute(step.key,{signal,deadlineAt:job.deadlineAt});
    if(signal.aborted)throw new JobError('STALE');
-   await completeStep(db,lease,step.key,result.cost,result.value,!!result.stop);
-   console.info(JSON.stringify({event:'jobs.step',jobId:id,step:step.key,outcome:result.stop?'DENIED':'SUCCEEDED',costMicroUsd:result.cost.toString(),durationMs:Math.round(performance.now()-started)}));
+   await completeStep(db,lease,step.key,result.cost,result.value,result.needsInput?'NEEDS_INPUT':!!result.stop);
+   console.info(JSON.stringify({event:'jobs.step',jobId:id,step:step.key,outcome:result.needsInput?'NEEDS_INPUT':result.stop?'DENIED':'SUCCEEDED',costMicroUsd:result.cost.toString(),durationMs:Math.round(performance.now()-started)}));
+   if(result.needsInput)return 'NEEDS_INPUT' as const;
    if(result.stop)return 'FAILED' as const;
   }
   await completeJob(db,lease);return 'COMPLETED' as const;
