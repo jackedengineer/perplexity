@@ -110,6 +110,7 @@ it('clarification is withheld on output outage, with no search, answer or public
  const p=providers();p.planner={modelId:'test/planner',plan:async()=>({plan:{action:'CLARIFY',question:'Which products are you comparing?',reasonCode:'MISSING_ENTITY'},usage:knownUsage})};
  p.output={...fakeSafety(),classify:async()=>{throw Error('PRIVATE');}};
  expect((await run(p)).result).toMatchObject({kind:'DENIED',code:'SAFETY_UNAVAILABLE'});
+ expect((await db.select().from(schema.outputReviews))[0]).toMatchObject({guardVersion:'legacy-classifier-v1',decision:'UNAVAILABLE'});
  expect((await createAnswerDelivery(db).load(identity,person.runId)).answer).toBeUndefined();
  expect(p.search.search).not.toHaveBeenCalled();expect(p.answer.generate).not.toHaveBeenCalled();
  expect(await db.select().from(schema.messages)).toHaveLength(1);

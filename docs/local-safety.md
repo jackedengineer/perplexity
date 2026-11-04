@@ -29,8 +29,10 @@ for historical evaluation and rollback. Old records keep their original evidence
 ## Audit and accounting
 
 Input reviews record `LOCAL_CHECK`, `local-boundary-v1` and a null model ID for local
-allows. Output reviews record `guard_version=local-boundary-v1`; historical rows
-default to `legacy-classifier-v1`. Only privately branded local guards can omit a
+allows. Local output approvals and denials record `guard_version=local-boundary-v1`;
+historical rows and legacy gate results keep `legacy-classifier-v1`. Failures without an attributed output verdict (including native model refusals and
+cancellation before the output gate) explicitly record `not-recorded` instead of
+claiming a classifier check occurred. Only privately branded local guards can omit a
 classifier provider-call receipt during finalization; string model IDs cannot opt in.
 Local stages create no provider calls and charge zero. Real answer, planner, search,
 extraction and unknown-cost holds retain the existing accounting. Durable jobs retain

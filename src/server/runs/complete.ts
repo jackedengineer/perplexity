@@ -75,7 +75,7 @@ export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { ans
       onStage?.("CHECKING_ANSWER");
       const result = await traceStage("output.release",()=>createReleaseGate(recordSafetyProvider(calls,"OUTPUT_SAFETY",dependencies.output)).approve({ runId,attemptVersion: loaded.run.attemptVersion,
         revision: loaded.run.admittedRevision,kind: draft.kind,question: loaded.question,markdown: draft.text,evidence },{ signal,deadlineAt: loaded.run.deadlineAt }));
-      if (result.kind === "DENIED") return finalization.fail(subject,runId,result.code,ownedAttempt,signal.aborted);
+      if (result.kind === "DENIED") return finalization.fail(subject,runId,result.code,ownedAttempt,signal.aborted,result.guardVersion);
       onStage?.("SAVING_ANSWER");
       return await finalization.commit(subject,sessionId,result.response,signal);
     } catch (error) {

@@ -15,8 +15,9 @@ const approvalInput = z.strictObject({ runId: z.uuid(),attemptVersion: z.int().p
   kind: z.enum(["ANSWER","CLARIFICATION","NO_EVIDENCE","CHAT"]),question: questionTextSchema,markdown: questionTextSchema,evidence: evidencePackageSchema });
 export type ApprovedResponse = Readonly<{ runId: string;attemptVersion: number;revision: number;policyVersion: "v1";
   kind: "ANSWER" | "CLARIFICATION" | "NO_EVIDENCE" | "CHAT";markdown: string;sources: readonly Readonly<VisibleSource>[];additionalSources?:readonly Readonly<VisibleSource>[] }>;
+export type OutputGuardVersion = typeof LOCAL_GUARD_VERSION | "legacy-classifier-v1" | "not-recorded";
 export type ReleaseResult = { kind: "APPROVED";response: ApprovedResponse }
-  | { kind: "DENIED";code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE" | "DEADLINE_EXCEEDED";response: SafetyResponse };
+  | { kind: "DENIED";guardVersion:OutputGuardVersion;code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE" | "DEADLINE_EXCEEDED";response: SafetyResponse };
 const approved = new WeakSet<object>();
 const localApproved = new WeakSet<object>();
 export function approvalGuardVersion(value:ApprovedResponse) {return localApproved.has(value)?LOCAL_GUARD_VERSION:"legacy-classifier-v1";}
@@ -24,7 +25,7 @@ export function isApprovedResponse(value: unknown): value is ApprovedResponse { 
 export function createReleaseGate(provider: SafetyProvider | undefined) {
   const gate = createInputGate(provider,"safety.output");
   return { async approve(value: unknown,options: ExecutionOptions): Promise<ReleaseResult> {
-    const deny = (code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE" | "DEADLINE_EXCEEDED",response: SafetyResponse = SAFETY_RESPONSES.UNAVAILABLE): ReleaseResult=>({ kind: "DENIED",code,response });
+    const deny = (code: "OUTPUT_BLOCKED" | "SAFETY_UNAVAILABLE" | "DEADLINE_EXCEEDED",response: SafetyResponse = SAFETY_RESPONSES.UNAVAILABLE): ReleaseResult=>({ kind: "DENIED",code,response,guardVersion:isLocalSafetyGuard(provider)?LOCAL_GUARD_VERSION:"legacy-classifier-v1" });
     try {
       const parsed = approvalInput.safeParse(value);
       if (!parsed.success) return deny("OUTPUT_BLOCKED");

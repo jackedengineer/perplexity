@@ -43,6 +43,7 @@ it('blocks unsafe Chat input before answer calls',async()=>{
 it('withholds blocked output and preserves paid usage',async()=>{
  const p=providers();p.output={...fakeSafety(),classify:async()=>({decision:'BLOCK',categoryCodes:['FRAUD'],policyVersion:'v1'})};
  expect((await run(p)).result).toMatchObject({code:'OUTPUT_BLOCKED'});
+ expect((await db.select().from(schema.outputReviews))[0]).toMatchObject({guardVersion:'legacy-classifier-v1',decision:'BLOCK'});
  expect((await createAnswerDelivery(db).load(identity,person.runId)).answer).toBeUndefined();
  expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({creditsCharged:0,knownProviderMicroUsd:300n});
 });
@@ -50,6 +51,7 @@ it('cancellation fences Chat output and refunds user credits',async()=>{
  const p=providers(),controller=new AbortController();p.answer={generate:async()=>{controller.abort();throw Error();}};
  expect((await run(p,controller.signal)).result.kind).toBe('DENIED');
  expect((await db.select().from(schema.runs))[0].status).toBe('CANCELLED');
+ expect((await db.select().from(schema.outputReviews))[0].guardVersion).toBe('not-recorded');
  expect((await db.select().from(schema.runSettlements))[0].creditsCharged).toBe(0);
  expect(await db.select().from(schema.messageCitations)).toHaveLength(0);
 });
@@ -81,6 +83,7 @@ it('local output checks still withhold leaked secrets and fabricated citations',
  for(const text of ['sk-or-v1-'+'a'.repeat(64),'A fabricated source [S1].']){
   const p=localProviders();p.answer.generate=vi.fn().mockResolvedValue({text,usage:knownUsage});
   expect((await run(p)).result).toMatchObject({kind:'DENIED',code:'OUTPUT_BLOCKED'});
+  expect((await db.select().from(schema.outputReviews))[0]).toMatchObject({guardVersion:LOCAL_GUARD_VERSION,decision:'BLOCK'});
   expect((await createAnswerDelivery(db).load(identity,person.runId)).answer).toBeUndefined();
   // A fresh isolated identity for the next distinct case, never replay a run.
   await db.delete(schema.user);await db.delete(schema.operatorUsageBuckets);
