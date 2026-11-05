@@ -9,7 +9,7 @@ export const LEGACY_STAGE_LIMITS=Object.freeze({
 // Safety wire bytes are capped at 20,960: .1/1M input + 384*.4/1M output <= 2,250.
 // Answer wire bytes are capped at 20k: .5/1M input + 1,200*2/1M output < 12,500.
 export const STAGE_LIMITS=Object.freeze({
- PLANNER:Object.freeze({capMicroUsd:2000n,maxDurationMs:5000}),
+ PLANNER:Object.freeze({capMicroUsd:2000n,maxDurationMs:8000}),
  INPUT_SAFETY:Object.freeze({capMicroUsd:2250n,maxDurationMs:5000}),QUERY_SAFETY:Object.freeze({capMicroUsd:2250n,maxDurationMs:5000}),QUERY_SECOND:Object.freeze({capMicroUsd:2250n,maxDurationMs:5000}),
  SEARCH:Object.freeze({capMicroUsd:8000n,maxDurationMs:8000}),SEARCH_SECOND:Object.freeze({capMicroUsd:8000n,maxDurationMs:8000}),EXTRACT:Object.freeze({capMicroUsd:8000n,maxDurationMs:8000}),
  EVIDENCE_SAFETY:Object.freeze({capMicroUsd:2250n,maxDurationMs:5000}),ANSWER:Object.freeze({capMicroUsd:12500n,maxDurationMs:12000}),OUTPUT_SAFETY:Object.freeze({capMicroUsd:2250n,maxDurationMs:5000}),
@@ -27,8 +27,18 @@ export function stageLimits(version:number,stage:ProviderStage){
  if(version===1&&stage in LEGACY_STAGE_LIMITS)return LEGACY_STAGE_LIMITS[stage as keyof typeof LEGACY_STAGE_LIMITS];
  return undefined;
 }
+// Tavily reports credits, never money. FAST books its pay-as-you-go list price per
+// credit: one basic search or one extract batch, exactly the stage's 8,000 cap.
+export const TAVILY_CREDIT_MICRO_USD=8000n;
+type HeldCall={id:string;status:string;capMicroUsd:bigint;costMicroUsd:bigint|null};
+// Calls claim their frozen cap before dispatch and the claims can't exceed the run's
+// reserve, so each unresolved call can add at most cap-cost. Holding more would only
+// block other runs. A priced call has no hold, so the receipt CLI refuses to raise it.
+export function unresolvedExposure(calls:readonly HeldCall[],resolved:ReadonlySet<string>=new Set()){
+ return calls.reduce((sum,call)=>!resolved.has(call.id)&&(call.costMicroUsd===null||call.status==='STARTED'||call.status==='UNKNOWN')?sum+call.capMicroUsd-(call.costMicroUsd??0n):sum,0n);
+}
 export type ProviderStage=keyof typeof STAGE_LIMITS;
-export type ProviderClaim={id:string;deadlineAt:Date;remainingMs:number;observedAt:number};
+export type ProviderClaim={id:string;deadlineAt:Date;remainingMs:number;runLimited:boolean;observedAt:number};
 export function providerDeadline(claim:Pick<ProviderClaim,'remainingMs'|'observedAt'>,incoming:AbortSignal) {
  const controller=new AbortController();
  let expired=false,timer:ReturnType<typeof setTimeout>|undefined;

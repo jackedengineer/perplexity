@@ -21,8 +21,8 @@ it("atomically persists the approved message, review, citation, sequence, termin
   const rows = await db.select().from(schema.messages);expect(rows).toHaveLength(2);expect(rows[1]).toMatchObject({ role: "ASSISTANT",sequence: 2,parts: [{ type: "text",text: "Water refracts sunlight [S1]." }] });
   expect((await db.select().from(schema.outputReviews))[0].decision).toBe("ALLOW");expect(await db.select().from(schema.messageCitations)).toHaveLength(1);
   expect((await db.select().from(schema.runs))[0].status).toBe("COMPLETED");
-  const receipt = (await db.select().from(schema.runSettlements))[0];expect(receipt).toMatchObject({ creditsCharged: 5,knownProviderMicroUsd: 600n,heldProviderMicroUsd: 49400n,releasedProviderMicroUsd: 0n });
-  expect((await db.select().from(schema.usageBuckets)).every(b=>b.reservedCredits === 0 && b.settledCredits === 5 && b.reservedProviderMicroUsd === 49400n && b.settledProviderMicroUsd === 600n)).toBe(true);
+  const receipt = (await db.select().from(schema.runSettlements))[0];expect(receipt).toMatchObject({ creditsCharged: 5,knownProviderMicroUsd: 8600n,heldProviderMicroUsd: 0n,releasedProviderMicroUsd: 41400n });
+  expect((await db.select().from(schema.usageBuckets)).every(b=>b.reservedCredits === 0 && b.settledCredits === 5 && b.reservedProviderMicroUsd === 0n && b.settledProviderMicroUsd === 8600n)).toBe(true);
 });
 it("duplicate completion returns the canonical message without new calls or charges",async()=>{
   await prepareCompletion(db,person);const model = answer(),service = createAnswerCompletion(db,{ answer: model,output: fakeSafety() });
@@ -135,12 +135,12 @@ it("late provider outcomes preserve the remaining hold after a failure receipt c
   const finalizer = createFinalization(db);
   expect(await finalizer.fail(person.subject,person.runId,"PROVIDER_UNAVAILABLE")).toMatchObject({ kind: "DENIED" });
   const [receipt] = await db.select().from(schema.runSettlements);
-  expect(receipt).toMatchObject({ creditsCharged: 0,knownProviderMicroUsd: 300n,heldProviderMicroUsd: 49700n,releasedProviderMicroUsd: 0n });
+  expect(receipt).toMatchObject({ creditsCharged: 0,knownProviderMicroUsd: 8300n,heldProviderMicroUsd: 20000n,releasedProviderMicroUsd: 21700n });
   await calls.finish(id,"UNKNOWN",{ ...knownUsage,costMicroUsd: 200n });
   expect((await db.select().from(schema.providerCalls).where(eq(schema.providerCalls.id,id)))[0]).toMatchObject({ status: "UNKNOWN",costMicroUsd: 200n });
   // Late accounting cannot mutate the immutable receipt or silently release its unknown hold.
   expect(await db.select().from(schema.runSettlements)).toEqual([receipt]);
-  expect((await db.select().from(schema.usageBuckets)).every(b=>b.reservedProviderMicroUsd === 49700n && b.settledProviderMicroUsd === 300n && b.reservedCredits === 0)).toBe(true);
+  expect((await db.select().from(schema.usageBuckets)).every(b=>b.reservedProviderMicroUsd === 20000n && b.settledProviderMicroUsd === 8300n && b.reservedCredits === 0)).toBe(true);
   await finalizer.fail(person.subject,person.runId,"PROVIDER_UNAVAILABLE");
   expect(await db.select().from(schema.runSettlements)).toEqual([receipt]);
 });

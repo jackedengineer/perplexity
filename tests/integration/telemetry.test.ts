@@ -38,14 +38,14 @@ it('captures every paid stage and safety decision without question, draft, evide
  }
  const summary=events.find(e=>e.event==='research.run_usage');
  expect(summary).toMatchObject({requestId,runId:person.runId,policyVersion:'v1',catalogVersion:'fast-v1',priceVersion:'standard-v1',entitlementVersion:'test-v1',accountingVersion:2,
-  knownCostMicroUsd:'600',costState:'PARTIAL',unknownCalls:1,inputTokens:60,outputTokens:30,searchCredits:1,estimatedUpperBoundMicroUsd:'50000',estimateKind:'RESERVATION_CEILING'});
+  knownCostMicroUsd:'8600',costState:'KNOWN',unknownCalls:0,inputTokens:60,outputTokens:30,searchCredits:1,estimatedUpperBoundMicroUsd:'50000',estimateKind:'RESERVATION_CEILING'});
  expect(JSON.stringify(events)).not.toMatch(/PRIVATE_|Why do rainbows|weather.gov|synthetic-subject|payloadHmac|keys|sessionId/);
 });
 it('counts output refusal costs and distinguishes the policy decision from infrastructure failure',async()=>{
  const p=providers();p.output={...fakeSafety(),classify:async()=>({decision:'BLOCK',categoryCodes:['FRAUD'],policyVersion:'v1'})};
  const {events,result}=await run(p);expect(result).toEqual({kind:'DENIED',code:'OUTPUT_BLOCKED'});
  expect(events.find(e=>e.event==='research.safety'&&e.stage==='safety.output')).toMatchObject({outcome:'BLOCK',categoryCodes:['FRAUD'],reason:'CLASSIFIER',promptVersion:OUTPUT_PROMPT_VERSION});
- expect(events.find(e=>e.event==='research.run_usage')).toMatchObject({knownCostMicroUsd:'600',searchCredits:1,unknownCalls:1});
+ expect(events.find(e=>e.event==='research.run_usage')).toMatchObject({knownCostMicroUsd:'8600',searchCredits:1,unknownCalls:0});
  expect(await db.select().from(schema.messages)).toHaveLength(1);
 });
 it('a failing search has a complete redacted trace and retains unknown monetary usage',async()=>{
@@ -72,11 +72,17 @@ async function operatorReports(){
 it('executes the operator query set with honest failure, latency, cost and feedback denominators',async()=>{
  await run();const reports=await operatorReports();
  expect(Object.keys(reports)).toEqual(['run_outcomes','provider_latency','retrieval_health','safety_decisions','false_refusal_feedback','reservations','costs']);
- expect(reports.costs[0]).toMatchObject({known_micro_usd:'600',booked_micro_usd:'600',held_micro_usd:'49400',unknown_calls:1,search_credits:1});
- expect(reports.reservations[0]).toMatchObject({reason:'AWAITING_USAGE',held_micro_usd:'49400'});
+ expect(reports.costs[0]).toMatchObject({known_micro_usd:'8600',booked_micro_usd:'8600',held_micro_usd:'0',unknown_calls:0,search_credits:1});
+ expect(reports.reservations).toHaveLength(0);
  expect(reports.provider_latency).toHaveLength(7);expect(reports.provider_latency.every(r=>Number(r.p95_ms)>=0)).toBe(true);
  expect(reports.false_refusal_feedback[0]).toMatchObject({coverage:'OWNER_REPORTS_ONLY',false_refusal_rate:null,labeled_cases:null});
  expect(JSON.stringify(reports)).not.toMatch(/PRIVATE_|Why do rainbows|weather.gov|sessionId|payloadHmac/);
+});
+it('reports only the failed call as held and awaiting usage',async()=>{
+ const p=providers();p.search={search:async()=>{throw new Error('PRIVATE_SEARCH_FAILURE');}};
+ await run(p);const reports=await operatorReports();
+ expect(reports.costs[0]).toMatchObject({known_micro_usd:'300',booked_micro_usd:'300',held_micro_usd:'8000',unknown_calls:1});
+ expect(reports.reservations[0]).toMatchObject({reason:'AWAITING_USAGE',held_micro_usd:'8000'});
 });
 it('counts approved clarification terminals separately in the availability denominator',async()=>{
  person=await seedCompletion(db,50000n,'Is it better?',2);
@@ -85,11 +91,12 @@ it('counts approved clarification terminals separately in the availability denom
  expect((await operatorReports()).run_outcomes[0]).toMatchObject({completed:0,clarifications:1,availability_denominator:1,failure_rate:'0.00000000000000000000'});
 });
 it('operator cost totals include reconciled receipts once and reveal missing settlement',async()=>{
- await run();const [search]=await db.select().from(schema.providerCalls).where(eq(schema.providerCalls.stage,'SEARCH'));
+ const failing=providers();failing.search={search:async()=>{throw new Error('PRIVATE_SEARCH_FAILURE');}};
+ await run(failing);const [search]=await db.select().from(schema.providerCalls).where(eq(schema.providerCalls.stage,'SEARCH'));
  await db.insert(schema.providerUsageResolutions).values({runId:person.runId,callId:search.id,costMicroUsd:300n,kind:'PROVIDER_RECEIPT',evidenceHash:'b'.repeat(64)});
  await createUsageReconciliation(db).reconcile(person.subject,person.runId);
  const reports=await operatorReports();
- expect(reports.costs[0]).toMatchObject({known_micro_usd:'900',booked_micro_usd:'900',held_micro_usd:'0',unknown_calls:0});
+ expect(reports.costs[0]).toMatchObject({known_micro_usd:'600',booked_micro_usd:'600',held_micro_usd:'0',unknown_calls:0});
  expect(reports.reservations).toHaveLength(0);
  const other=await seedCompletion(db,50000n,"Why do rainbows form?",2);
  await db.update(schema.runs).set({createdAt:new Date(Date.now()-120000),deadlineAt:new Date(Date.now()-1000)}).where(eq(schema.runs.id,other.runId));

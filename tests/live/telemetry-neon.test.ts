@@ -18,7 +18,7 @@ it('captures restricted-runtime research and executes every operator query read-
    search:{search:async()=>({results:[{title:'Synthetic rainbow source',url:'https://weather.gov/rainbow',content:'Sunlight bends in water droplets.',score:.9}],credits:1 as const})}};
   const result=await withTelemetry(randomUUID(),()=>createRunExecution(f.runtime,f.keys,providers).execute(identity,admitted.run,submissionSchema.parse(p.request),new AbortController().signal,()=>{}),e=>events.push(e));
   expect(result.kind).toBe('COMPLETED');
-  expect(events.find(e=>e.event==='research.run_usage')).toMatchObject({knownCostMicroUsd:'600',unknownCalls:1,costState:'PARTIAL',searchCredits:1});
+  expect(events.find(e=>e.event==='research.run_usage')).toMatchObject({knownCostMicroUsd:'8600',unknownCalls:0,costState:'KNOWN',searchCredits:1});
   const connection=await f.runtimePool.connect();let reports=0;
   try{
    await connection.query('BEGIN READ ONLY');await connection.query("SET LOCAL statement_timeout='5s'");

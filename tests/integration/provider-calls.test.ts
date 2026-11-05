@@ -13,11 +13,11 @@ let person: Awaited<ReturnType<typeof seedCompletion>>;
 beforeAll(async()=>{ const journal = JSON.parse(await readFile("drizzle/meta/_journal.json","utf8"));for (const e of journal.entries) await pg.exec(await readFile(`drizzle/${e.tag}.sql`,"utf8")); });
 beforeEach(async()=>{ await db.delete(schema.user);await db.delete(schema.operatorUsageBuckets);person = await seedCompletion(db); });
 afterAll(()=>pg.close());
-it("records each completed provider stage once and leaves search monetary usage unknown",async()=>{
+it("records each completed provider stage once and books search at its fixed credit price",async()=>{
   await prepareCompletion(db,person);
   const calls = await db.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,person.runId));
   expect(calls).toHaveLength(4);expect(calls.every(c=>c.status === "SUCCEEDED")).toBe(true);
-  expect(calls.find(c=>c.stage === "SEARCH")).toMatchObject({ searchCredits: 1,costMicroUsd: null });
+  expect(calls.find(c=>c.stage === "SEARCH")).toMatchObject({ searchCredits: 1,costMicroUsd: 8000n });
   expect(calls.filter(c=>c.stage !== "SEARCH").every(c=>c.costMicroUsd === 100n)).toBe(true);
   const ledger = createProviderCalls(db,person.subject,person.runId);
   const {id} = await ledger.begin("ANSWER","test/answer");
@@ -98,6 +98,30 @@ it('a fresh caller timeout cannot extend search, and its unknown charge stays he
  const [{id:callId}]=await db.select().from(schema.providerCalls);
  expect((await db.select().from(schema.providerCalls))[0]).toMatchObject({id:callId,status:'UNKNOWN',costMicroUsd:null});
  await createFinalization(db).fail(person.subject,person.runId,'DEADLINE_EXCEEDED');
- expect((await db.select().from(schema.runSettlements))[0].heldProviderMicroUsd).toBe(50000n);
+ expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({heldProviderMicroUsd:8000n,releasedProviderMicroUsd:42000n});
  expect(await createUsageReconciliation(db).reconcile(person.subject,person.runId)).toBe('UNRESOLVED');
+});
+const slowClaims=(delayMs:number)=>{const slow=Object.create(db) as typeof db;slow.transaction=(async(work:Parameters<typeof db.transaction>[0])=>{const result=await db.transaction(work);await new Promise(resolve=>setTimeout(resolve,delayMs));return result;}) as typeof db.transaction;return slow;};
+it('a stage limit is not consumed by the time spent claiming the call',async()=>{
+ await db.update(schema.runs).set({status:'CHECKING_INPUT'}).where(eq(schema.runs.id,person.runId));
+ const before=performance.now(),claim=await createProviderCalls(slowClaims(60),person.subject,person.runId).begin('INPUT_SAFETY','test/safety');
+ expect(claim.observedAt-before).toBeGreaterThanOrEqual(55);expect(claim.remainingMs).toBe(5000);expect(claim.runLimited).toBe(false);
+});
+it('the run deadline still counts claim time, and says it was the limiting bound',async()=>{
+ await db.update(schema.runs).set({status:'CHECKING_INPUT',deadlineAt:new Date(Date.now()+1500)}).where(eq(schema.runs.id,person.runId));
+ const claim=await createProviderCalls(slowClaims(60),person.subject,person.runId).begin('INPUT_SAFETY','test/safety');
+ expect(claim.remainingMs).toBeLessThanOrEqual(1500-55);expect(claim.runLimited).toBe(true);
+});
+it('books a Tavily extract batch at its fixed credit price and a zero-credit result at zero',async()=>{
+ const {recordExtractProvider}=await import('@/server/runs/provider-calls');
+ person=await seedCompletion(db,50000n,'Why do rainbows form?',2);
+ await db.update(schema.runs).set({status:'PREPARING_EVIDENCE'}).where(eq(schema.runs.id,person.runId));
+ const provider=recordExtractProvider(createProviderCalls(db,person.subject,person.runId),{extract:async()=>({pages:[],failedUrls:[],rejectedUrls:[],credits:1})});
+ await provider.extract(['https://example.org/a'],{signal:new AbortController().signal,deadlineAt:new Date(Date.now()+45000)});
+ expect((await db.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,person.runId)))[0]).toMatchObject({stage:'EXTRACT',status:'SUCCEEDED',costMicroUsd:8000n,searchCredits:1});
+ const other=await seedCompletion(db,50000n,'Why do rainbows form?',2);
+ await db.update(schema.runs).set({status:'PREPARING_EVIDENCE'}).where(eq(schema.runs.id,other.runId));
+ const empty=recordExtractProvider(createProviderCalls(db,other.subject,other.runId),{extract:async()=>({pages:[],failedUrls:[],rejectedUrls:[],credits:0})});
+ await empty.extract(['https://example.org/a'],{signal:new AbortController().signal,deadlineAt:new Date(Date.now()+45000)});
+ expect((await db.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,other.runId)))[0]).toMatchObject({costMicroUsd:0n,searchCredits:0});
 });

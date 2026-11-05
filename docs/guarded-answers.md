@@ -88,8 +88,9 @@ allocations, not vendor billing guarantees. Privacy/price/account controls still
 need verification with the actual application credentials before live release.
 
 Record outcomes and nullable actual cost/tokens separately from content. A
-completed search reports Tavily credits; its monetary cost remains unknown until
-reconciled. A provider failure can still have a known partial charge. Finish cost
+completed search or extract reports Tavily credits and is booked at the
+pay-as-you-go list price of 8,000 microUSD per credit. A failed one stays unknown.
+A provider failure can still have a known partial charge. Finish cost
 recording after cancellation/fencing, but never treat that as continuation
 permission. A duplicate or uncertain attempt is not automatically repeated.
 
@@ -219,8 +220,8 @@ because the original response was lost. If it rolled back, no draft is public.
 The paid attempt still prevents automatic replay. Recovery/expiry of abandoned
 holds needs the explicit T18 reconciliation job before public release.
 
-For unknown Tavily monetary cost, missing OpenRouter usage or a late outcome,
-retain the monetary hold. Reconcile against vendor billing with an append-only
+For a failed Tavily call, missing OpenRouter usage or a late outcome, retain a
+monetary hold of that call's stage cap minus any reported cost. Reconcile against vendor billing with an append-only
 adjustment and an idempotent external reference; such a job is not implemented
 here. A reported overage fails closed and requires investigation. Do not edit a
 receipt, raise an admitted cap or clear an unknown value to zero to unblock it.

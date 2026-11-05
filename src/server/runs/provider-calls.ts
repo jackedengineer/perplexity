@@ -7,14 +7,16 @@ import { AdmissionError } from "./errors";
 import type { ProviderUsage } from "@/server/ai/usage";
 import { SafetyProviderError,type SafetyProvider } from "@/server/safety/provider";
 import type { SearchProvider } from "@/server/search/tavily";
-import {providerDeadline,stageLimits,type ProviderStage} from './budgets';
+import {TAVILY_CREDIT_MICRO_USD,providerDeadline,stageLimits,type ProviderStage} from './budgets';
 import {recordProviderObservation,traceStage} from '@/server/telemetry/trace';
+import {PlanningError} from '@/server/ai/plan';
 const noUsage:ProviderUsage={costMicroUsd:0n,inputTokens:0,outputTokens:0,actualModel:null};
+const tavilyUsage=(credits:number):ProviderUsage=>({costMicroUsd:BigInt(credits)*TAVILY_CREDIT_MICRO_USD,inputTokens:null,outputTokens:null,actualModel:null});
 const phases = { PLANNER: "PLANNING",QUERY_SECOND:"SEARCHING",SEARCH_SECOND:"SEARCHING",EXTRACT:"PREPARING_EVIDENCE", INPUT_SAFETY: "CHECKING_INPUT",QUERY_SAFETY: "SEARCHING",SEARCH: "SEARCHING",EVIDENCE_SAFETY: "PREPARING_EVIDENCE",ANSWER: "GENERATING",OUTPUT_SAFETY: "CHECKING_OUTPUT" };
 export function createProviderCalls(db: AdmissionDatabase,subject: string,runId: string) {
   return {
     async begin(stage: ProviderStage,requestedModel: string,signal?:AbortSignal) {
-      const observedAt=performance.now();
+      const startedAt=performance.now();
       if(signal?.aborted)throw new AdmissionError('CONFLICT');
       const claim=await db.transaction(async(tx)=>{
         const { run,conversation,now } = await lockOwnedRun(tx,subject,runId);
@@ -27,10 +29,13 @@ export function createProviderCalls(db: AdmissionDatabase,subject: string,runId:
         if (overages > 0 || BigInt(total)+limits.capMicroUsd > run.providerReserveMicroUsd) throw new AdmissionError("BUDGET_EXCEEDED");
         const [call] = await tx.insert(providerCalls).values({ runId,stage,budgetVersion:run.accountingVersion,requestedModel,attemptVersion: run.attemptVersion,
           capMicroUsd: limits.capMicroUsd,status: "STARTED",startedAt: now }).returning({ id: providerCalls.id });
-        return {id:call.id,deadlineAt:run.deadlineAt,remainingMs:Math.min(limits.maxDurationMs,run.deadlineAt.getTime()-now.getTime()),observedAt};
+        return {id:call.id,deadlineAt:run.deadlineAt,maxDurationMs:limits.maxDurationMs,runRemainingMs:run.deadlineAt.getTime()-now.getTime()};
       });
+      // The stage limit bounds the wait for the provider, so database time doesn't consume it. The absolute run deadline still counts everything.
+      const observedAt=performance.now();
       recordProviderObservation({providerCallId:claim.id,providerStage:stage,modelId:/^[a-z0-9-]+\/[A-Za-z0-9._:-]+$/u.test(requestedModel)?requestedModel:undefined,outcome:"UNKNOWN",costState:"UNKNOWN",inputTokens:null,outputTokens:null,searchCredits:null},true);
-      return claim;
+      const runRemainingMs=claim.runRemainingMs-(observedAt-startedAt);
+      return {id:claim.id,deadlineAt:claim.deadlineAt,remainingMs:Math.min(claim.maxDurationMs,runRemainingMs),runLimited:runRemainingMs<=claim.maxDurationMs,observedAt};
     },
     async finish(id: string,status: "SUCCEEDED" | "UNKNOWN" | "SKIPPED",usage?: ProviderUsage,searchCredits?: 0|1) {
       // A paid result may arrive after cancellation/fencing; record its cost without authorizing continuation.
@@ -67,7 +72,7 @@ export function recordSearchProvider(calls: ReturnType<typeof createProviderCall
     const claim = await calls.begin(stage,"tavily/basic",options.signal),id=claim.id,budget=providerDeadline(claim,options.signal);
     try {
       if(budget.signal.aborted){await calls.finish(id,'SKIPPED',noUsage);throw new AdmissionError('DEADLINE_EXCEEDED');}
-      const response = await provider.search(query,{...options,signal:budget.signal,deadlineAt:claim.deadlineAt});await calls.finish(id,"SUCCEEDED",undefined,response.credits);
+      const response = await provider.search(query,{...options,signal:budget.signal,deadlineAt:claim.deadlineAt});await calls.finish(id,"SUCCEEDED",tavilyUsage(response.credits),response.credits);
       if(budget.signal.aborted)throw new AdmissionError('DEADLINE_EXCEEDED');return response;
     }
     catch { try { await calls.finish(id,"UNKNOWN"); } catch { /* Preserve unknown reservation. */ } throw new AdmissionError(budget.expired?"DEADLINE_EXCEEDED":options.signal.aborted?"CONFLICT":"PROVIDER_UNAVAILABLE"); }
@@ -84,9 +89,13 @@ export function recordPlannerProvider(calls:ReturnType<typeof createProviderCall
    const result=await provider.plan(input,{signal:budget.signal,deadlineAt:claim.deadlineAt});await calls.finish(claim.id,result.engine==='CONTEXT_RULE'?'SKIPPED':'SUCCEEDED',result.usage);
    if(budget.signal.aborted)throw new Error('Deadline');return result;
   }catch(error){
-   try{await calls.finish(claim.id,'UNKNOWN',provider.usage?.());}catch{}
-   if(budget.expired)throw new AdmissionError('DEADLINE_EXCEEDED');
+   // The planner reads a complete response before reporting usage, so a reported cost is final even if the plan is then rejected.
+   const usage=provider.usage?.();
+   try{await calls.finish(claim.id,usage?.costMicroUsd!=null?'SUCCEEDED':'UNKNOWN',usage);}catch{}
+   if(budget.expired&&claim.runLimited)throw new AdmissionError('DEADLINE_EXCEEDED');
    if(options.signal.aborted)throw new AdmissionError('CONFLICT');
+   // Only the planner's own limit ran out. The run still has time, so planRun may continue without a plan from the model.
+   if(budget.expired)throw new PlanningError('TIMEOUT');
    throw error;
   }finally{budget.stop();}
  }};
@@ -96,7 +105,7 @@ export function recordExtractProvider(calls:ReturnType<typeof createProviderCall
   const claim=await calls.begin('EXTRACT','tavily/extract-basic',options.signal),budget=providerDeadline(claim,options.signal);
   try{
    if(budget.signal.aborted){await calls.finish(claim.id,'SKIPPED',noUsage);throw new AdmissionError('DEADLINE_EXCEEDED');}
-   const result=await provider.extract(urls,{signal:budget.signal,deadlineAt:claim.deadlineAt});await calls.finish(claim.id,'SUCCEEDED',undefined,result.credits);
+   const result=await provider.extract(urls,{signal:budget.signal,deadlineAt:claim.deadlineAt});await calls.finish(claim.id,'SUCCEEDED',tavilyUsage(result.credits),result.credits);
    if(budget.signal.aborted)throw new AdmissionError('DEADLINE_EXCEEDED');return result;
   }catch{try{await calls.finish(claim.id,'UNKNOWN');}catch{}throw new AdmissionError(budget.expired?'DEADLINE_EXCEEDED':options.signal.aborted?'CONFLICT':'PROVIDER_UNAVAILABLE');}finally{budget.stop();}
  });}};

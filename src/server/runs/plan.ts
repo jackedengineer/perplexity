@@ -1,13 +1,14 @@
 import {createHash} from 'node:crypto';
 import {and,eq} from 'drizzle-orm';
 import {inputSafetyReviews,messages,runPlans,runs} from '@/db/schema';
-import {PLANNING_VERSION,preparePlanningInput,standaloneFallback,validatePlan} from '@/server/ai/plan';
+import {PLANNING_VERSION,PlanningError,literalQuestionPlan,preparePlanningInput,standaloneFallback,validatePlan} from '@/server/ai/plan';
 import type {PlannerProvider} from '@/server/ai/planner-provider';
 import type {SubmitQuery} from '@/server/contracts/chat';
 import {lockOwnedRun} from './lock';
 import {loadPlanningContext} from './context';
 import type {AdmissionDatabase} from './usage';
 import {AdmissionError} from './errors';
+import {recordTelemetry} from '@/server/telemetry/trace';
 export async function planRun(db:AdmissionDatabase,subject:string,runId:string,submission:SubmitQuery,provider:PlannerProvider,signal:AbortSignal){
  const loaded=await db.transaction(async tx=>{
   const {run,conversation,now}=await lockOwnedRun(tx,subject,runId);
@@ -20,7 +21,15 @@ export async function planRun(db:AdmissionDatabase,subject:string,runId:string,s
  });
  let plan;
  try{plan=validatePlan((await provider.plan(loaded.input,{signal,deadlineAt:loaded.run.deadlineAt})).plan,loaded.input,loaded.run.accountingVersion>=2?2:1);}
- catch(error){if(error instanceof AdmissionError)throw error;plan=standaloneFallback(loaded.input);if(!plan)throw new AdmissionError('PROVIDER_UNAVAILABLE');}
+ catch(error){
+  if(error instanceof AdmissionError)throw error;
+  const failure=error instanceof PlanningError?error:new PlanningError();
+  // A question the planner's model appears to have declined isn't sent on to search under a literal plan.
+  const declined=failure.reason==='PROVIDER_REFUSED'||failure.reason==='OUTPUT_NOT_JSON';
+  plan=standaloneFallback(loaded.input)??(declined?null:literalQuestionPlan(loaded.input));
+  recordTelemetry('research.planner_failure',{plannerFailure:failure.reason,providerHttpStatus:failure.httpStatus,plannerFallback:plan!==null});
+  if(!plan)throw new AdmissionError('PROVIDER_UNAVAILABLE');
+ }
  await db.transaction(async tx=>{
   const {run,conversation,now}=await lockOwnedRun(tx,subject,runId);
   if(run.status!=='PLANNING'||run.attemptVersion!==loaded.run.attemptVersion||conversation.revision!==loaded.run.admittedRevision||run.deadlineAt<=now||signal.aborted)throw new AdmissionError('CONFLICT');

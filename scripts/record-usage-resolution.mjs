@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import { Pool } from 'pg';
 import { databaseEnvironment } from './database-environment.ts';
+import { receiptMatchesCall } from './usage-receipt-rules.mjs';
 const receiptSchema=z.strictObject({callId:z.uuid(),runId:z.uuid(),costMicroUsd:z.string().regex(/^\d{1,6}$/u),
  kind:z.enum(['PROVIDER_RECEIPT','VERIFIED_NOT_BILLED']),evidenceHash:z.string().regex(/^[a-f0-9]{64}$/u)})
  .refine(v=>BigInt(v.costMicroUsd)<=150000n&&(v.kind!=='VERIFIED_NOT_BILLED'||BigInt(v.costMicroUsd)===0n));
@@ -18,8 +19,8 @@ try {
  const client=await pool.connect();
  try {
   await client.query('BEGIN');
-  const {rows}=await client.query(`SELECT c.cap_micro_usd,c.cost_micro_usd,r.status FROM provider_calls c JOIN runs r ON r.id=c.run_id WHERE c.id=$1 AND c.run_id=$2 FOR UPDATE OF c`,[receipt.callId,receipt.runId]);
-  const call=rows[0];if(!call||['RECEIVED','CHECKING_INPUT','PLANNING','SEARCHING','PREPARING_EVIDENCE','GENERATING','CHECKING_OUTPUT'].includes(call.status)||BigInt(receipt.costMicroUsd)>BigInt(call.cap_micro_usd)||BigInt(receipt.costMicroUsd)<BigInt(call.cost_micro_usd??0))throw new Error('Receipt does not match a terminal provider call');
+  const {rows}=await client.query(`SELECT c.cap_micro_usd,c.cost_micro_usd,c.status AS call_status,r.status AS run_status FROM provider_calls c JOIN runs r ON r.id=c.run_id WHERE c.id=$1 AND c.run_id=$2 FOR UPDATE OF c`,[receipt.callId,receipt.runId]);
+  const call=rows[0];if(!call||!receiptMatchesCall(call,receipt.costMicroUsd))throw new Error('Receipt does not match a terminal provider call');
   const existing=await client.query('SELECT cost_micro_usd,kind,evidence_hash FROM provider_usage_resolutions WHERE call_id=$1',[receipt.callId]);
   if(existing.rows.length) {
    const saved=existing.rows[0];if(BigInt(saved.cost_micro_usd)!==BigInt(receipt.costMicroUsd)||saved.kind!==receipt.kind||saved.evidence_hash!==receipt.evidenceHash)throw new Error('Conflicting immutable receipt');
