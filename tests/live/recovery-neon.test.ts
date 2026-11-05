@@ -28,7 +28,7 @@ it('overlapping reapers recover a killed handler without releasing unknown cost'
  await f.owner.update(schema.runs).set({createdAt:new Date(Date.now()-120000),deadlineAt:new Date(Date.now()-60000)}).where(eq(schema.runs.id,p.runId));
  const results=await simultaneously(Array.from({length:4},()=>()=>createRunRecovery(f.runtime).sweep(undefined,f.namespace)));
  expect(results.reduce((n,r)=>n+r.recovered,0)).toBe(1);
- expect((await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,p.runId)))[0]).toMatchObject({creditsCharged:0,heldProviderMicroUsd:50000n});
+ expect((await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,p.runId)))[0]).toMatchObject({creditsCharged:0,heldProviderMicroUsd:2250n});
  expect((await f.owner.select().from(schema.runs).where(eq(schema.runs.id,p.runId)))[0]).toMatchObject({status:'TIMED_OUT',attemptVersion:2});
 },60000);
 it('cancellation wins against a paused answer, then concurrent reconciliation debits its late cost once',async()=>{

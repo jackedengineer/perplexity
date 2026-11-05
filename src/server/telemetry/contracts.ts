@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import {modelIdSchema} from '@/server/ai/models';
+import {PLANNER_FAILURES} from '@/server/ai/plan';
 import {PUBLIC_ERRORS} from '@/server/contracts/error-messages';
 import {INPUT_REASONS} from '@/server/safety/provider';
 import {safetyCategorySchema} from '@/server/safety/policy';
@@ -21,12 +22,13 @@ export const telemetryFieldsSchema=z.object({
  providerCallId:z.uuid().optional(),providerStage:z.enum(['PLANNER','INPUT_SAFETY','QUERY_SAFETY','QUERY_SECOND','SEARCH','SEARCH_SECOND','EXTRACT','EVIDENCE_SAFETY','ANSWER','OUTPUT_SAFETY']).optional(),
  inputTokens:aggregateTokens.nullable().optional(),outputTokens:aggregateTokens.nullable().optional(),searchCredits:count.nullable().optional(),
  knownCostMicroUsd:money.optional(),estimatedUpperBoundMicroUsd:money.optional(),heldMicroUsd:money.optional(),bookedMicroUsd:money.optional(),
+ plannerFailure:z.enum(PLANNER_FAILURES).optional(),plannerFallback:z.boolean().optional(),providerHttpStatus:z.int().min(100).max(599).optional(),
  costState:z.enum(['KNOWN','PARTIAL','UNKNOWN']).optional(),estimateKind:z.literal('RESERVATION_CEILING').optional(),unknownCalls:count.optional(),
  answerCredits:count.optional(),extractedSources:count.optional(),extractionFailures:count.optional(),sourceCount:count.optional(),discardedSources:count.optional(),returnedSources:count.optional(),
 });
 export const providerTelemetryFieldsSchema=telemetryFieldsSchema.extend({inputTokens:count.nullable().optional(),outputTokens:count.nullable().optional()});
 export type TelemetryFields=z.infer<typeof telemetryFieldsSchema>;
-export const eventNameSchema=z.enum(['research.span','research.safety','research.sources','research.provider_started','research.usage','research.run_usage','research.first_progress','research.approved_delivery','research.telemetry_unavailable']);
+export const eventNameSchema=z.enum(['research.span','research.safety','research.sources','research.provider_started','research.usage','research.run_usage','research.first_progress','research.approved_delivery','research.planner_failure','research.telemetry_unavailable']);
 export const telemetryEventSchema=telemetryFieldsSchema.extend({
  event:eventNameSchema,schemaVersion:z.literal(1),timestamp:z.iso.datetime(),requestId:z.uuid(),traceId:z.string().regex(/^[a-f0-9]{32}$/u),spanId:z.string().regex(/^[a-f0-9]{16}$/u),
  parentSpanId:z.string().regex(/^[a-f0-9]{16}$/u).optional(),stage:stageSchema.optional(),phase:z.enum(['START','END']).optional(),

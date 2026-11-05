@@ -11,6 +11,10 @@ import { createAnswerDelivery } from "@/server/chat/delivery";
 import {FREE_ADMISSION_POLICY} from '@/server/runs/policy';
 import { createRunAdmission } from "@/server/runs/admit";
 import {SafetyProviderError} from '@/server/safety/provider';
+import {randomUUID} from 'node:crypto';
+import {PlanningError} from '@/server/ai/plan';
+import {withTelemetry} from '@/server/telemetry/trace';
+import type {TelemetryEvent} from '@/server/telemetry/contracts';
 const pg = new PGlite(),db = drizzle(pg,{schema});
 let person: Awaited<ReturnType<typeof seedCompletion>>,identity: {user:{id:string};sessionId:string};
 beforeAll(async()=>{const journal=JSON.parse(await readFile("drizzle/meta/_journal.json","utf8"));for(const e of journal.entries)await pg.exec(await readFile(`drizzle/${e.tag}.sql`,"utf8"));});
@@ -50,7 +54,7 @@ it("output denial leaves no answer in status/history and preserves provider acco
 it("a search outage settles the admitted failure without leaking upstream diagnostics",async()=>{
   const p=providers();vi.mocked(p.search.search).mockRejectedValue(new Error("PRIVATE provider response"));
   expect((await run(p)).result).toMatchObject({kind:"DENIED",code:"PROVIDER_UNAVAILABLE"});expect(p.answer.generate).not.toHaveBeenCalled();
-  expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({creditsCharged:0,heldProviderMicroUsd:49700n});
+  expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({creditsCharged:0,knownProviderMicroUsd:300n,heldProviderMicroUsd:8000n,releasedProviderMicroUsd:41700n});
 });
 it("logout during the input check stops the next paid search stage",async()=>{
   const p=providers();p.input={...fakeSafety(),classify:async()=>{await db.delete(schema.session).where(eq(schema.session.id,identity.sessionId));return {decision:"ALLOW",categoryCodes:[],policyVersion:"v1"};}};
@@ -201,6 +205,34 @@ it('retains contextual day freshness on a resolved follow-up',async()=>{
 });
 
 import {createLocalSafetyGuard,LOCAL_GUARD_VERSION} from '@/server/safety/local';
+it('a failed model plan searches the exact words of a question the local rule cannot plan, and logs only a fixed reason',async()=>{
+ const question='Who won the 2022 FIFA World Cup?';
+ person=await seedCompletion(db,50000n,question,2);identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};
+ const p=providers(),plan=vi.fn(async()=>{throw new PlanningError('PLAN_VOCABULARY');});p.planner={modelId:'test/planner',usage:()=>({...knownUsage,costMicroUsd:65n}),plan};
+ const events:TelemetryEvent[]=[],{result}=await withTelemetry(randomUUID(),()=>run(p),event=>events.push(event));
+ expect(result.kind).toBe('COMPLETED');expect(plan).toHaveBeenCalledOnce();
+ expect(p.search.search).toHaveBeenCalledWith(question,expect.anything());
+ expect((await db.select().from(schema.runPlans))[0].plan).toMatchObject({action:'ANSWER',standaloneQuestion:question,retrieval:{queries:[question]}});
+ // The model call's reported cost is final even though its plan was rejected, so nothing stays held for a receipt.
+ expect((await db.select().from(schema.providerCalls)).find(c=>c.stage==='PLANNER')).toMatchObject({status:'SUCCEEDED',costMicroUsd:65n});
+ expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({heldProviderMicroUsd:0n});
+ const failure=events.find(e=>e.event==='research.planner_failure');
+ expect(failure).toMatchObject({plannerFailure:'PLAN_VOCABULARY',plannerFallback:true,stage:'planning'});
+ expect(JSON.stringify(failure)).not.toContain('FIFA');
+});
+it('a planner failure on a question with no usable literal form still fails, holding only the planner cap',async()=>{
+ person=await seedCompletion(db,50000n,'Is it better?',2);identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};
+ const p=providers();p.planner={modelId:'test/planner',plan:async()=>{throw new PlanningError('HTTP_ERROR',503);}};
+ const events:TelemetryEvent[]=[],{result}=await withTelemetry(randomUUID(),()=>run(p),event=>events.push(event));
+ expect(result).toMatchObject({kind:'DENIED',code:'PROVIDER_UNAVAILABLE'});expect(p.search.search).not.toHaveBeenCalled();
+ expect(events.find(e=>e.event==='research.planner_failure')).toMatchObject({plannerFailure:'HTTP_ERROR',providerHttpStatus:503,plannerFallback:false});
+ expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({knownProviderMicroUsd:100n,heldProviderMicroUsd:2000n,releasedProviderMicroUsd:47900n});
+});
+it.each(['PROVIDER_REFUSED','OUTPUT_NOT_JSON'] as const)('a question the planner did not plan because of %s is not sent on under a literal plan',async reason=>{
+ person=await seedCompletion(db,50000n,'Who won the 2022 FIFA World Cup?',2);identity={user:{id:person.subject},sessionId:(await completionSession(db,person.subject)).sessionId};
+ const p=providers();p.planner={modelId:'test/planner',plan:async()=>{throw new PlanningError(reason);}};
+ expect((await run(p)).result).toMatchObject({kind:'DENIED',code:'PROVIDER_UNAVAILABLE'});expect(p.search.search).not.toHaveBeenCalled();expect(p.answer.generate).not.toHaveBeenCalled();
+});
 it('Web keeps citations, owner checks and settlement without any classifier provider calls',async()=>{
  const p=providers();for(const stage of ['input','query','evidence','output'] as const)p[stage]=createLocalSafetyGuard();
  expect((await run(p)).result).toEqual({kind:'COMPLETED'});
@@ -209,6 +241,6 @@ it('Web keeps citations, owner checks and settlement without any classifier prov
  expect((await db.select().from(schema.outputReviews))[0].guardVersion).toBe(LOCAL_GUARD_VERSION);
  expect((await createAnswerDelivery(db).load(identity,person.runId)).answer?.text).toContain('[S1]');
  await expect(createAnswerDelivery(db).load({...identity,user:{id:'foreign'}},person.runId)).rejects.toMatchObject({code:'NOT_FOUND'});
- // Search still has no USD receipt; local safety must not release its unknown hold.
- expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({knownProviderMicroUsd:200n,heldProviderMicroUsd:49800n});
+ // Search is booked at its fixed credit price, so a clean run releases the rest of its reserve.
+ expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({knownProviderMicroUsd:8200n,heldProviderMicroUsd:0n,releasedProviderMicroUsd:41800n});
 });

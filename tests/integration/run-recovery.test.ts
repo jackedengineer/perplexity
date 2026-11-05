@@ -35,8 +35,8 @@ it('repairs an expired killed handler and preserves unknown provider cost',async
  await db.insert(schema.providerCalls).values({runId:person.runId,stage:'INPUT_SAFETY',attemptVersion:1,requestedModel:'test/safety',capMicroUsd:5000n,status:'STARTED',startedAt:new Date(Date.now()-90000)});
  await createRunRecovery(db).sweep();await createRunRecovery(db).sweep();
  expect((await db.select().from(schema.runs))[0]).toMatchObject({status:'TIMED_OUT',attemptVersion:2});
- expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({creditsCharged:0,heldProviderMicroUsd:50000n});
- expect((await db.select().from(schema.usageBuckets)).every(b=>b.reservedCredits===0&&b.reservedProviderMicroUsd===50000n)).toBe(true);
+ expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({creditsCharged:0,heldProviderMicroUsd:5000n,releasedProviderMicroUsd:45000n});
+ expect((await db.select().from(schema.usageBuckets)).every(b=>b.reservedCredits===0&&b.reservedProviderMicroUsd===5000n)).toBe(true);
 });
 
 it('late completion after cancellation records usage but cannot commit or resettle',async()=>{

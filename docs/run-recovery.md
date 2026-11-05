@@ -25,6 +25,15 @@ features; T18 reuses the existing T11 owner/status and T10 settlement boundaries
   CLI records these receipts using explicit database selection, not hosted owner
   credentials. Time passing alone never means not billed. Legacy accounting-v0
   holds and cap overages remain held for operator investigation.
+- An ambiguous call holds only what it could still cost: its frozen stage cap minus
+  any reported cost. Each call claims that cap before dispatch and the claims cannot
+  exceed the run's reserve, so the rest of the reserve is released at settlement.
+  Holds settled earlier under the whole-reserve rule shrink to the same amount on
+  the next sweep, without a receipt; this never releases an unresolved call's cap.
+  Nothing is held for a call with a final reported cost, so the receipt CLI rejects
+  a receipt that differs from it; a bill that disagrees needs investigation. A planner call whose response reported a cost is
+  final even if its plan is rejected. Tavily is booked at a fixed price, so a
+  successful search or extract needs no receipt.
 - Overlapping sweeps, duplicate cancellation, repeated receipts and late completion
   are idempotent. Database clocks determine expiry; no provider/model is called by
   recovery. Responses and logs contain fixed states/counts, never drafts or evidence.

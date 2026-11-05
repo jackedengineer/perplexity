@@ -62,7 +62,7 @@ it('expired retries retain the deadline and unknown hold; late usage reconciles 
  await createRunRecovery(f.runtime).sweep(undefined,f.namespace);
  expect(await f.admission.admit(p.subject,p.request)).toMatchObject({kind:'RUN_ALREADY_FINISHED',run:{deadlineAt:expired.toISOString()}});
  await expect(calls.begin('INPUT_SAFETY','test/new-timeout')).rejects.toMatchObject({code:'DEADLINE_EXCEEDED'});
- expect((await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,admitted.run.id)))[0].heldProviderMicroUsd).toBe(50000n);
+ expect((await f.owner.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,admitted.run.id)))[0].heldProviderMicroUsd).toBe(2250n);
  await calls.finish(claim.id,'SUCCEEDED',{costMicroUsd:300n,inputTokens:10,outputTokens:5,actualModel:'test/safety'});
  await Promise.allSettled(Array.from({length:4},()=>createUsageReconciliation(f.runtime).reconcile(p.subject,admitted.run.id)));
  expect(await f.owner.select().from(schema.runReconciliations).where(eq(schema.runReconciliations.runId,admitted.run.id))).toHaveLength(1);

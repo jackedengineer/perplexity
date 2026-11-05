@@ -21,7 +21,10 @@ export function preparePlanningInput(value:PlannerInput):PlannerInput{
  }
  return plannerInputSchema.parse(selected);
 }
-export class PlanningError extends Error{constructor(){super('Planning unavailable');}}
+// Fixed codes only: these reach logs, so they never carry provider or user text.
+export const PLANNER_FAILURES=['INPUT_INVALID','NOT_DISPATCHED','TIMEOUT','HTTP_ERROR','TRANSPORT','PROVIDER_REFUSED','OUTPUT_NOT_JSON','OUTPUT_UNPARSEABLE','FINISH_REASON','PLAN_SCHEMA','PLAN_CLARIFY','PLAN_RETRIEVAL','PLAN_LOCALE','PLAN_CONSTRAINT','PLAN_VOCABULARY','PLAN_ANCHOR','PLAN_NEGATION','PLAN_REFERENCE','PLAN_QUERY_INTENT','PLAN_FRESHNESS','UNKNOWN'] as const;
+export type PlannerFailure=typeof PLANNER_FAILURES[number];
+export class PlanningError extends Error{constructor(readonly reason:PlannerFailure='UNKNOWN',readonly httpStatus?:number){super('Planning unavailable');}}
 const genericWords=new Set(('a an and are as at about be between by can compare comparison cost costs current date dates describe differences do does explain explanation fact facts features find for from general give how in information is latest me of official on or overview plans please price prices pricing question recent research resources results review search sources than the their them then these they this those to topic use using vs versus was were what when where which why with without work works you your it its that one ones into details summary summarize provide tell more examples difference brief briefly concise sentence sentences word words').split(' '));
 const words=(text:string)=>(text.normalize('NFKC').replace(/[’‘]/gu,"'").toLowerCase().match(/[\p{L}\p{N}]+(?:[._'-][\p{L}\p{N}]+)*/gu)??[]).map(word=>word.replace(/'s$/u,''));
 const numeric=(text:string)=>text.normalize('NFKC').match(/\d+(?:[.,/-]\d+)*/gu)?.map(v=>v.replaceAll(',',''))??[];
@@ -56,13 +59,13 @@ function requireQueryIntent(plan:Extract<QueryPlan,{action:'ANSWER'}>,original:s
  const material=[...exclusions,...budgets],constraintWords=new Set(material.flatMap(words));
  const topics=words(searchSubject(plan.standaloneQuestion)).filter(word=>!genericWords.has(word)&&!constraintWords.has(word)&&!/^\d/u.test(word)&&!['recommend','recommendation','best'].includes(word));
  const queryWords=plan.retrieval.queries.map(query=>new Set(words(query))),allWords=new Set(queryWords.flatMap(set=>[...set]));
- if(!topics.length||topics.some(topic=>!allWords.has(topic)))throw new PlanningError();
+ if(!topics.length||topics.some(topic=>!allWords.has(topic)))throw new PlanningError('PLAN_QUERY_INTENT');
  for(const [index,query] of plan.retrieval.queries.entries()){
-  if(!topics.some(topic=>queryWords[index].has(topic))||material.some(value=>words(value).some(word=>!queryWords[index].has(word))||[...value.matchAll(/[$₹€£]/gu)].some(match=>!query.includes(match[0]))))throw new PlanningError();
+  if(!topics.some(topic=>queryWords[index].has(topic))||material.some(value=>words(value).some(word=>!queryWords[index].has(word))||[...value.matchAll(/[$₹€£]/gu)].some(match=>!query.includes(match[0]))))throw new PlanningError('PLAN_QUERY_INTENT');
  }
  // Subject numbers may be split (e.g. React 18 / React 19); shared budgets and
  // exclusions above stay on every query. Other original numbers remain covered.
- if(numeric(original).some(number=>!plan.retrieval.queries.some(query=>numeric(query).includes(number))))throw new PlanningError();
+ if(numeric(original).some(number=>!plan.retrieval.queries.some(query=>numeric(query).includes(number))))throw new PlanningError('PLAN_QUERY_INTENT');
 }
 // Conservative provenance validation, not a semantic-equivalence or safety proof.
 // Actual outbound queries still pass local boundary checks before search.
@@ -75,42 +78,59 @@ export function validatePlan(value:unknown,input:unknown,maxQueries:number=PLANN
   const vocabulary=new Set(words([original.original.text,...context.map(m=>m.text)].join(' ')));
   const userNumbers=new Set(users.flatMap(m=>numeric(m.text)));
   if(plan.action==='CLARIFY'){
-   if(standaloneFallback(original)||resolvePricingFollowup(original))throw new PlanningError();
-   if(plan.question.length>240||(plan.question.match(/\?/gu)?.length??0)>1||/[\r\n]/u.test(plan.question)||!safeEvidenceText(plan.question)||/https?:|www\./iu.test(plan.question))throw new PlanningError();
-   if(words(plan.question).some(word=>!vocabulary.has(word)&&!genericWords.has(word)&&!clarificationWords.has(word))||numeric(plan.question).some(n=>!userNumbers.has(n)))throw new PlanningError();
+   if(standaloneFallback(original)||resolvePricingFollowup(original))throw new PlanningError('PLAN_CLARIFY');
+   if(plan.question.length>240||(plan.question.match(/\?/gu)?.length??0)>1||/[\r\n]/u.test(plan.question)||!safeEvidenceText(plan.question)||/https?:|www\./iu.test(plan.question))throw new PlanningError('PLAN_CLARIFY');
+   if(words(plan.question).some(word=>!vocabulary.has(word)&&!genericWords.has(word)&&!clarificationWords.has(word))||numeric(plan.question).some(n=>!userNumbers.has(n)))throw new PlanningError('PLAN_CLARIFY');
    return freeze(plan);
   }
-  if(![1,2].includes(maxQueries)||!plan.retrieval.required||plan.retrieval.queries.length>maxQueries||plan.disclosedAssumptions.length)throw new PlanningError();
-  if(Intl.getCanonicalLocales(plan.answerLanguage)[0]!==Intl.getCanonicalLocales(original.locale??'en')[0])throw new PlanningError();
+  if(![1,2].includes(maxQueries)||!plan.retrieval.required||plan.retrieval.queries.length>maxQueries||plan.disclosedAssumptions.length)throw new PlanningError('PLAN_RETRIEVAL');
+  if(Intl.getCanonicalLocales(plan.answerLanguage)[0]!==Intl.getCanonicalLocales(original.locale??'en')[0])throw new PlanningError('PLAN_LOCALE');
   for(const constraint of plan.explicitConstraints){
    const source=users.find(m=>m.id===constraint.sourceMessageId);
-   if(constraint.name!=='EXPLICIT'||!source||!source.text.includes(constraint.value))throw new PlanningError();
+   if(constraint.name!=='EXPLICIT'||!source||!source.text.includes(constraint.value))throw new PlanningError('PLAN_CONSTRAINT');
   }
-  if(/^what about its pricing\??$/iu.test(original.original.text.trim())&&!pricingReferenceEntity(original))throw new PlanningError();
+  if(/^what about its pricing\??$/iu.test(original.original.text.trim())&&!pricingReferenceEntity(original))throw new PlanningError('PLAN_REFERENCE');
   const derived=[plan.standaloneQuestion,...plan.retrieval.queries];
-  if(derived.some(text=>!safeEvidenceText(text)||words(text).some(word=>!vocabulary.has(word)&&!genericWords.has(word))||numeric(text).some(n=>!userNumbers.has(n))))throw new PlanningError();
+  if(derived.some(text=>!safeEvidenceText(text)||words(text).some(word=>!vocabulary.has(word)&&!genericWords.has(word))||numeric(text).some(n=>!userNumbers.has(n))))throw new PlanningError('PLAN_VOCABULARY');
   // Rewrites cannot erase explicit negation, numeric limits or named user topics.
   const standaloneWords=new Set(words(plan.standaloneQuestion));
   const anchors=words(original.original.text).filter(w=>!genericWords.has(w));
-  if(anchors.some(w=>!standaloneWords.has(w))||numeric(original.original.text).some(n=>!numeric(plan.standaloneQuestion).includes(n)))throw new PlanningError();
-  for(const negation of original.original.text.match(negative)??[])if(!standaloneWords.has(negation.toLowerCase()))throw new PlanningError();
+  if(anchors.some(w=>!standaloneWords.has(w))||numeric(original.original.text).some(n=>!numeric(plan.standaloneQuestion).includes(n)))throw new PlanningError('PLAN_ANCHOR');
+  for(const negation of original.original.text.match(negative)??[])if(!standaloneWords.has(negation.toLowerCase()))throw new PlanningError('PLAN_NEGATION');
   if(hasReference(original.original.text)){
-   if(!original.context.length)throw new PlanningError();
+   if(!original.context.length)throw new PlanningError('PLAN_REFERENCE');
    const previous=new Set(original.context.flatMap(m=>words(m.text)).filter(w=>!genericWords.has(w)));
-   if(!words(plan.standaloneQuestion).some(w=>previous.has(w))||hasReference(plan.standaloneQuestion))throw new PlanningError();
+   if(!words(plan.standaloneQuestion).some(w=>previous.has(w))||hasReference(plan.standaloneQuestion))throw new PlanningError('PLAN_REFERENCE');
   }
   requireQueryIntent(plan,original.original.text);
-  if(plan.retrieval.freshness==='RECENT'&&!freshnessTimeRange(users.map(m=>m.text).join(' ')))throw new PlanningError();
-  if(plan.retrieval.freshness==='SPECIFIC_RANGE'&&![plan.retrieval.startDate,plan.retrieval.endDate].every(date=>users.some(m=>m.text.includes(date!))))throw new PlanningError();
+  if(plan.retrieval.freshness==='RECENT'&&!freshnessTimeRange(users.map(m=>m.text).join(' ')))throw new PlanningError('PLAN_FRESHNESS');
+  if(plan.retrieval.freshness==='SPECIFIC_RANGE'&&![plan.retrieval.startDate,plan.retrieval.endDate].every(date=>users.some(m=>m.text.includes(date!))))throw new PlanningError('PLAN_FRESHNESS');
   return freeze(plan);
- }catch{throw new PlanningError();}
+ }catch(error){throw error instanceof PlanningError?error:new PlanningError('PLAN_SCHEMA');}
 }
 export function standaloneFallback(value:unknown):QueryPlan|null{
  try{
   const input=plannerInputSchema.parse(value),text=input.original.text;
   const compare=/^compare\s+\S[\s\S]{0,240}\s+(?:and|vs\.?|versus)\s+\S/iu.test(text.trim());
   if(text.length>300||hasReference(text)||/\b(?:best|better|recommend)\b/iu.test(text)||!compare&&!/^(?:explain|define|describe|why (?:do|does|is)|how (?:do|does)|what (?:is|are|causes))\s+\S+/iu.test(text.trim()))return null;
-  return validatePlan({action:'ANSWER',standaloneQuestion:text,intent:compare?'COMPARE':'EXPLAIN',explicitConstraints:[],disclosedAssumptions:[],retrieval:{required:true,queries:[text],freshness:freshnessTimeRange(text)?'RECENT':'ANY',startDate:null,endDate:null},answerLanguage:input.locale??'en'},input);
+  return exactOriginalPlan(input,compare?'COMPARE':'EXPLAIN');
+ }catch{return null;}
+}
+function exactOriginalPlan(input:PlannerInput,intent:'COMPARE'|'EXPLAIN'|'RESEARCH'){
+ const text=input.original.text;
+ return validatePlan({action:'ANSWER',standaloneQuestion:text,intent,explicitConstraints:[],disclosedAssumptions:[],retrieval:{required:true,queries:[text],freshness:freshnessTimeRange(text)?'RECENT':'ANY',startDate:null,endDate:null},answerLanguage:input.locale??'en'},input);
+}
+// Only for when the model call has already failed: searching the user's exact words
+// beats failing the run. It's limited to a conversation's first question because a
+// FAST answer doesn't see earlier turns, and no word list can reliably tell a follow-up
+// ("Who founded the company?") from a new question. Wrongly guessing gives a confident
+// answer about the wrong subject, which is worse than a failed run the user can retry.
+export function literalQuestionPlan(value:unknown):QueryPlan|null{
+ try{
+  const input=plannerInputSchema.parse(value),text=input.original.text;
+  const topics=new Set(words(text).filter(word=>!genericWords.has(word)));
+  if(input.context.length||text.length>300||hasReference(text)||topics.size<2)return null;
+  return exactOriginalPlan(input,'RESEARCH');
  }catch{return null;}
 }
 

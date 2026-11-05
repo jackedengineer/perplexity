@@ -95,5 +95,5 @@ it('a native provider refusal is a policy result, not a classifier outage',async
  expect((await run(p)).result).toMatchObject({kind:'DENIED',code:'OUTPUT_BLOCKED'});
  expect(p.answer.generate).toHaveBeenCalledOnce();
  expect((await createAnswerDelivery(db).load(identity,person.runId)).answer).toBeUndefined();
- expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({creditsCharged:0,heldProviderMicroUsd:50000n});
+ expect((await db.select().from(schema.runSettlements))[0]).toMatchObject({creditsCharged:0,heldProviderMicroUsd:12500n,releasedProviderMicroUsd:37500n});
 });

@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {expect,it} from 'vitest';
-import {validatePlan,standaloneFallback,plannerInputSchema,preparePlanningInput,PLANNER_LIMITS,type PlannerInput} from '@/server/ai/plan';
+import {literalQuestionPlan,validatePlan,standaloneFallback,plannerInputSchema,preparePlanningInput,PLANNER_LIMITS,type PlannerInput} from '@/server/ai/plan';
 const input=(text='Compare Neon and Supabase for Next.js, not MongoDB. Budget $100.'):PlannerInput=>({original:{id:randomUUID(),text},context:[],now:'2026-10-23T09:00:00.000Z',timezone:'Asia/Kolkata',locale:null});
 const answer=(i:PlannerInput)=>({action:'ANSWER',standaloneQuestion:i.original.text,intent:'COMPARE',explicitConstraints:[{name:'EXPLICIT',value:'not MongoDB',sourceMessageId:i.original.id},{name:'EXPLICIT',value:'Budget $100',sourceMessageId:i.original.id}],disclosedAssumptions:[],retrieval:{required:true,queries:[i.original.text],freshness:'ANY',startDate:null,endDate:null},answerLanguage:'en'});
 it('preserves original text, explicit negation, entities and budgets in a bounded immutable plan',()=>{
@@ -103,4 +103,25 @@ it('binds the planned language to the requested locale',()=>{
  const i=input('Explain photosynthesis');i.locale='fr';const p={...answer(i),explicitConstraints:[],retrieval:{...answer(i).retrieval,queries:['photosynthesis explanation']},answerLanguage:'fr'};
  expect(validatePlan(p,i)).toMatchObject({answerLanguage:'fr'});
  expect(()=>validatePlan({...p,answerLanguage:'en'},i)).toThrow();
+});
+
+const withContext=(text:string):PlannerInput=>({...input(text),context:[{id:randomUUID(),role:'USER',text:'Tell me about Stripe'},{id:randomUUID(),role:'ASSISTANT',text:'Stripe is a payments company.'}]});
+it('after a failed model call, plans the exact words of a first question that stands on its own',()=>{
+ for(const text of ['Who won the 2022 FIFA World Cup?','Which country won the 2018 FIFA World Cup?','Name the largest planet in the solar system.','Best laptop under 50000 rupees for coding','Compare React 18 and React 19 without Redux']){
+  expect(literalQuestionPlan(input(text))).toMatchObject({action:'ANSWER',standaloneQuestion:text,intent:'RESEARCH',explicitConstraints:[],retrieval:{queries:[text],freshness:'ANY'},answerLanguage:'en'});
+ }
+ expect(literalQuestionPlan(input('What changed in the latest EU AI Act news this week?'))).toMatchObject({retrieval:{freshness:'RECENT'}});
+});
+it('never guesses a question with no real subject or any question in a conversation with history',()=>{
+ for(const text of ['Is it better?','Which one should I use?','Compare them','Tell me more','Which is better?','What about its pricing?','Why?'])expect(literalQuestionPlan(input(text))).toBeNull();
+ // FAST answers don't see the conversation, so a wrong guess here is a confident answer about the wrong subject.
+ for(const text of ['Who founded the company?','What are the tax implications in Germany?','Now compare to Adyen and PayPal fees','Yes please go ahead with the comparison','The enterprise tier in Germany','Thanks a lot for the help','¿Cuánto cuesta en Alemania y Francia?','And in 2018?','Who is his wife?','Who won the 2022 FIFA World Cup?'])expect(literalQuestionPlan(withContext(text))).toBeNull();
+ expect(literalQuestionPlan(input('Who won the World Cup? '+'detail '.repeat(60)))).toBeNull();
+ expect(literalQuestionPlan({original:{id:'bad',text:'Who won the 2022 FIFA World Cup?'}})).toBeNull();
+});
+it('keeps every validator rule on the literal plan, and reports rule failures by code',()=>{
+ const i=input('Who won the 2022 FIFA World Cup?'),plan=literalQuestionPlan(i);
+ expect(()=>validatePlan({...plan,retrieval:{...(plan as {retrieval:object}).retrieval,queries:['2022 FIFA World Cup winner']}},i)).toThrow(expect.objectContaining({reason:'PLAN_VOCABULARY'}));
+ expect(()=>validatePlan({...plan,standaloneQuestion:'Who won the FIFA World Cup?'},i)).toThrow(expect.objectContaining({reason:'PLAN_ANCHOR'}));
+ expect(()=>validatePlan({action:'IGNORE'},i)).toThrow(expect.objectContaining({reason:'PLAN_SCHEMA'}));
 });

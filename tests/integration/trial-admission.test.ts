@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
-import { eq,sql } from 'drizzle-orm';
+import { and,eq,sql } from 'drizzle-orm';
 import { afterAll,beforeAll,expect,it } from 'vitest';
 import * as schema from '@/db/schema';
 import { createRunAdmission } from '@/server/runs/admit';
@@ -83,13 +83,15 @@ it('persists a version-three answer and reconciles late search costs without cha
  const p=await fixture(false),request={...p.request,modelKey:'standard-gemini-flash'};
  const admitted=await p.admission.admit(p.subject,request);expect(admitted.kind).toBe('ADMITTED');if(admitted.kind!=='ADMITTED')throw Error('Admission failed');
  await prepareCompletion(db,{subject:p.subject,runId:admitted.run.id,request});
+ // A search whose cost was never booked, as on runs from before the fixed Tavily price.
+ await db.update(schema.providerCalls).set({costMicroUsd:null}).where(and(eq(schema.providerCalls.runId,admitted.run.id),eq(schema.providerCalls.stage,'SEARCH')));
  const {sessionId}=await completionSession(db,p.subject);
  const result=await createAnswerCompletion(db,{answer:{modelId:'google/gemini-3.7-flash',generate:async()=>({text:'Water refracts sunlight [S1].',usage:{...knownUsage,costMicroUsd:30000n}})},output:fakeSafety()}).complete(p.subject,sessionId,admitted.run.id,new AbortController().signal);
  expect(result.kind).toBe('COMMITTED');
  const calls=await db.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId,admitted.run.id));
  expect(calls.find(c=>c.stage==='ANSWER')).toMatchObject({budgetVersion:3,capMicroUsd:48000n,costMicroUsd:30000n});
  const original=(await db.select().from(schema.runSettlements).where(eq(schema.runSettlements.runId,admitted.run.id)))[0];
- expect(original.heldProviderMicroUsd).toBeGreaterThan(0n);
+ expect(original.heldProviderMicroUsd).toBe(8000n);
  const search=calls.find(c=>c.stage==='SEARCH')!;
  await db.insert(schema.providerUsageResolutions).values({runId:admitted.run.id,callId:search.id,kind:'PROVIDER_RECEIPT',costMicroUsd:1000n,evidenceHash:'a'.repeat(64)});
  const {createUsageReconciliation}=await import('@/server/runs/reconcile');

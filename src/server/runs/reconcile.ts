@@ -4,6 +4,7 @@ import { ACTIVE_RUN_STATUSES,providerCalls,providerUsageResolutions,runSettlemen
 import type { AdmissionDatabase } from './usage';
 import { lockOwnedRun } from './lock';
 import { AdmissionError } from './errors';
+import { unresolvedExposure } from './budgets';
 export function createUsageReconciliation(db:AdmissionDatabase) {
   async function reconcile(subject:string,runId:string) {
     if(!z.uuid().safeParse(runId).success)throw new AdmissionError('NOT_FOUND');
@@ -29,7 +30,9 @@ export function createUsageReconciliation(db:AdmissionDatabase) {
       }
       const alreadyKnown=receipt.knownProviderMicroUsd+previous.reduce((sum,r)=>sum+r.chargedMicroUsd,0n);
       if(held===0n) {if(known!==alreadyKnown)throw new AdmissionError('BUDGET_EXCEEDED');return 'UNCHANGED' as const;}
-      const charged=known-alreadyKnown,remaining=unknown?reservation.providerReserveMicroUsd-known:0n;
+      // Holds settled under the old whole-reserve rule shrink to the same exposure, with no refund of any unresolved cap.
+      const unspent=reservation.providerReserveMicroUsd-known,exposure=unresolvedExposure(calls,new Set(resolutions.map(r=>r.callId)));
+      const charged=known-alreadyKnown,remaining=exposure>unspent?unspent:exposure;
       const released=held-charged-remaining,moved=charged+released;
       if(charged<0n||remaining<0n||released<0n||known>reservation.providerReserveMicroUsd)throw new AdmissionError('BUDGET_EXCEEDED');
       if(moved===0n)return unknown?'UNRESOLVED' as const:'UNCHANGED' as const;
@@ -48,8 +51,9 @@ export function createUsageReconciliation(db:AdmissionDatabase) {
   }
   return {reconcile,async sweep(deadline=performance.now()+25000,budgetKey?:string) {
     if(performance.now()>=deadline)return {scanned:0,reconciled:0,failed:0};
-    // Only actionable holds enter the bounded batch. Unresolved old calls cannot
-    // starve a later receipt that actually changes accounting.
+    // Only actionable holds enter the bounded batch: a new charge, or a hold above what
+    // unresolved calls could still cost. Calls already held at exactly their exposure
+    // cannot starve a later receipt that actually changes accounting.
     const candidates=await db.select({id:runs.id,subject:appUsers.authSubject}).from(runs)
       .innerJoin(appUsers,eq(appUsers.id,runs.userId)).innerJoin(runSettlements,eq(runSettlements.runId,runs.id))
       .where(and(budgetKey?eq(runs.operatorBudgetKey,budgetKey):undefined,inArray(runs.accountingVersion,[1,2,3]),sql`${runs.status} NOT IN ('RECEIVED','CHECKING_INPUT','PLANNING','SEARCHING','PREPARING_EVIDENCE','GENERATING','CHECKING_OUTPUT')`,
@@ -57,7 +61,8 @@ export function createUsageReconciliation(db:AdmissionDatabase) {
         sql`(
           (select coalesce(sum(coalesce(p.cost_micro_usd,c.cost_micro_usd,0)),0) from provider_calls c left join provider_usage_resolutions p on p.call_id=c.id where c.run_id=${runs.id})
           > ${runSettlements.knownProviderMicroUsd}+(select coalesce(sum(charged_micro_usd),0) from run_reconciliations where run_id=${runs.id})
-          OR NOT EXISTS(select 1 from provider_calls c left join provider_usage_resolutions p on p.call_id=c.id where c.run_id=${runs.id} and p.call_id is null and (c.cost_micro_usd is null or c.status in ('STARTED','UNKNOWN')))
+          OR coalesce((select remaining_held_micro_usd from run_reconciliations where run_id=${runs.id} order by version desc limit 1),${runSettlements.heldProviderMicroUsd})
+            > (select coalesce(sum(c.cap_micro_usd-coalesce(c.cost_micro_usd,0)),0) from provider_calls c left join provider_usage_resolutions p on p.call_id=c.id where c.run_id=${runs.id} and p.call_id is null and (c.cost_micro_usd is null or c.status in ('STARTED','UNKNOWN')))
         )`),sql`EXISTS(select 1 from provider_calls c left join provider_usage_resolutions p on p.call_id=c.id where c.run_id=${runs.id} and (c.cost_micro_usd>c.cap_micro_usd or p.cost_micro_usd<c.cost_micro_usd))`))).orderBy(runSettlements.createdAt,runs.id).limit(10);
     let reconciled=0,failed=0;
     for(const candidate of candidates) {if(performance.now()>=deadline)break;try{if(await reconcile(candidate.subject,candidate.id)==='RECONCILED')reconciled++;}catch{failed++;}}

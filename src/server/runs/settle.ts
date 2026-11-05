@@ -2,13 +2,14 @@ import { and,eq,inArray,sql } from "drizzle-orm";
 import { providerCalls,runSettlements,usageBuckets,operatorUsageBuckets,usageReservations,runs } from "@/db/schema";
 import type { AdmissionTransaction } from "./usage";
 import { AdmissionError } from "./errors";
+import { unresolvedExposure } from "./budgets";
 export async function settleRun(tx: AdmissionTransaction,run: typeof runs.$inferSelect,creditsCharged: number,now: Date) {
   const [reservation] = await tx.select().from(usageReservations).where(and(eq(usageReservations.runId,run.id),eq(usageReservations.userId,run.userId)));
   if (!reservation || creditsCharged > reservation.answerCredits) throw new AdmissionError("CONFLICT");
   const calls = await tx.select().from(providerCalls).where(eq(providerCalls.runId,run.id));
   const known = calls.reduce((sum,call)=>sum+(call.costMicroUsd ?? 0n),0n);
-  const unknown = run.accountingVersion === 0 || calls.some(call=>call.status === "STARTED" || call.status === "UNKNOWN" || call.costMicroUsd === null);
-  const held = unknown ? reservation.providerReserveMicroUsd-known : 0n;
+  const unspent = reservation.providerReserveMicroUsd-known,exposure = unresolvedExposure(calls);
+  const held = run.accountingVersion === 0 || exposure > unspent ? unspent : exposure;
   const released = reservation.providerReserveMicroUsd-known-held;
   if (calls.some(call=>(call.costMicroUsd ?? 0n) > call.capMicroUsd) || known > reservation.providerReserveMicroUsd || held < 0n || released < 0n) throw new AdmissionError("BUDGET_EXCEEDED");
   const userIds = [reservation.periodBucketId,reservation.dayBucketId],operatorIds = [reservation.operatorPeriodBucketId,reservation.operatorDayBucketId];
