@@ -55,7 +55,8 @@ it('keeps the approved day limit when renewing after the whole schedule has expi
  await bucket('DAY','2026-11-04T00:00:00.000Z','2026-11-05T00:00:00.000Z',550000n);
  await bucket('DAY','2026-11-05T00:00:00.000Z','2026-11-05T13:55:00.000Z',1000000n);
  expect(await renew('2026-11-09T06:00:00.000Z')).toMatchObject({dayLimitMicroUsd:'1000000',dayWindowExtended:false,dayWindowsAdded:4});
- expect(await activeAt(now-hour)).toEqual([]);
+ // New windows start at the renewal, not back across the gap.
+ expect((await activeAt(now-hour)).map(r=>r.kind)).toEqual(['PERIOD']);
  for(let time=now;time<Date.parse('2026-11-09T06:00:00.000Z');time+=hour){
   const active=await activeAt(time);
   expect(active.map(r=>r.kind).sort()).toEqual(['DAY','PERIOD']);expect(active.find(r=>r.kind==='DAY')?.limit).toBe('1000000');
