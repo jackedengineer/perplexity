@@ -50,6 +50,21 @@ it('continues a rolling day window without overlap',async()=>{
  for(let time=now;time<Date.parse('2026-11-10T06:00:00.000Z');time+=hour)expect((await activeAt(time)).map(r=>r.kind).sort()).toEqual(['DAY','PERIOD']);
  expect((await activeAt(Date.parse('2026-11-09T01:00:00.000Z'))).find(r=>r.kind==='DAY')?.limit).toBe('400000');
 });
+it('keeps the approved day limit when renewing after the whole schedule has expired',async()=>{
+ await bucket('PERIOD','2026-10-20T00:00:00.000Z','2026-11-05T13:55:00.000Z',1700000n,200000,40000);
+ await bucket('DAY','2026-11-04T00:00:00.000Z','2026-11-05T00:00:00.000Z',550000n);
+ await bucket('DAY','2026-11-05T00:00:00.000Z','2026-11-05T13:55:00.000Z',1000000n);
+ expect(await renew('2026-11-09T06:00:00.000Z')).toMatchObject({dayLimitMicroUsd:'1000000',dayWindowExtended:false,dayWindowsAdded:4});
+ expect(await activeAt(now-hour)).toEqual([]);
+ for(let time=now;time<Date.parse('2026-11-09T06:00:00.000Z');time+=hour){
+  const active=await activeAt(time);
+  expect(active.map(r=>r.kind).sort()).toEqual(['DAY','PERIOD']);expect(active.find(r=>r.kind==='DAY')?.limit).toBe('1000000');
+ }
+});
+it('uses the lower default only when no day window has ever existed',async()=>{
+ await bucket('PERIOD','2026-11-02T00:00:00.000Z','2026-11-07T00:00:00.000Z',1700000n);
+ expect(await renew('2026-11-08T00:00:00.000Z')).toMatchObject({dayLimitMicroUsd:'400000'});
+});
 it.each([
  ['an unreviewed ceiling',async()=>{await bucket('PERIOD','2026-11-02T00:00:00.000Z','2026-11-12T00:00:00.000Z',2500000n);},'2026-11-19T00:00:00.000Z',/ceiling/u],
  ['exhausted capacity',async()=>{await bucket('PERIOD','2026-11-02T00:00:00.000Z','2026-11-12T00:00:00.000Z',1700000n,1660000,0);},'2026-11-19T00:00:00.000Z',/Reconcile/u],

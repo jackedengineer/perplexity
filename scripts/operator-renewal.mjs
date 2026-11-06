@@ -16,9 +16,11 @@ export function renewalEnd(key,now=Date.now()){
 // would overlap a later one, and two active days make every admission fail. Leaving days
 // uncovered would let ensure_operator_day create rolling windows at its lower default.
 export function planDayWindows(days,endsAt,now,fallbackLimit){
- const live=days.map(d=>({id:d.id,startsAt:new Date(d.starts_at).getTime(),endsAt:new Date(d.ends_at).getTime(),limit:BigInt(d.provider_limit_micro_usd)})).filter(d=>d.endsAt>now).sort((a,b)=>a.startsAt-b.startsAt);
+ const all=days.map(d=>({id:d.id,startsAt:new Date(d.starts_at).getTime(),endsAt:new Date(d.ends_at).getTime(),limit:BigInt(d.provider_limit_micro_usd)})).sort((a,b)=>a.startsAt-b.startsAt);
+ const live=all.filter(d=>d.endsAt>now);
  if(live.some((day,index)=>index>0&&day.startsAt<live[index-1].endsAt))throw new Error('Overlapping day windows');
- const end=endsAt.getTime(),last=live.at(-1),limit=last?.limit??fallbackLimit,plan={extend:null,insert:[]};
+ // An expired schedule still carries the approved limit, so a late renewal keeps it.
+ const end=endsAt.getTime(),last=live.at(-1),limit=all.at(-1)?.limit??fallbackLimit,plan={extend:null,insert:[]};
  let cursor=last?.endsAt??now;
  if(cursor>=end)return plan;
  if(last&&cursor%dayMs!==0){cursor=Math.min(end,nextUtcMidnight(cursor));plan.extend={id:last.id,endsAt:new Date(cursor)};}
