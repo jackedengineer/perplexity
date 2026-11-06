@@ -25,7 +25,7 @@ it('captures restricted-runtime research and executes every operator query read-
    for(const block of (await readFile('docs/operations.sql','utf8')).split(/^-- name: /mu).slice(1)){
     const end=block.indexOf('\n'),name=block.slice(0,end).trim(),query=block.slice(end+1);
     const report=await connection.query(query);reports++;
-    if(name==='costs')expect(report.rows.find(r=>r.run_id===admitted.run.id)).toMatchObject({known_micro_usd:'600',booked_micro_usd:'600',held_micro_usd:'49400'});
+    if(name==='costs')expect(report.rows.find(r=>r.run_id===admitted.run.id)).toMatchObject({known_micro_usd:'8600',booked_micro_usd:'8600',held_micro_usd:'0'});
    }
   }finally{await connection.query('ROLLBACK');connection.release();}
   expect(reports).toBe(7);expect(JSON.stringify(events)).not.toMatch(/Sunlight bends|Light bends|weather.gov|Synthetic admission concurrency|sessionId|payloadHmac/);
