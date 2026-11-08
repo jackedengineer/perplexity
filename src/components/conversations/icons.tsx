@@ -7,7 +7,7 @@ const paths = {
   copy: "M9 9h12v12H9zM15 9V3H3v12h6",external: "M14 3h7v7M21 3 10 14M10 3H3v18h18v-7",
   plus: "M12 5v14M5 12h14", search: "m20 20-4-4M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0",
   panel: "M9 3v18M4 3h16v18H4z", chevron: "m9 5 7 7-7 7", down: "m6 9 6 6 6-6",
-  clock: "M12 7v5l3 2M21 12a9 9 0 1 1-3-6.7M21 3v6h-6", folder: "M3 7h7l2-3h9v15H3z",
+  clock: "M12 7v5l3 2M21 12a9 9 0 1 1-3-6.7M21 3v6h-6", folder: "M3 7h7l2-3h9v15H3z", file: "M6 3h8l4 4v14H6zM14 3v4h4", upload: "M12 16V4M7 9l5-5 5 5M4 20h16", trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
   computer: "M3 4h18v13H3zM8 21h8M12 17v4M8 8v3M12 8v3", automation: "M12 3a9 9 0 1 0 9 9M12 7v5l3 2M19 2v6M16 5h6",
   artifact: "M3 5h18v14H3zM8 5v14M8 10h13", settings: "m12 3 9 5v8l-9 5-9-5V8zM16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
   lock: "M6 10h12v11H6zM8 10V7a4 4 0 0 1 8 0v3M12 14v3", arrow: "M12 19V5M5 12l7-7 7 7",

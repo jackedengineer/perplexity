@@ -1,4 +1,5 @@
 import 'server-only';
+import {documentsEnabled} from '@/server/documents';
 import {getDb} from '@/db';
 import {getCurrentSession} from '@/lib/current-session';
 import {readUsage} from './usage';
@@ -12,6 +13,7 @@ export async function usageResponse(models=false) {
   const usage=await readUsage(getDb(),session.user.id);
   const entries=MODEL_CATALOG.filter(m=>(usage.tier!=='GUEST'||m.band==='ECONOMY')&&catalogConfiguration(m.key,process.env)).map(({key,name,credits,band})=>({key,name,credits,band}));
   const available=models?await researchAvailable(getDb(),parseAdmissionPolicyEnvironment(process.env).operatorBudgetKey):true;
-  return Response.json(models?{models:available?entries:[],usage,researchAvailable:available}:usage,{headers});
+  // Files mode is offered to signed-in accounts when the feature is switched on.
+  return Response.json(models?{models:available?entries:[],usage,researchAvailable:available,documents:documentsEnabled()&&usage.tier!=='GUEST'}:usage,{headers});
  }catch{return Response.json({error:'Usage is temporarily unavailable. Please try again.'},{status:503,headers});}
 }

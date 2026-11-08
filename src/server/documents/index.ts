@@ -25,7 +25,7 @@ function documentStore(): DocumentStore {
   }
   // Node (local development and browser tests) keeps files in an ignored directory.
   const root = process.env.DOCUMENT_STORE_DIR;
-  if (!root || process.env.NODE_ENV === "production" && process.env.VERCEL) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
+  if (!root) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
   return createFileDocumentStore(root);
 }
 

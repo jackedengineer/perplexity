@@ -202,3 +202,31 @@ body:has(.research-shell) { background: #191919; }
   .active-thread .thread-content { transition: padding-right 180ms ease-out; }
   .active-thread .thread-bottom { transition: width 180ms ease-out, margin-right 180ms ease-out; }
 }
+
+/* Files mode: a toolbar pill like the model picker, and a compact list in the shared dialog. */
+.files-trigger { display: inline-flex; align-items: center; gap: 6px; height: 28px; margin-right: 4px; padding: 0 10px; border: 1px solid #343c41; border-radius: 20px; background: #242a2e; color: var(--r-text); font: inherit; font-size: 12px; cursor: pointer; transition: background-color 120ms; }
+.files-trigger:hover { background: var(--r-hover); }
+.files-trigger:disabled { opacity: .5; cursor: default; }
+.files-dialog .research-muted { font-size: 13px; line-height: 1.5; }
+.files-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 16px 0 4px; }
+.files-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.files-actions .files-limits { font-size: 12px; flex: 1 1 220px; }
+.files-feedback { min-height: 18px; font-size: 12px; color: var(--r-muted); }
+.files-error { margin: 4px 0 8px; color: #f0a8a8; font-size: 13px; }
+.files-empty { padding: 24px 0 8px; text-align: center; }
+.files-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: min(50vh, 420px); overflow-y: auto; border-top: 1px solid var(--r-line); }
+.file-row { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 0; border-bottom: 1px solid var(--r-line); color: var(--r-muted); }
+.file-details { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.file-title { color: var(--r-text); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+a.file-title:hover { text-decoration: underline; }
+.file-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.file-status .research-spinner { width: 10px; height: 10px; border-width: 1.5px; }
+.file-row[data-status="FAILED"] .file-status { color: #f0a8a8; }
+.file-confirm { display: inline-flex; gap: 6px; }
+.research-button.danger { border-color: #7a3b3b; color: #f6c9c9; }
+.research-button.danger:hover { background: #3a2222; }
+@media (max-width: 767px) {
+  .files-trigger { height: 32px; }
+  .file-row { min-height: 60px; }
+  .file-confirm .research-button, .file-row .research-icon-button { min-height: 44px; }
+}
