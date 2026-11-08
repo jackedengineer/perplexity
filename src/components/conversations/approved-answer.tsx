@@ -29,6 +29,11 @@ function citationLabel(source:PublicAnswer['sources'][number]){
   const label=source.title.replace(/, page (\d+)$/u,' · p. $1');
   return label.length>32?label.slice(0,14)+'…'+label.slice(-14):label;
 }
+// Names where an answer's sources came from: your files, the web, or both.
+function sourcesLabel(sources:{contentKind?:string}[]){
+  const files=sources.some(source=>source.contentKind==="DOCUMENT_PAGE"),web=sources.some(source=>source.contentKind!=="DOCUMENT_PAGE");
+  return files&&web?"Web and files · Sources used":files?"Files · Sources used":"Web · Sources used";
+}
 export function ApprovedAnswer({ messageId,answer,text,reveal,onSources }: {messageId:string; answer: PublicAnswer;text: string;reveal?:AnswerReveal;onSources: ()=>void }) {
   const [copied,setCopied] = useState(false),[copyFailed,setCopyFailed] = useState(false);
   const copyTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
@@ -59,7 +64,7 @@ export function ApprovedAnswer({ messageId,answer,text,reveal,onSources }: {mess
     }
   }); }
   return <div className="approved-answer">
-    <div className="answer-researched">{answer.kind === "CHAT" ? "Chat · No web search" : answer.kind === "ANSWER" ? (answer.sources.some(source=>source.contentKind==="DOCUMENT_PAGE") ? "Files · Sources used" : "Web · Sources used") : answer.kind === "NO_EVIDENCE" ? "Search complete" : "One more detail"}</div>
+    <div className="answer-researched">{answer.kind === "CHAT" ? "Chat · No web search" : answer.kind === "ANSWER" ? sourcesLabel(answer.sources) : answer.kind === "NO_EVIDENCE" ? "Search complete" : "One more detail"}</div>
     <div className="answer-prose" aria-busy={reveal?.active??false} aria-live="off">{render(reveal?.document??answer.document)}</div>
     {reveal&&<span className="sr-only" role="status">{reveal.active?'Showing approved answer':'Answer ready'}</span>}
     {reveal?.active?<button className="research-button answer-show-full" type="button" onClick={event=>{event.currentTarget.closest('article')?.focus({preventScroll:true});reveal.finish();}}>Show full answer<Icon name="down" size={13}/></button>:<div className="answer-actions">

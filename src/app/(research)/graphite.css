@@ -122,7 +122,8 @@ body:has(.research-shell) { background: #191919; }
 .quick-search-results p { padding: 20px 12px; color: var(--r-muted); }
 .quick-search footer { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--r-line); padding: 12px 16px; font-size: 12px; color: var(--r-muted); }
 .mode-picker { display: flex; width: fit-content; gap: 3px; padding: 3px; margin-bottom: 10px; border-radius: 8px; background: #151515; flex-shrink: 0; }
-.mode-picker button { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 6px; padding: 7px 12px; background: transparent; color: #aaa; cursor: pointer; font: inherit; font-size: 12px; transition: background 140ms ease, color 140ms ease; }
+.mode-picker button { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 6px; padding: 7px 12px; background: transparent; color: #aaa; cursor: pointer; font: inherit; font-size: 12px; transition: background 140ms ease, color 140ms ease, transform 120ms var(--r-ease-out); }
+.mode-picker button:active:not(:disabled) { transform: scale(.96); }
 .mode-picker button[aria-pressed=true] { background: #333; color: #efefed; }
 .mode-picker button:hover { color: #fff; }
 .mode-picker button:disabled { cursor: default; }
@@ -204,9 +205,6 @@ body:has(.research-shell) { background: #191919; }
 }
 
 /* Files mode: a toolbar pill like the model picker, and a compact list in the shared dialog. */
-.files-trigger { display: inline-flex; align-items: center; gap: 6px; height: 28px; margin-right: 4px; padding: 0 10px; border: 1px solid #343c41; border-radius: 20px; background: #242a2e; color: var(--r-text); font: inherit; font-size: 12px; cursor: pointer; transition: background-color 120ms; }
-.files-trigger:hover { background: var(--r-hover); }
-.files-trigger:disabled { opacity: .5; cursor: default; }
 .files-dialog .research-muted { font-size: 13px; line-height: 1.5; }
 .files-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 16px 0 4px; }
 .files-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
@@ -227,7 +225,57 @@ a.file-title:hover { text-decoration: underline; }
 .research-button.danger { border-color: #7a3b3b; color: #f6c9c9; }
 .research-button.danger:hover { background: #3a2222; }
 @media (max-width: 767px) {
-  .files-trigger { height: 32px; }
   .file-row { min-height: 60px; }
   .file-confirm .research-button, .file-row .research-icon-button { min-height: 44px; }
 }
+
+/* Attachments: files ride along with any Chat or Web question. Motion is feedback only:
+   chips settle in, the drop target lights up, the menu grows from the paperclip. */
+.research-shell { --r-ease-out: cubic-bezier(0.23, 1, 0.32, 1); }
+.question-composer { position: relative; }
+.attach-trigger { position: relative; color: var(--r-muted); transition: background-color 120ms ease, color 120ms ease, transform 120ms var(--r-ease-out); }
+.attach-trigger:hover, .attach-trigger[aria-expanded=true] { color: var(--r-text); }
+.attachment-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; padding: 0 4px; }
+.attachment-chip { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: min(260px, 100%); min-height: 40px; padding: 5px 4px 5px 6px; border: 1px solid var(--r-line); border-radius: 10px; background: #1c1c1c;
+  transition: opacity 180ms var(--r-ease-out), scale 180ms var(--r-ease-out), border-color 150ms ease; }
+@starting-style { .attachment-chip { opacity: 0; scale: .96; } }
+.attachment-chip[data-state=failed] { border-color: #6b3b3b; }
+.attachment-icon { display: flex; flex-shrink: 0; width: 26px; height: 26px; align-items: center; justify-content: center; border-radius: 7px; background: #2a2a2a; color: var(--r-muted); }
+.attachment-icon .research-spinner { width: 12px; height: 12px; border-width: 1.5px; border-top-color: #2a2a2a; }
+.attachment-copy { display: flex; flex-direction: column; min-width: 0; }
+.attachment-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--r-text); font-size: 12px; line-height: 16px; }
+.attachment-copy small { color: var(--r-muted); font-size: 11px; line-height: 14px; font-variant-numeric: tabular-nums; }
+.attachment-chip[data-state=failed] small { color: #f0a8a8; }
+.attachment-remove { display: flex; flex-shrink: 0; align-items: center; justify-content: center; width: 24px; height: 24px; margin-left: auto; border: 0; border-radius: 6px; background: transparent; color: var(--r-muted); cursor: pointer; transition: background-color 120ms ease, color 120ms ease; }
+.attachment-remove:hover { background: var(--r-hover); color: var(--r-text); }
+.attachment-problems { min-height: 0; padding-top: 8px; }
+.attachment-problems p { margin: 0 0 2px; color: #f0a8a8; }
+.composer-drop { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px dashed #7d858a; border-radius: inherit; background: #222222f2; color: var(--r-text); font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 150ms ease; }
+.question-composer[data-dragging=true] { border-color: #7d858a; }
+.question-composer[data-dragging=true] .composer-drop { opacity: 1; }
+.attach-menu { position: fixed; z-index: 100; width: min(300px, calc(100vw - 24px)); overflow-y: auto; overscroll-behavior: contain; padding: 6px; border: 1px solid #38393d; border-radius: 14px; background: #202124; color: #ebebed; box-shadow: 0 12px 38px #0005;
+  transform-origin: left top; transition: opacity 150ms var(--r-ease-out), scale 150ms var(--r-ease-out); }
+.attach-menu[data-above=true] { translate: 0 -100%; transform-origin: left bottom; }
+@starting-style { .attach-menu { opacity: 0; scale: .97; } }
+.attach-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; border-radius: 9px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color 110ms ease; }
+.attach-item:hover:not(:disabled), .attach-item:focus-visible { background: #ffffff0a; }
+.attach-item:focus-visible { outline: 1px solid #70b8ba66; outline-offset: -1px; }
+.attach-item:disabled { opacity: .45; cursor: default; }
+.attach-item > svg { flex-shrink: 0; color: #a0a0a7; }
+.attach-item-copy { flex: 1; min-width: 0; }
+.attach-item-copy strong { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; font-weight: 500; }
+.attach-item-copy small { display: block; margin-top: 2px; color: #a0a0a7; font-size: 11px; }
+.attach-check { display: flex; flex-shrink: 0; width: 16px; color: #70b8ba; }
+.attach-heading { padding: 10px 10px 4px; color: #a0a0a7; font-size: 11px; }
+.attach-separator { height: 1px; margin: 6px 4px; background: #38393d; }
+.question-files { list-style: none; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 6px; max-width: min(90%, 640px); margin: 8px 0 0; padding: 0; }
+.question-files a { display: inline-flex; align-items: center; gap: 6px; max-width: 240px; padding: 4px 10px; border: 1px solid var(--r-line); border-radius: 20px; color: var(--r-muted); font-size: 12px; text-decoration: none; transition: color 120ms ease, border-color 120ms ease; }
+.question-files a span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.question-files a:hover { color: var(--r-text); border-color: #4a4a4a; }
+.revision-files { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; color: var(--r-muted); font-size: 13px; line-height: 1.4; }
+@media (pointer: coarse) { .attachment-remove { width: 32px; height: 32px; } .attach-item { min-height: 48px; } .drop-only { display: none; } }
+/* Phones: one swipeable row, so five files don't push the question off screen. */
+@media (max-width: 767px) { .attachment-chips { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; margin-inline: -4px; padding-inline: 8px; } .attachment-chips::-webkit-scrollbar { display: none; } .attachment-chip { flex-shrink: 0; max-width: 220px; } }
+@media (prefers-reduced-motion: reduce) { .attach-menu, .attachment-chip { transition: opacity 150ms ease; } @starting-style { .attach-menu, .attachment-chip { scale: 1; } } }
+/* iOS Safari zooms into any field under 16px on focus and never zooms back out. */
+@media (pointer: coarse) { .research-shell input, .research-shell select, .research-shell textarea, .model-popover input { font-size: 16px; } }

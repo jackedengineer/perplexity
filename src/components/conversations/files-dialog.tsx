@@ -1,28 +1,13 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {createPortal} from 'react-dom';
 import {Icon} from './icons';
-import {readyDocuments,useDocuments,type UserDocument} from './documents';
+import {useDocuments,type UserDocument} from './documents';
 
-const size=(bytes:number)=>bytes<1024*1024?`${Math.max(1,Math.round(bytes/1024))} KB`:`${Number((bytes/1024/1024).toFixed(1))} MB`;
+export const fileSize=(bytes:number)=>bytes<1024*1024?`${Math.max(1,Math.round(bytes/1024))} KB`:`${Number((bytes/1024/1024).toFixed(1))} MB`;
 function statusText(document:UserDocument){
-  if(document.status==='READY')return `${document.pageCount} ${document.pageCount===1?'page':'pages'} · ${size(document.byteSize)}`;
+  if(document.status==='READY')return `${document.pageCount} ${document.pageCount===1?'page':'pages'} · ${fileSize(document.byteSize)}`;
   if(document.status==='PROCESSING')return 'Preparing for questions…';
   return document.failure==='UNREADABLE'?'No readable text found':'Couldn’t prepare this file. Delete it and upload again.';
-}
-
-// Toolbar entry point for Files mode: shows how many files are ready and opens the list.
-export function FilesButton({disabled}:{disabled:boolean}){
-  const {documents}=useDocuments(),[open,setOpen]=useState<HTMLElement|null>(null);
-  const ready=readyDocuments(documents);
-  return <>
-    <button type="button" className="files-trigger" disabled={disabled} onClick={event=>setOpen(event.currentTarget.closest<HTMLElement>('.research-shell')??document.body)} aria-haspopup="dialog">
-      <Icon name="file" size={14}/><span>{ready?`${ready} ${ready===1?'file':'files'}`:'Add files'}</span>
-    </button>
-    {/* Portalled out of the composer form, so no control in the dialog can submit the question,
-        but kept inside the research shell, which provides the theme. */}
-    {open&&createPortal(<FilesDialog onClose={()=>setOpen(null)}/>,open)}
-  </>;
 }
 
 export function FilesDialog({onClose}:{onClose:()=>void}){
@@ -45,10 +30,10 @@ export function FilesDialog({onClose}:{onClose:()=>void}){
     for(const file of Array.from(files??[])){
       // The server enforces every limit; these checks only save a pointless upload.
       if(file.type&&file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf')){problems.push(`${file.name} isn’t a PDF.`);continue;}
-      if(limits&&file.size>limits.maxBytes){problems.push(`${file.name} is larger than ${size(limits.maxBytes)}.`);continue;}
+      if(limits&&file.size>limits.maxBytes){problems.push(`${file.name} is larger than ${fileSize(limits.maxBytes)}.`);continue;}
       setUploading(file.name);
-      const problem=await upload(file);
-      if(problem)problems.push(`${file.name}: ${problem}`);
+      const result=await upload(file);
+      if('error' in result)problems.push(`${file.name}: ${result.error}`);
     }
     setMessages(problems);setUploading('');
     if(input.current)input.current.value='';
@@ -60,11 +45,11 @@ export function FilesDialog({onClose}:{onClose:()=>void}){
   }
   return <dialog ref={dialog} className="research-dialog files-dialog" aria-labelledby="files-heading" onClose={onClose} onClick={event=>{if(event.target===event.currentTarget)dialog.current?.close();}}>
     <div className="dialog-heading"><h2 id="files-heading">Your files</h2><button type="button" className="research-icon-button" aria-label="Close files" onClick={()=>dialog.current?.close()}><Icon name="close"/></button></div>
-    <p className="research-muted">Ask questions about your PDFs in Files mode. Answers cite the file and page. Your files stay private to your account.</p>
+    <p className="research-muted">Attach a PDF to any question in Chat or Web. Answers cite the file and page. Your files stay private to your account.</p>
     <div className="files-actions">
       <input ref={input} id="files-input" className="files-input" type="file" aria-label="Choose PDF files" tabIndex={-1} accept="application/pdf,.pdf" multiple onChange={event=>void choose(event.target.files)} disabled={Boolean(uploading)||full}/>
       <button type="button" className="research-button primary" onClick={()=>input.current?.click()} disabled={Boolean(uploading)||full}><Icon name="upload" size={14}/>Upload PDF</button>
-      <span className="research-muted files-limits">{limits?`Up to ${limits.maxDocuments} PDFs, ${size(limits.maxBytes)} and ${limits.maxPages} pages each. Scanned PDFs aren’t supported yet.`:''}</span>
+      <span className="research-muted files-limits">{limits?`Up to ${limits.maxDocuments} PDFs, ${fileSize(limits.maxBytes)} and ${limits.maxPages} pages each. Scanned PDFs aren’t supported yet.`:''}</span>
     </div>
     <div className="files-feedback" role="status" aria-live="polite">{uploading?`Uploading ${uploading}…`:announcement}</div>
     {messages.length>0&&<div className="files-error" role="alert">{messages.map(message=><p key={message}>{message}</p>)}</div>}
