@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
-import { bigint, check, customType, date, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, varchar, vector } from "drizzle-orm/pg-core";
+import { bigint, check, customType, date, foreignKey, index, integer, pgTable, primaryKey, smallint, text, timestamp, uniqueIndex, uuid, varchar, vector } from "drizzle-orm/pg-core";
 import { appUsers } from "./conversation-schema";
+import { runs } from "./run-schema";
 const instant = (name: string) => timestamp(name,{ withTimezone: true,precision: 3 });
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
@@ -62,4 +63,19 @@ export const documentUsage = pgTable("document_usage",{
 },t=>[
   primaryKey({ columns: [t.userId,t.day] }),
   check("document_usage_valid",sql`${t.characters} > 0`),
+]);
+
+// Files attached to one question. Retrieval for that run searches only these files.
+// Deleting a file removes its rows, so later answers can't cite it; saved answers keep their text.
+export const runDocuments = pgTable("run_documents",{
+  runId: uuid("run_id").notNull().references(()=>runs.id,{ onDelete: "cascade" }),
+  documentId: uuid("document_id").notNull(),
+  userId: uuid("user_id").notNull(),
+  position: smallint("position").notNull(),
+},t=>[
+  primaryKey({ columns: [t.runId,t.documentId] }),
+  foreignKey({ columns: [t.documentId,t.userId],foreignColumns: [documents.id,documents.userId],name: "run_document_same_owner_fk" }).onDelete("cascade"),
+  uniqueIndex("run_document_position_unique").on(t.runId,t.position),
+  index("run_documents_document_idx").on(t.documentId),
+  check("run_document_valid",sql`${t.position} BETWEEN 0 AND 4`),
 ]);

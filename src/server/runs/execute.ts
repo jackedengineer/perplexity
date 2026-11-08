@@ -46,7 +46,8 @@ export function createRunExecution(db: AdmissionDatabase,keys: unknown,providers
       const [liveSession] = await db.select({ id: session.id }).from(session).where(and(eq(session.id,identity.sessionId),eq(session.userId,subject),
         sql`${session.expiresAt} > clock_timestamp()`,sql`${session.createdAt} + interval '30 days' > clock_timestamp()`));
       if (!liveSession) throw new AdmissionError("UNAUTHENTICATED");
-      if(input.mode === 'CHAT') {
+      // Chat with attached files is admitted as a DOCUMENTS run and goes through retrieval.
+      if(input.mode === 'CHAT' && !input.documentIds?.length) {
         await db.transaction(async tx=>{
           const {run:current,conversation,now}=await lockOwnedRun(tx,subject,run.id);
           if(current.mode!=='CHAT'||current.status!=='PLANNING'||conversation.revision!==current.admittedRevision||current.deadlineAt<=now||signal.aborted)throw new AdmissionError('CONFLICT');
