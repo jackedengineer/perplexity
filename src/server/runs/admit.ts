@@ -62,8 +62,9 @@ export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, 
           catalogVersion:'trials-v2',priceVersion:'credits-v2'};
         if (attached.length) {
           // Only the owner's READY files: a file still being prepared has no searchable text yet.
+          // KEY SHARE holds off a concurrent delete until this admission commits its rows.
           const ready = await tx.select({ id: documents.id }).from(documents)
-            .where(and(eq(documents.userId,owner.id),inArray(documents.id,attached),eq(documents.status,"READY")));
+            .where(and(eq(documents.userId,owner.id),inArray(documents.id,attached),eq(documents.status,"READY"))).for("key share");
           if (ready.length !== attached.length) return denied("DOCUMENT_NOT_READY");
         }
         if (!await consumeAttempts(tx,owner.id,now,policy)) return denied("RATE_LIMITED");

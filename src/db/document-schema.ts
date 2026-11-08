@@ -66,16 +66,18 @@ export const documentUsage = pgTable("document_usage",{
 ]);
 
 // Files attached to one question. Retrieval for that run searches only these files.
-// Deleting a file removes its rows, so later answers can't cite it; saved answers keep their text.
+// Deleting a file nulls its document_id but keeps the row, so a run admitted with files can
+// tell one was deleted mid-run and fail, rather than searching everything or nothing.
 export const runDocuments = pgTable("run_documents",{
   runId: uuid("run_id").notNull().references(()=>runs.id,{ onDelete: "cascade" }),
-  documentId: uuid("document_id").notNull(),
+  documentId: uuid("document_id"),
   userId: uuid("user_id").notNull(),
   position: smallint("position").notNull(),
 },t=>[
-  primaryKey({ columns: [t.runId,t.documentId] }),
-  foreignKey({ columns: [t.documentId,t.userId],foreignColumns: [documents.id,documents.userId],name: "run_document_same_owner_fk" }).onDelete("cascade"),
-  uniqueIndex("run_document_position_unique").on(t.runId,t.position),
+  primaryKey({ columns: [t.runId,t.position] }),
+  // Migration 0041 narrows this to SET NULL (document_id); user_id stays set.
+  foreignKey({ columns: [t.documentId,t.userId],foreignColumns: [documents.id,documents.userId],name: "run_document_same_owner_fk" }).onDelete("set null"),
+  uniqueIndex("run_document_file_unique").on(t.runId,t.documentId),
   index("run_documents_document_idx").on(t.documentId),
   check("run_document_valid",sql`${t.position} BETWEEN 0 AND 4`),
 ]);

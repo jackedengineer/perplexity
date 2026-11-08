@@ -30,7 +30,7 @@ Question with attached files  (submission carries documentIds, at most 5)
   → same evidence check, answer, citation validation, output check and settlement as Web mode
 ```
 
-A Chat question with files is stored as `runs.mode = 'DOCUMENTS'`: no query leaves the server, no Tavily credits are spent, and the retrieval row records `source_kind = 'DOCUMENTS'`. A Web question with files keeps `FAST` and `source_kind = 'WEB'`, because it spends search credits; its file pages are `DOCUMENT_PAGE` passages, and `run_documents` records which files it used. A failed file search fails the run rather than answering from the web alone. A `DOCUMENTS` submission without `documentIds` (from clients before attachments) still searches all of the asker's files.
+A Chat question with files is stored as `runs.mode = 'DOCUMENTS'`: no query leaves the server, no Tavily credits are spent, and the retrieval row records `source_kind = 'DOCUMENTS'`. A Web question with files keeps `FAST` and `source_kind = 'WEB'`, because it spends search credits; its file pages are `DOCUMENT_PAGE` passages, and `run_documents` records which files it used. A failed file search fails the run rather than answering from the web alone. A Web question with no topic of its own ("Summarize this") searches only the files. Search queries use only the user's own words, so a file's name never reaches web search unless the user typed it. Deleting a file while a question about it is running fails that run with `DOCUMENT_NOT_READY` instead of searching other files; the attachment row stays with no file. A `DOCUMENTS` submission without `documentIds` (from clients before attachments) still searches all of the asker's files.
 
 ## API
 
@@ -87,7 +87,7 @@ Hybrid is kept even though vector-only ranked better here. Answers use up to fiv
 - **Storage:** R2 bucket bound as `DOCUMENTS_BUCKET`. On Node, `DOCUMENT_STORE_DIR` points at a local folder for development and browser tests.
 - **Database:** migration `0038_document_rag` installs `pgvector`, adds the two tables and their grants, and extends the run, retrieval, passage and provider-call constraints. It is additive: existing rows are unaffected.
 - **Rollback:** set `ENABLE_DOCUMENTS` to anything else and redeploy. **Don't restore a Worker version from before this feature once a Files answer exists**: older code rejects `DOCUMENT_PAGE` sources, so every conversation containing a Files answer would fail to load. Keep the migrations.
-- **Attachments migration:** `0040_file_attachments` adds `run_documents` (run, file, owner, position), deleted with either the run or the file, and grants the app `SELECT, INSERT` only. Additive; older Worker versions ignore it, so rolling back the attachment UI is a normal redeploy.
+- **Attachments migrations:** `0040_file_attachments` adds `run_documents` (run, file, owner, position) and grants the app `SELECT, INSERT` only; `0041_attachment_deletes` makes a deleted file null its `document_id` instead of removing the row. Additive; older Worker versions ignore it, so rolling back the attachment UI is a normal redeploy.
 - **Logs:** `documents.upload` (outcome, pages, duration) and `documents.embedding` (embedded, failed). No file names or text are logged.
 
 ## Review

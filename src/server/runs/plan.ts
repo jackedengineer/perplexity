@@ -28,7 +28,7 @@ export async function planRun(db:AdmissionDatabase,subject:string,runId:string,s
   const failure=error instanceof PlanningError?error:new PlanningError();
   // A question the planner's model appears to have declined isn't sent on to search under a literal plan.
   const declined=failure.reason==='PROVIDER_REFUSED'||failure.reason==='OUTPUT_NOT_JSON';
-  plan=standaloneFallback(loaded.input)??(declined?null:literalQuestionPlan(loaded.input)??attachedFilesPlan(loaded.input));
+  plan=standaloneFallback(loaded.input)??(declined?null:literalQuestionPlan(loaded.input)??attachedFilesPlan(loaded.input,loaded.run.mode==='DOCUMENTS'));
   recordTelemetry('research.planner_failure',{plannerFailure:failure.reason,providerHttpStatus:failure.httpStatus,plannerFallback:plan!==null});
   if(!plan)throw new AdmissionError('PROVIDER_UNAVAILABLE');
  }

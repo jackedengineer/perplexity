@@ -41,16 +41,17 @@ export function QuestionComposer({text,onText,onSubmit,pending,onStop,placeholde
     <DropHint files={files}/>
   </form>{text.length>maximum&&<p className="composer-feedback" role="alert">Shorten your question to {maximum.toLocaleString()} characters for this mode.</p>}
   {files.problems.length>0&&<div className="composer-feedback attachment-problems" role="alert">{files.problems.map(problem=><p key={problem}>{problem}</p>)}</div>}
+  {files.loadError&&<div className="composer-feedback attachment-problems" role="alert"><p>{files.loadError} <button type="button" className="text-button" onClick={files.retry}>Retry</button></p></div>}
   <UsageSummary files={files.usable?attachments.length:0} notice={files.notice}/></>;
 }
 const noop=()=>{};
 export function StartQuestion({compact=false}: {compact?:boolean}) {
   const [text,setText]=useState(""),[pending,setPending]=useState(false),[error,setError]=useState(""),[attachments,setAttachments]=useState<string[]>([]);
-  const starting=useStartSearch(),startDeep=useStartDeep(),{mode}=useModelAccess(),router=useRouter();
+  const starting=useStartSearch(),startDeep=useStartDeep(),{mode,data}=useModelAccess(),router=useRouter();
   useEffect(()=>{try{const draft=sessionStorage.getItem(WORKSPACE_DRAFT_KEY);if(draft){sessionStorage.removeItem(WORKSPACE_DRAFT_KEY);queueMicrotask(()=>setText(draft.slice(0,4000)));}}catch{/* Storage is optional. */}},[]);
   async function submit() {
     if(pending||!text.trim())return;setPending(true);setError("");
-    try {if(mode==='DEEP')await startDeep(text);else await starting(text,attachments);}catch(failure){if(failure instanceof ConversationRequestError&&failure.status===401)router.replace("/sign-in");
+    try {if(mode==='DEEP')await startDeep(text);else await starting(text,data?.documents?attachments:[]);}catch(failure){if(failure instanceof ConversationRequestError&&failure.status===401)router.replace("/sign-in");
       setError(mode==='DEEP'&&failure instanceof Error?failure.message:"We couldn’t confirm that it was saved. Retry to safely check the same creation request.");setPending(false);}
   }
   return <section className={compact?"next-question":"new-thread"}>

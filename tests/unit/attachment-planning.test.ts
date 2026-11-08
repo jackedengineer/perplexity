@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { attachedFilesPlan, clarifyUnresolvedReference, literalQuestionPlan, validatePlan, type PlannerInput } from "@/server/ai/plan";
+import { attachedFilesPlan, clarifyUnresolvedReference, hasSearchTopic, literalQuestionPlan, validatePlan, type PlannerInput } from "@/server/ai/plan";
 import { mixResults } from "@/server/search/retrieve";
 import type { RankedResult } from "@/server/search/rank";
 
@@ -16,10 +16,22 @@ describe("planning a question with attached files", () => {
     expect(reason(() => validatePlan(answer(text), input(text, ["aurora-water-report.pdf"])))).toBe("OK");
   });
 
-  it("lets a query use words from the file's title", () => {
-    const text = "What is the turbidity in this?";
-    expect(reason(() => validatePlan(answer("What is the turbidity in the aurora water report?", ["aurora water report turbidity"]), input(text, ["aurora-water-report.pdf"])))).toBe("OK");
-    expect(reason(() => validatePlan(answer("What is the turbidity in the aurora water report?", ["aurora water report turbidity"]), input(text)))).not.toBe("OK");
+  it("lets the rewritten question name the file, but keeps the file's name out of search queries", () => {
+    const text = "What is the turbidity in this?", files = ["aurora-water-report.pdf"];
+    expect(reason(() => validatePlan(answer("What is the turbidity in the aurora water report?", ["turbidity"]), input(text, files)))).toBe("OK");
+    expect(reason(() => validatePlan(answer("What is the turbidity in the aurora water report?", ["aurora water report turbidity"]), input(text, files)))).toBe("PLAN_VOCABULARY");
+    expect(reason(() => validatePlan(answer("What is the turbidity in the aurora water report?", ["turbidity"]), input(text)))).not.toBe("OK");
+  });
+
+  it("uses the literal fallback for a follow-up only when nothing but the files is searched", () => {
+    const followUp: PlannerInput = { ...input("Who founded the company?", ["report.pdf"]), context: [{ id: randomUUID(), role: "USER", text: "Tell me about Acme" }] };
+    expect(attachedFilesPlan(followUp, false)).toBeNull();
+    expect(attachedFilesPlan(followUp, true)).toMatchObject({ action: "ANSWER" });
+  });
+
+  it("knows when a question has nothing to search the web for", () => {
+    expect(hasSearchTopic("Summarize this")).toBe(false);
+    expect(hasSearchTopic("turbidity guidelines")).toBe(true);
   });
 
   it("never asks which document the user means", () => {
@@ -32,8 +44,8 @@ describe("planning a question with attached files", () => {
   it("answers 'Summarize this' when a file is attached, and still refuses it without one", () => {
     expect(reason(() => validatePlan(answer("Summarize this"), input("Summarize this")))).not.toBe("OK");
     expect(literalQuestionPlan(input("Summarize this", ["report.pdf"]))).toBeNull();
-    expect(attachedFilesPlan(input("Summarize this", ["report.pdf"]))).toMatchObject({ action: "ANSWER", retrieval: { queries: ["Summarize this"] } });
-    expect(attachedFilesPlan(input("Summarize this"))).toBeNull();
+    expect(attachedFilesPlan(input("Summarize this", ["report.pdf"]), false)).toMatchObject({ action: "ANSWER", retrieval: { queries: ["Summarize this"] } });
+    expect(attachedFilesPlan(input("Summarize this"), true)).toBeNull();
   });
 
   it("keeps negations and numbers from the question even with files attached", () => {

@@ -17,6 +17,7 @@ import {rankEvidenceResults,explicitPreferredDomains,type RankedResult} from "./
 import {freshnessTimeRange} from './freshness';
 import type { SearchProvider } from "./tavily";
 import {queryPlanSchema} from "@/server/contracts/pipeline";
+import {hasSearchTopic} from '@/server/ai/plan';
 import {STAGE_LIMITS} from '@/server/runs/budgets';
 import type {DocumentFinder} from '@/server/documents/retrieve';
 import type { EvidencePackage } from "@/server/contracts/pipeline";
@@ -73,10 +74,16 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
           if(run.accountingVersion>=2&&!record)throw new AdmissionError('CONFLICT');
           if(record&&(record.originalHash!==createHash('sha256').update(parts.data[0].text).digest('hex')||record.messageId!==message.id||record.attemptVersion!==run.attemptVersion||plan?.action!=='ANSWER'))throw new AdmissionError('CONFLICT');
           const query=searchQuerySchema.parse(plan?.action==='ANSWER'?plan.retrieval.queries[0]:parts.data[0].text);
+          const rows=await tx.select({id:runDocuments.documentId}).from(runDocuments).where(and(eq(runDocuments.runId,runId),eq(runDocuments.userId,run.userId))).orderBy(runDocuments.position);
+          const attached=rows.flatMap(row=>row.id?[row.id]:[]);
+          // A file deleted since admission leaves its row with no document. Searching the rest, or
+          // every file the user owns, would answer from something they didn't attach.
+          if(attached.length<rows.length)throw new RetrievalError('DOCUMENT_NOT_READY');
           // Files runs search the owner's own documents: no web query leaves the server and no search credits are spent.
-          // Web runs with attached files search both; the retrieval stays WEB because search credits are spent.
-          const sourceKind=run.mode==='DOCUMENTS'?'DOCUMENTS' as const:'WEB' as const;
-          const attached=(await tx.select({id:runDocuments.documentId}).from(runDocuments).where(and(eq(runDocuments.runId,runId),eq(runDocuments.userId,run.userId))).orderBy(runDocuments.position)).map(row=>row.id);
+          // Web runs with files search both and stay WEB, because search credits are spent, unless the
+          // question has no topic of its own ("Summarize this"), when only the files are searched.
+          const planned=plan?.action==='ANSWER'?plan.retrieval.queries:[query];
+          const sourceKind=run.mode==='DOCUMENTS'||attached.length&&!planned.some(hasSearchTopic)?'DOCUMENTS' as const:'WEB' as const;
           if((sourceKind==='DOCUMENTS'||attached.length)&&!dependencies.documents)throw new AdmissionError('CONFIGURATION_UNAVAILABLE');
           await tx.insert(runRetrievals).values({ runId,attemptVersion: run.attemptVersion,policyVersion: run.policyVersion,sourceKind,
             detectorVersion: EVIDENCE_DETECTOR_VERSION,modelId: sourceKind==='DOCUMENTS'?dependencies.documents!.modelId:dependencies.modelId,status: "STARTED",createdAt: now,expiresAt: new Date(now.getTime()+30*86_400_000) });
@@ -105,12 +112,14 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
           ...(web?queries.map((query,index)=>(index===0?search:dependencies.searchSecond!).search(query,{...options,...(filters?{filters}:{})})):[]),
         ]);
         const timedOut=(r:PromiseSettledResult<unknown>)=>r.status==='rejected'&&(r.reason instanceof AdmissionError||r.reason instanceof RetrievalError)&&r.reason.code==='DEADLINE_EXCEEDED';
+        const successful=(responses as PromiseSettledResult<{results:RankedResult[];credits:number}>[]).flatMap(r=>r.status==='fulfilled'?[r.value]:[]);
+        // Recorded before any failure below, so a failed run still shows the credits it spent.
+        if(web&&successful.length)searchCredits=successful.reduce((sum,r)=>sum+r.credits,0);
         // Attached files are required: an answer from the web alone would silently ignore them.
         if(fileOutcome.status==='rejected'){
           if(signal.aborted)throw new AdmissionError('CONFLICT');
           throw new RetrievalError(timedOut(fileOutcome)?'DEADLINE_EXCEEDED':'PROVIDER_UNAVAILABLE');
         }
-        const successful=(responses as PromiseSettledResult<{results:RankedResult[];credits:number}>[]).flatMap(r=>r.status==='fulfilled'?[r.value]:[]);
         if(web&&!successful.length){
           if(signal.aborted)throw new AdmissionError('CONFLICT');
           throw new RetrievalError(responses.every(timedOut)?'DEADLINE_EXCEEDED':'PROVIDER_UNAVAILABLE');

@@ -14,7 +14,7 @@ const hasFiles=(event:DragEvent)=>Boolean(event.dataTransfer?.types.includes('Fi
 // Everything a composer needs to attach files: uploads in flight, problems to show,
 // readiness for sending, and page-wide drag-and-drop while it is mounted.
 export function useAttachments({attachments,onAttachments,active}:{attachments:string[];onAttachments:(ids:string[])=>void;active:boolean}){
-  const {enabled,documents,limits,loaded,error,upload}=useDocuments();
+  const {enabled,documents,limits,loaded,error,upload,refresh}=useDocuments();
   const [uploads,setUploads]=useState<Upload[]>([]),[problems,setProblems]=useState<string[]>([]),[dragging,setDragging]=useState(false);
   const current=useRef(attachments);
   useEffect(()=>{current.current=attachments;},[attachments]);
@@ -67,9 +67,11 @@ export function useAttachments({attachments,onAttachments,active}:{attachments:s
   const preparing=attached.find(document=>document?.status==='PROCESSING');
   const failed=attached.some(document=>document?.status==='FAILED');
   const missing=attached.some(document=>document===null);
-  const notice=!usable||!attachments.length&&!uploads.length?null:uploads.length?`Uploading ${uploads.length===1?uploads[0].name:`${uploads.length} files`}…`
+  // A failed list load blocks sending attached files; say so and offer a retry instead of "Loading".
+  const loadError=usable&&error&&missing?error:null;
+  const notice=!usable||!attachments.length&&!uploads.length||loadError?null:uploads.length?`Uploading ${uploads.length===1?uploads[0].name:`${uploads.length} files`}…`
     :failed?'Remove the file that couldn’t be prepared to send.':preparing?`Preparing ${preparing.title}… you can send once it’s ready.`:missing?'Loading your files…':null;
-  return {usable,uploads,problems,dragging,add,toggle,clearProblems:()=>setProblems([]),
+  return {usable,uploads,problems,dragging,add,toggle,clearProblems:()=>setProblems([]),loadError,retry:refresh,
     ready:!usable||!uploads.length&&!failed&&!preparing&&!missing,notice,
     onPaste(event:ClipboardEvent){
       const files=Array.from(event.clipboardData.files);
@@ -150,7 +152,8 @@ export function AttachButton({attachments,files,disabled}:{attachments:string[];
       style={{left:position.left,top:position.top,maxHeight:position.maxHeight}}
       onKeyDown={event=>{
         if(event.key==='Escape'){event.preventDefault();close();return;}
-        if(event.key==='Tab'){close(false);return;}
+        // Back to the paperclip, not past the portalled menu to the end of the page.
+        if(event.key==='Tab'){event.preventDefault();close();return;}
         const items=Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role^=menuitem]:not(:disabled)')??[]),index=items.indexOf(document.activeElement as HTMLButtonElement);
         const next=event.key==='ArrowDown'?(index+1)%items.length:event.key==='ArrowUp'?(index-1+items.length)%items.length:event.key==='Home'?0:event.key==='End'?items.length-1:undefined;
         if(next!==undefined){event.preventDefault();items[next]?.focus();}

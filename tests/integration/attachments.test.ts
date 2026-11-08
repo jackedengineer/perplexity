@@ -44,14 +44,15 @@ async function addDocument(who: Person, name: string) {
 }
 const request = (who: Person, text: string, mode: RunMode, documentIds?: string[], expectedRevision = 0) =>
   ({ conversationId: who.conversation.id, clientRequestId: randomUUID(), expectedRevision, mode, modelKey: "fast-default", message: { text }, ...(documentIds ? { documentIds } : {}) });
-function providers(web: { title: string; url: string; content: string }[] = []) {
-  return { planner: fakePlanner(), input: fakeSafety(), query: fakeSafety(), evidence: fakeSafety(), output: fakeSafety(), embedding: fakeEmbeddings(),
+function providers(web: { title: string; url: string; content: string }[] = [], embedding = fakeEmbeddings()) {
+  return { planner: fakePlanner(), input: fakeSafety(), query: fakeSafety(), evidence: fakeSafety(), output: fakeSafety(), embedding,
     answer: { modelId: "test/answer", generate: vi.fn().mockResolvedValue({ text: "From the file [S1].", usage: knownUsage }) },
     search: { search: vi.fn().mockResolvedValue({ results: web.map(result => ({ ...result, score: 0.9 })), credits: 1 }) } } as unknown as ExecutionProviders & { search: { search: ReturnType<typeof vi.fn> }; answer: { generate: ReturnType<typeof vi.fn> } };
 }
-async function ask(who: Person, input: ReturnType<typeof request>, p = providers()) {
+async function ask(who: Person, input: ReturnType<typeof request>, p = providers(), beforeRun?: () => Promise<unknown>) {
   const admitted = await who.admission.admit(who.subject, input);
   if (admitted.kind === "DENIED") return admitted;
+  await beforeRun?.();
   const result = await createRunExecution(db, keys, p).execute(who.identity, admitted.run, submissionSchema.parse(input), new AbortController().signal, () => undefined);
   return { ...result, runId: admitted.run.id };
 }
@@ -131,5 +132,41 @@ describe("attaching files to a question", () => {
     expect((await history()).items.find(item => item.role === "ASSISTANT")).not.toHaveProperty("attachments");
     await who.service.remove(who.subject, water.id);
     expect((await history()).items.find(item => item.role === "USER")).not.toHaveProperty("attachments");
+  });
+
+  it("fails a run whose attached file was deleted after it was admitted, instead of searching other files", async () => {
+    for (const mode of ["CHAT", "FAST"] as const) {
+      const who = await person();
+      await addDocument(who, "budget-table");
+      const water = await addDocument(who, "water-report");
+      const p = providers([{ title: "Turbidity guidance", url: "https://example.org/turbidity", content: "Turbidity should stay below 1 NTU." }]);
+      const result = await ask(who, request(who, "What was the average turbidity?", mode, [water.id]), p, () => who.service.remove(who.subject, water.id));
+      expect(result).toMatchObject({ kind: "DENIED", code: "DOCUMENT_NOT_READY" });
+      expect(p.answer.generate).not.toHaveBeenCalled();
+      expect(p.search.search).not.toHaveBeenCalled();
+      const runId = (result as { runId: string }).runId;
+      expect(await db.select().from(schema.runSources).where(eq(schema.runSources.runId, runId))).toHaveLength(0);
+      // The attachment row stays, without its file, so the run's history is honest.
+      expect(await db.select({ documentId: schema.runDocuments.documentId }).from(schema.runDocuments).where(eq(schema.runDocuments.runId, runId))).toEqual([{ documentId: null }]);
+    }
+  });
+
+  it("a Web question with nothing to search for but the file searches only the file", async () => {
+    const who = await person();
+    const water = await addDocument(who, "water-report");
+    const p = providers([{ title: "Unrelated", url: "https://example.org/x", content: "Unrelated text." }]);
+    const result = await ask(who, request(who, "Summarize this", "FAST", [water.id]), p);
+    expect(result).toMatchObject({ kind: "COMPLETED" });
+    expect(p.search.search).not.toHaveBeenCalled();
+    expect((await db.select().from(schema.runRetrievals).where(eq(schema.runRetrievals.runId, (result as { runId: string }).runId)))[0]).toMatchObject({ sourceKind: "DOCUMENTS", searchCredits: null });
+  });
+
+  it("keeps the search credits a Web run spent when its file search fails", async () => {
+    const who = await person();
+    const water = await addDocument(who, "water-report");
+    const p = providers([{ title: "Turbidity guidance", url: "https://example.org/turbidity", content: "Turbidity should stay below 1 NTU." }], fakeEmbeddings({ fail: true }));
+    const result = await ask(who, request(who, "Is the turbidity in the water report within guidelines?", "FAST", [water.id]), p);
+    expect(result).toMatchObject({ kind: "DENIED", code: "PROVIDER_UNAVAILABLE" });
+    expect((await db.select().from(schema.runRetrievals).where(eq(schema.runRetrievals.runId, (result as { runId: string }).runId)))[0]).toMatchObject({ sourceKind: "WEB", searchCredits: 1, status: "UNAVAILABLE" });
   });
 });
