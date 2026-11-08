@@ -13,3 +13,5 @@ export * from './operations-schema';
 
 export * from "./job-schema";
 export * from "./billing-schema";
+
+export * from "./document-schema";
