@@ -50,7 +50,9 @@ export async function parsePdf(bytes: Uint8Array): Promise<ParsedPdf> {
           if (raw.length > DOCUMENT_LIMITS.maxPageCharacters * 2) throw new DocumentError("DOCUMENT_TOO_LARGE");
         }
       } finally {
-        await reader.cancel().catch(() => undefined);
+        // Stopping early leaves the stream to the document teardown below: cancelling it makes
+        // pdf.js close an already-closed controller, an unhandled error in the Worker.
+        reader.releaseLock();
         page.cleanup();
       }
       const text = normalizePageText(raw);

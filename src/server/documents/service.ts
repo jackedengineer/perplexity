@@ -166,7 +166,9 @@ export function createDocumentService(db: AdmissionDatabase, dependencies: Depen
             await settleDocuments(tx, claimed, [], cap, now());
             await tx.update(documents).set({ status: "FAILED", failureCode: "EMBEDDING_FAILED", updatedAt: now() })
               .where(and(inArray(documents.id, [...new Set(claimed.map(row => row.documentId))]), eq(documents.status, "PROCESSING"),
-                sql`EXISTS (SELECT 1 FROM document_chunks c WHERE c.document_id = ${documents.id} AND c.embedding IS NULL AND c.attempts >= ${DOCUMENT_LIMITS.embeddingAttempts})`));
+                // Another worker may still hold a live lease on a chunk's last attempt and succeed.
+                sql`EXISTS (SELECT 1 FROM document_chunks c WHERE c.document_id = ${documents.id} AND c.embedding IS NULL AND c.attempts >= ${DOCUMENT_LIMITS.embeddingAttempts}
+                  AND (c.lease_until IS NULL OR c.lease_until < clock_timestamp()))`));
           });
           break;
         }

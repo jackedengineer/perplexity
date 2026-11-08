@@ -239,3 +239,15 @@ describe("review hardening", () => {
     expect((await db.select().from(schema.documentChunks).where(eq(schema.documentChunks.id, chunks[0].id)))[0].embeddingModel).toBe("other-worker");
   });
 });
+
+it("a failed batch doesn't fail a document while another worker holds a live lease on its last attempt", async () => {
+  const subject = await person();
+  await service.upload(subject, { title: "w.pdf", bytes: await fixturePdf("water-report") });
+  const chunks = await db.select().from(schema.documentChunks).orderBy(schema.documentChunks.ordinal);
+  // Another worker is mid-call on chunk 0's final attempt; this worker's batch is chunks 1-2.
+  await db.update(schema.documentChunks).set({ attempts: DOCUMENT_LIMITS.embeddingAttempts, leaseUntil: new Date(Date.now() + 60_000) }).where(eq(schema.documentChunks.id, chunks[0].id));
+  // This worker's own chunks fail on their first attempt, with retries left.
+  await embedAll(fakeEmbeddings({ fail: true }));
+  expect((await service.list(subject))[0].status).toBe("PROCESSING");
+});
+
