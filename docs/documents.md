@@ -1,6 +1,8 @@
 # Files: questions about your own PDFs
 
-Signed-in users upload PDFs and ask questions about them in **Files** mode. Answers cite the file and page, and the citation opens the PDF at that page. Files stay private to their owner.
+Signed-in users attach PDFs to any **Chat** or **Web** question: with the paperclip, by dropping files anywhere on the page, or by pasting them. Answers cite the file and page, and the citation opens the PDF at that page. Files stay private to their owner.
+
+Files are a feature of a question, not a mode. Chat with files answers only from those files; Web with files searches the web and the files together. Attached files stay on follow-ups in the same conversation until the user removes them, and each saved question lists the files it was asked with. Deep Research doesn't read files yet, so its composer hides them.
 
 ## How it works
 
@@ -15,16 +17,20 @@ Upload  POST /api/documents (raw PDF)
   → after the response: embed chunks (openai/text-embedding-3-small via OpenRouter, zero retention)
   → READY once every chunk has a vector       (scheduled backstop every minute)
 
-Question in Files mode
-  → same admission, input check and planner as Web mode
+Question with attached files  (submission carries documentIds, at most 5)
+  → admission checks each file is the asker's and READY (else DOCUMENT_NOT_READY), records run_documents
+  → Chat + files runs as DOCUMENTS; Web + files runs as FAST and also searches the files
+  → planner sees the file names, so "this report" resolves to them and it never asks which file
   → embed the question                        (provider ledger stage QUERY_EMBEDDING, cap 100 µUSD)
-  → one SQL query over the asker's READY chunks:
-      pgvector cosine top 20 + Postgres full-text top 20, fused with Reciprocal Rank Fusion
+  → one SQL query over the attached files' READY chunks:
+      pgvector cosine top 20 + Postgres full-text top 20 + each file's opening chunks,
+      fused with Reciprocal Rank Fusion (the opening chunks let "Summarize this" find something)
+  → Web + files: file pages and web results alternate, at most 3 file pages of the 5 evidence slots
   → best chunk per page becomes evidence, linked to /documents/<id>?page=N
   → same evidence check, answer, citation validation, output check and settlement as Web mode
 ```
 
-Files mode is a third `runs.mode` (`DOCUMENTS`). Only the search step differs from Web mode: no query leaves the server, no Tavily credits are spent, and the retrieval row records `source_kind = 'DOCUMENTS'`.
+A Chat question with files is stored as `runs.mode = 'DOCUMENTS'`: no query leaves the server, no Tavily credits are spent, and the retrieval row records `source_kind = 'DOCUMENTS'`. A Web question with files keeps `FAST` and `source_kind = 'WEB'`, because it spends search credits; its file pages are `DOCUMENT_PAGE` passages, and `run_documents` records which files it used. A failed file search fails the run rather than answering from the web alone. A `DOCUMENTS` submission without `documentIds` (from clients before attachments) still searches all of the asker's files.
 
 ## API
 
@@ -35,8 +41,10 @@ Files mode is a third `runs.mode` (`DOCUMENTS`). Only the search step differs fr
 | `DELETE` | `/api/documents/:id` | `204`. Idempotent; another user's ID also returns `204` and changes nothing |
 | `GET` | `/api/documents/:id/file` | The original PDF, owner only |
 | `GET` | `/documents/:id?page=N` | Redirects to the file at `#page=N`; this is the citation link |
+| `POST` | `/api/chat` | The submission gains optional `documentIds` (1–5 unique IDs). They are part of the idempotency fingerprint, so the same request key with a different file list is `IDEMPOTENCY_MISMATCH` |
+| `GET` | conversation history | A question asked with files carries `attachments: [{ id, title }]`; a deleted file drops out |
 
-Errors use the shared `{ error: { code, message }, requestId }` shape. New codes: `DOCUMENT_UNSUPPORTED` (415), `DOCUMENT_TOO_LARGE` (413), `DOCUMENT_UNREADABLE` (422), `DOCUMENT_LIMIT_REACHED` (409), `DOCUMENT_DAILY_LIMIT` (429). Guests get `UNAUTHENTICATED`.
+Errors use the shared `{ error: { code, message }, requestId }` shape. New codes: `DOCUMENT_UNSUPPORTED` (415), `DOCUMENT_TOO_LARGE` (413), `DOCUMENT_UNREADABLE` (422), `DOCUMENT_LIMIT_REACHED` (409), `DOCUMENT_DAILY_LIMIT` (429), `DOCUMENT_NOT_READY` (409, an attached file is still preparing, was deleted or isn't the asker's). Guests get `UNAUTHENTICATED`.
 
 ## Limits
 
@@ -75,10 +83,11 @@ Hybrid is kept even though vector-only ranked better here. Answers use up to fiv
 
 ## Operating it
 
-- **Feature flag:** `ENABLE_DOCUMENTS=true` (a plain Worker variable). Off hides Files mode, returns `404` from the API and skips the scheduled backstop.
+- **Feature flag:** `ENABLE_DOCUMENTS=true` (a plain Worker variable). Off hides the paperclip and drop target, returns `404` from the API and skips the scheduled backstop.
 - **Storage:** R2 bucket bound as `DOCUMENTS_BUCKET`. On Node, `DOCUMENT_STORE_DIR` points at a local folder for development and browser tests.
 - **Database:** migration `0038_document_rag` installs `pgvector`, adds the two tables and their grants, and extends the run, retrieval, passage and provider-call constraints. It is additive: existing rows are unaffected.
 - **Rollback:** set `ENABLE_DOCUMENTS` to anything else and redeploy. **Don't restore a Worker version from before this feature once a Files answer exists**: older code rejects `DOCUMENT_PAGE` sources, so every conversation containing a Files answer would fail to load. Keep the migrations.
+- **Attachments migration:** `0040_file_attachments` adds `run_documents` (run, file, owner, position), deleted with either the run or the file, and grants the app `SELECT, INSERT` only. Additive; older Worker versions ignore it, so rolling back the attachment UI is a normal redeploy.
 - **Logs:** `documents.upload` (outcome, pages, duration) and `documents.embedding` (embedded, failed). No file names or text are logged.
 
 ## Review
@@ -91,3 +100,4 @@ An independent review before launch found, and this branch fixes with regression
 - Integration on the real migrations with pgvector: storage rules, upload, dedupe, quota, budget, retries, ownership, HTTP contract (`tests/integration/documents.test.ts`, `document-schema.test.ts`), and Files runs end to end (`document-retrieval.test.ts`).
 - Browser, desktop and phone, on development Neon with synthetic providers: `LIVE_NEON_E2E=1 pnpm exec playwright test --config playwright.documents.config.ts`.
 - PDF fixtures are generated by `tests/fixtures/documents/generate.mjs`.
+- Attachments: scoping to the attached files, Web + files mixing and credits, refusals, history, idempotency (`tests/integration/attachments.test.ts`); planner rules with files and result mixing (`tests/unit/attachment-planning.test.ts`); paperclip and drag-and-drop, chips, follow-ups, Manage files and phone layout with a worst-case file name (`tests/e2e/documents.spec.ts`).
