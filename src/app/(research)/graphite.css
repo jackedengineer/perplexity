@@ -232,7 +232,9 @@ a.file-title:hover { text-decoration: underline; }
 /* Attachments: files ride along with any Chat or Web question. Motion is feedback only:
    chips settle in, the drop target lights up, the menu grows from the paperclip. */
 .research-shell { --r-ease-out: cubic-bezier(0.23, 1, 0.32, 1); }
-.question-composer { position: relative; }
+/* Only composers that can take files anchor the drop overlay; a positioned composer would
+   paint over the guest policy footer where the two overlap on short screens. */
+.question-composer:has(.composer-drop) { position: relative; }
 .attach-trigger { position: relative; color: var(--r-muted); transition: background-color 120ms ease, color 120ms ease, transform 120ms var(--r-ease-out); }
 .attach-trigger:hover, .attach-trigger[aria-expanded=true] { color: var(--r-text); }
 .attachment-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; padding: 0 4px; }
