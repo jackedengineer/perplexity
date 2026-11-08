@@ -8,6 +8,8 @@ export async function runCloudflareMaintenance(env:Environment,scheduledTime:num
  const hourly=new Date(scheduledTime).getUTCMinutes()===0;
  const endpoints=native?[]:[{path:'/api/internal/jobs-dispatch',secret:env.JOBS_CRON_SECRET}];
  if(hourly)endpoints.push({path:'/api/internal/recovery',secret:env.CRON_SECRET});
+ // Finishes embedding any uploaded document whose background task was cut short.
+ if(env.ENABLE_DOCUMENTS==='true')endpoints.push({path:'/api/internal/documents',secret:env.CRON_SECRET});
  const tasks=endpoints.map(async({path,secret})=>{
   const response=await dispatch(new Request('https://perplexity.jacked.dev'+path,{headers:{authorization:'Bearer '+secret,'user-agent':'perplex-cloudflare-cron/1.0'},signal:AbortSignal.timeout(30000)}));
   await response.body?.cancel();if(!response.ok)throw new Error('Maintenance unavailable');
