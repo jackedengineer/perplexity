@@ -18,9 +18,10 @@ import {freshnessTimeRange} from './freshness';
 import type { SearchProvider } from "./tavily";
 import {queryPlanSchema} from "@/server/contracts/pipeline";
 import {STAGE_LIMITS} from '@/server/runs/budgets';
+import type {DocumentFinder} from '@/server/documents/retrieve';
 import type { EvidencePackage } from "@/server/contracts/pipeline";
 
-type Dependencies = {extract?:ExtractProvider;searchSecond?:SearchProvider;querySecondGate?:ReturnType<typeof createInputGate>;modelId: string; search: SearchProvider; queryGate: ReturnType<typeof createInputGate>; evidenceGate: ReturnType<typeof createEvidenceGate> };
+type Dependencies = {documents?:DocumentFinder;extract?:ExtractProvider;searchSecond?:SearchProvider;querySecondGate?:ReturnType<typeof createInputGate>;modelId: string; search: SearchProvider; queryGate: ReturnType<typeof createInputGate>; evidenceGate: ReturnType<typeof createEvidenceGate> };
 export type RetrievalResult = { kind: "READY" | "NO_EVIDENCE";runId: string;sources: number;passages: number }
   | { kind: "RUN_IN_PROGRESS" | "RUN_ALREADY_FINISHED";runId: string } | { kind: "DENIED";code: PublicErrorCode };
 const denied = (code: PublicErrorCode): RetrievalResult => ({ kind: "DENIED",code });
@@ -64,16 +65,19 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
           if(run.accountingVersion>=2&&!record)throw new AdmissionError('CONFLICT');
           if(record&&(record.originalHash!==createHash('sha256').update(parts.data[0].text).digest('hex')||record.messageId!==message.id||record.attemptVersion!==run.attemptVersion||plan?.action!=='ANSWER'))throw new AdmissionError('CONFLICT');
           const query=searchQuerySchema.parse(plan?.action==='ANSWER'?plan.retrieval.queries[0]:parts.data[0].text);
-          await tx.insert(runRetrievals).values({ runId,attemptVersion: run.attemptVersion,policyVersion: run.policyVersion,
-            detectorVersion: EVIDENCE_DETECTOR_VERSION,modelId: dependencies.modelId,status: "STARTED",createdAt: now,expiresAt: new Date(now.getTime()+30*86_400_000) });
+          // Files runs search the owner's own documents: no web query leaves the server and no search credits are spent.
+          const sourceKind=run.mode==='DOCUMENTS'?'DOCUMENTS' as const:'WEB' as const;
+          if(sourceKind==='DOCUMENTS'&&!dependencies.documents)throw new AdmissionError('CONFIGURATION_UNAVAILABLE');
+          await tx.insert(runRetrievals).values({ runId,attemptVersion: run.attemptVersion,policyVersion: run.policyVersion,sourceKind,
+            detectorVersion: EVIDENCE_DETECTOR_VERSION,modelId: sourceKind==='DOCUMENTS'?dependencies.documents!.modelId:dependencies.modelId,status: "STARTED",createdAt: now,expiresAt: new Date(now.getTime()+30*86_400_000) });
           await tx.update(runs).set({ status: "SEARCHING",updatedAt: now }).where(eq(runs.id,runId));
-          return { kind: "CLAIMED",run,query,plan,original:parts.data[0].text } as const;
+          return { kind: "CLAIMED",run,query,plan,original:parts.data[0].text,sourceKind } as const;
         });
         if (prepared.kind !== "CLAIMED") return prepared;
         claim = prepared.run;
         const options = { signal,deadlineAt: prepared.run.deadlineAt };
         const plannedQueries=prepared.plan?.action==='ANSWER'?prepared.plan.retrieval.queries:[prepared.query];
-        const queries=prepared.run.modelKey.startsWith('economy-')?plannedQueries.slice(0,1):plannedQueries;
+        const queries=prepared.run.modelKey.startsWith('economy-')||prepared.sourceKind==='DOCUMENTS'?plannedQueries.slice(0,1):plannedQueries;
         if(queries.length>2||queries.length===2&&(!dependencies.querySecondGate||!dependencies.searchSecond))throw new AdmissionError('CONFIGURATION_UNAVAILABLE');
         for(const [index,query] of queries.entries()){
           const gate=index===0?queryGate:dependencies.querySecondGate!;
@@ -84,23 +88,27 @@ export function createRetrieval(db: AdmissionDatabase,dependencies?: Dependencie
         await db.transaction(tx=>checkpoint(tx,subject,runId,prepared.run,stage,signal));
         const plan=prepared.plan?.action==='ANSWER'?prepared.plan:null;
         const filters=plan?{freshness:plan.retrieval.freshness,...(plan.retrieval.freshness==='RECENT'?{timeRange:freshnessTimeRange(plan.standaloneQuestion)??freshnessTimeRange(prepared.original)??'month'}:{}),startDate:plan.retrieval.startDate,endDate:plan.retrieval.endDate,preferredDomains:explicitPreferredDomains(prepared.original)}:undefined;
-        const responses=await Promise.allSettled(queries.map((query,index)=>(index===0?search:dependencies.searchSecond!).search(query,{...options,...(filters?{filters}:{})})));
+        const documents=prepared.sourceKind==='DOCUMENTS'?dependencies.documents!:null;
+        const responses=documents
+          ?[await documents.find({ownerId:prepared.run.userId,question:plan?.standaloneQuestion??prepared.original,queries},options).then(results=>({status:'fulfilled' as const,value:{results,credits:0}}),reason=>({status:'rejected' as const,reason}))]
+          :await Promise.allSettled(queries.map((query,index)=>(index===0?search:dependencies.searchSecond!).search(query,{...options,...(filters?{filters}:{})})));
         const successful=responses.flatMap(r=>r.status==='fulfilled'?[r.value]:[]);
         if(!successful.length){
           if(signal.aborted)throw new AdmissionError('CONFLICT');
           const allTimedOut=responses.every(r=>r.status==='rejected'&&(r.reason instanceof AdmissionError||r.reason instanceof RetrievalError)&&r.reason.code==='DEADLINE_EXCEEDED');
           throw new RetrievalError(allTimedOut?'DEADLINE_EXCEEDED':'PROVIDER_UNAVAILABLE');
         }
-        const response={results:successful.flatMap(r=>r.results),credits:successful.reduce((sum,r)=>sum+r.credits,0)};searchCredits=response.credits;
+        const response={results:successful.flatMap(r=>r.results),credits:successful.reduce((sum,r)=>sum+r.credits,0)};searchCredits=documents?null:response.credits;
         await db.transaction(async(tx)=>{
           const { now } = await checkpoint(tx,subject,runId,prepared.run,stage,signal);
           await tx.update(runs).set({ status: 'PREPARING_EVIDENCE',updatedAt: now }).where(eq(runs.id,runId));
         });
         stage = 'PREPARING_EVIDENCE';
         let extractionFailures=0;
-        let selected:RankedResult[]=plan?rankEvidenceResults(response.results,plan.standaloneQuestion,new Date(),filters):response.results;
+        // Document matches arrive already fused and ranked; web results are ranked here.
+        let selected:RankedResult[]=plan&&!documents?rankEvidenceResults(response.results,plan.standaloneQuestion,new Date(),filters):response.results;
         // Preserve enough of the absolute deadline for answer, output safety and persistence.
-        if(!prepared.run.modelKey.startsWith('economy-')&&dependencies.extract&&selected.length&&prepared.run.deadlineAt.getTime()-Date.now()>extractionMinimumRemainingMs){
+        if(!documents&&!prepared.run.modelKey.startsWith('economy-')&&dependencies.extract&&selected.length&&prepared.run.deadlineAt.getTime()-Date.now()>extractionMinimumRemainingMs){
           await db.transaction(tx=>checkpoint(tx,subject,runId,prepared.run,stage,signal));
           try{
             const extracted=await dependencies.extract.extract(selected.slice(0,2).map(r=>r.url),options);

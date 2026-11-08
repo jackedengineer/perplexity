@@ -15,7 +15,7 @@ export const allow = { decision: "ALLOW",categoryCodes: [],policyVersion: "v1" }
 export const knownUsage = { costMicroUsd: 100n,inputTokens: 10,outputTokens: 5,actualModel: "test/safety" };
 export const fakeSafety = () => ({ modelId: "test/safety",classify: async()=>allow,usage: ()=>knownUsage });
 export const keys = { activeKeyId: "test-v1",keys: { "test-v1": "a".repeat(64) } };
-export async function seedCompletion(db: AdmissionDatabase,reserve = 50000n,text="Why do rainbows form?",accountingVersion=1,locale?:string,mode:"FAST"|"CHAT"="FAST") {
+export async function seedCompletion(db: AdmissionDatabase,reserve = 50000n,text="Why do rainbows form?",accountingVersion=1,locale?:string,mode:import("@/server/contracts/chat").RunMode="FAST") {
   const subject = randomUUID(),namespace = `completion-${randomUUID()}`;
   await db.insert(schema.user).values({ id: subject,name: "Synthetic completion",email: `${subject}@example.test` });
   const [profile] = await db.insert(schema.appUsers).values({ authSubject: subject }).returning();

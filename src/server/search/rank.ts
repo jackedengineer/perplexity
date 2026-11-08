@@ -3,7 +3,7 @@ import {canonicalSourceUrl,safeEvidenceText} from './evidence';
 import {safeRawEvidenceText} from './raw-text';
 const stop=new Set('a an and are as at be by can do does explain for from how in is it of on or the to what which why with'.split(' '));
 const terms=(text:string)=>text.normalize('NFKC').toLowerCase().match(/[\p{L}\p{N}]+/gu)?.filter(t=>!stop.has(t))??[];
-export type RankedResult=SearchResult&{contentKind?:'SEARCH_PASSAGE'|'EXTRACTED_PAGE';retrievedAt?:string};
+export type RankedResult=SearchResult&{contentKind?:'SEARCH_PASSAGE'|'EXTRACTED_PAGE'|'DOCUMENT_PAGE';retrievedAt?:string};
 export type RankingPreferences={freshness?:'ANY'|'RECENT'|'SPECIFIC_RANGE';preferredDomains?:string[]};
 function relevantWindow(text:string,query:Set<string>){
  let best='',score=-1;

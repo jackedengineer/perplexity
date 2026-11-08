@@ -5,7 +5,7 @@ import { canonicalSourceUrl,validateEvidence } from "@/server/search/evidence";
 import { inspectInput } from "@/server/safety/deterministic";
 import { questionTextSchema } from "@/server/contracts/chat";
 export type VisibleSource = { sourceId: string;number: number;url: string;title: string;publishedAt: string | null;
-  passageIds: string[];contentHashes: string[];supportStatus: "NOT_CHECKED";retrievedAt?:string;contentKind?:"SEARCH_PASSAGE"|"EXTRACTED_PAGE" };
+  passageIds: string[];contentHashes: string[];supportStatus: "NOT_CHECKED";retrievedAt?:string;contentKind?:"SEARCH_PASSAGE"|"EXTRACTED_PAGE"|"DOCUMENT_PAGE" };
 type Node = { type: string;value?: string;children?: Node[] };
 const allowedNodes = new Set(["root","paragraph","text","heading","emphasis","strong","delete","blockquote","list","listItem","code","inlineCode","break","thematicBreak"]);
 export function validateCitations(markdown: string,evidence: EvidencePackage,required: boolean): VisibleSource[] {

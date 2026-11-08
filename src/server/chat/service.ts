@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import type { RunMode } from "@/server/contracts/chat";
 import { getDb } from "@/db";
 import { getCurrentSession } from "@/lib/current-session";
 import { getServerEnv } from "@/lib/env";
@@ -18,18 +19,20 @@ import { createRunExecution } from "@/server/runs/execute";
 import { createAnswerDelivery } from "./delivery";
 import { createChatHttp } from "./http";
 import { createRequestLimiter } from "@/server/runs/rate-limit";
+import { documentsEnabled,embeddingProvider } from "@/server/documents";
 export const chatHttp = createChatHttp({
   identity: getCurrentSession,origin: ()=>getServerEnv().BETTER_AUTH_URL,
   consumeRequest: subject=>createRequestLimiter(getDb(),parseAdmissionPolicyEnvironment(process.env).operatorBudgetKey).consume(subject),
   load: (identity,runId)=>createAnswerDelivery(getDb()).load(identity,runId),
   backend() {
     const db = getDb(),keys = parseAdmissionEnvironment(process.env);
-    function configureExecution(modelKey:string,mode:"FAST"|"CHAT") {
+    function configureExecution(modelKey:string,mode:RunMode) {
       const answer=catalogConfiguration(modelKey,process.env),planner=parsePlannerModel(process.env);
       const searchKey=z.string().min(16).max(512).regex(/^[A-Za-z0-9._-]+$/u).safeParse(process.env.TAVILY_API_KEY);
       if(!planner||!answer||!searchKey.success)throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
+      if(mode==="DOCUMENTS"&&!documentsEnabled())throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
       return createRunExecution(db,keys,{
-        extract:createTavilyExtract(searchKey.data),planner:createPlannerProvider(planner),input:createLocalSafetyGuard(),query:createLocalSafetyGuard(),
+        ...(mode==="DOCUMENTS"?{embedding:embeddingProvider()}:{}),extract:createTavilyExtract(searchKey.data),planner:createPlannerProvider(planner),input:createLocalSafetyGuard(),query:createLocalSafetyGuard(),
         evidence:createLocalSafetyGuard(),output:createLocalSafetyGuard(),
         answer:(mode === "CHAT" ? createChatProvider : createAnswerProvider)(answer,fetch,MODEL_CATALOG.find(m=>m.key===modelKey)!.maxOutputTokens,12000,extendedAnswerBudget(modelKey)),search:createTavilySearch(searchKey.data),
       });
