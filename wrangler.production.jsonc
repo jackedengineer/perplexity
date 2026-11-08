@@ -38,8 +38,15 @@
     "BETTER_AUTH_URL": "https://perplexity.jacked.dev",
     "JOB_ENVIRONMENT": "LIVE",
     "JOB_OPERATOR_BUDGET_KEY": "live-pilot-20261102",
-    "JOB_EXECUTION_BACKEND": "cloudflare"
+    "JOB_EXECUTION_BACKEND": "cloudflare",
+    "ENABLE_DOCUMENTS": "true"
   },
+  "r2_buckets": [
+    {
+      "binding": "DOCUMENTS_BUCKET",
+      "bucket_name": "perplexity-documents"
+    }
+  ],
   "kv_namespaces": [
     {
       "binding": "PAID_ACTIVITY",

@@ -7,21 +7,24 @@ import { useEffect,useState } from "react";
 import {WORKSPACE_DRAFT_KEY} from './workspace-draft';
 import { useRouter } from "next/navigation";
 import { ResearchMark, Icon } from "./icons";
+import {readyDocuments,useDocuments} from "./documents";
+import {FilesButton} from "./files-dialog";
 import { useStartSearch } from "./use-start-search";
 import { ConversationRequestError } from "./client-api";
 export function QuestionComposer({text,onText,onSubmit,pending,onStop,placeholder="Ask anything…"}: {
   text:string;onText:(value:string)=>void;onSubmit:()=>void;pending:boolean;onStop?:()=>void;placeholder?:string;
 }) {
-  const {data,mode,deepAvailable}=useModelAccess();
-  const deep=mode==='DEEP',needsPro=deep&&data&&!data.usage.subscription;
-  const available=deep?Boolean(deepAvailable&&data?.usage.subscription&&data.usage.subscription.reportsRemaining>0):Boolean(data?.models.length);
+  const {data,mode,deepAvailable}=useModelAccess(),{documents}=useDocuments();
+  const deep=mode==='DEEP',files=mode==='DOCUMENTS',needsPro=deep&&data&&!data.usage.subscription;
+  // Files mode needs at least one ready file, so a question never spends credits on an empty library.
+  const available=deep?Boolean(deepAvailable&&data?.usage.subscription&&data.usage.subscription.reportsRemaining>0):Boolean(data?.models.length)&&(!files||readyDocuments(documents)>0);
   const maximum=deep?1000:4000;
   const valid=Boolean(text.trim())&&text.length<=maximum;
   return <><ModePicker disabled={pending}/><form className="research-composer question-composer" data-has-text={Boolean(text.trim())} data-pending={pending} onSubmit={event=>{event.preventDefault();if(!pending&&available&&valid)onSubmit();}} aria-busy={pending}>
     <textarea aria-label="Ask a question" placeholder={placeholder} rows={2} maxLength={maximum} value={text} disabled={pending} onChange={event=>onText(event.target.value)}
       onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();if(!pending&&available&&valid)onSubmit();}}} />
     <div className="composer-toolbar">
-      {!deep&&<ModelSelector disabled={pending}/>}<span className="toolbar-spacer"/>
+      {files&&<FilesButton disabled={pending}/>}{!deep&&<ModelSelector disabled={pending}/>}<span className="toolbar-spacer"/>
       {deep&&<span className="deep-composer-hint">{text.length}/1,000</span>}
       {needsPro?<Link href="/pricing" className="composer-upgrade">Upgrade to Pro ↗</Link>:
       pending&&onStop ? <button className="send-button stop-button" type="button" onClick={onStop} aria-label="Stop research"><span/></button>

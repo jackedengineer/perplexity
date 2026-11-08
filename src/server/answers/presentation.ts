@@ -10,7 +10,7 @@ export function presentAnswer(value: unknown) {
   const payload = approvedPayloadSchema.parse(value);
   function displaySource(source:(typeof payload.sources)[number]){
     if (canonicalSourceUrl(source.url) !== source.url || !safeEvidenceText(source.title)) throw new Error("Invalid approved source");
-    return { sourceId: source.sourceId,number: source.number,url: source.url,title: source.title,domain: new URL(source.url).hostname.replace(/^www\./u,""),supportStatus: source.supportStatus,...(source.retrievedAt?{retrievedAt:source.retrievedAt,publishedAt:source.publishedAt,contentKind:source.contentKind}:{}) };
+    return { sourceId: source.sourceId,number: source.number,url: source.url,title: source.title,domain: source.contentKind==="DOCUMENT_PAGE"?"Your files":new URL(source.url).hostname.replace(/^www\./u,""),supportStatus: source.supportStatus,...(source.retrievedAt?{retrievedAt:source.retrievedAt,publishedAt:source.publishedAt,contentKind:source.contentKind}:{}) };
   }
   const sources=payload.sources.map(displaySource),additionalSources=payload.additionalSources?.map(displaySource);
   let count = 0;

@@ -12,7 +12,7 @@ import {recordProviderObservation,traceStage} from '@/server/telemetry/trace';
 import {PlanningError} from '@/server/ai/plan';
 const noUsage:ProviderUsage={costMicroUsd:0n,inputTokens:0,outputTokens:0,actualModel:null};
 const tavilyUsage=(credits:number):ProviderUsage=>({costMicroUsd:BigInt(credits)*TAVILY_CREDIT_MICRO_USD,inputTokens:null,outputTokens:null,actualModel:null});
-const phases = { PLANNER: "PLANNING",QUERY_SECOND:"SEARCHING",SEARCH_SECOND:"SEARCHING",EXTRACT:"PREPARING_EVIDENCE", INPUT_SAFETY: "CHECKING_INPUT",QUERY_SAFETY: "SEARCHING",SEARCH: "SEARCHING",EVIDENCE_SAFETY: "PREPARING_EVIDENCE",ANSWER: "GENERATING",OUTPUT_SAFETY: "CHECKING_OUTPUT" };
+const phases = { PLANNER: "PLANNING",QUERY_SECOND:"SEARCHING",SEARCH_SECOND:"SEARCHING",EXTRACT:"PREPARING_EVIDENCE", INPUT_SAFETY: "CHECKING_INPUT",QUERY_SAFETY: "SEARCHING",SEARCH: "SEARCHING",EVIDENCE_SAFETY: "PREPARING_EVIDENCE",ANSWER: "GENERATING",OUTPUT_SAFETY: "CHECKING_OUTPUT",QUERY_EMBEDDING: "SEARCHING" };
 export function createProviderCalls(db: AdmissionDatabase,subject: string,runId: string) {
   return {
     async begin(stage: ProviderStage,requestedModel: string,signal?:AbortSignal) {
@@ -109,4 +109,21 @@ export function recordExtractProvider(calls:ReturnType<typeof createProviderCall
    if(budget.signal.aborted)throw new AdmissionError('DEADLINE_EXCEEDED');return result;
   }catch{try{await calls.finish(claim.id,'UNKNOWN');}catch{}throw new AdmissionError(budget.expired?'DEADLINE_EXCEEDED':options.signal.aborted?'CONFLICT':'PROVIDER_UNAVAILABLE');}finally{budget.stop();}
  });}};
+}
+// Files mode: the question's embedding is a paid call, so it gets a claim, a deadline and a recorded cost.
+export function recordEmbeddingProvider(calls:ReturnType<typeof createProviderCalls>,provider:import('@/server/documents/embedding').EmbeddingProvider):import('@/server/documents/embedding').EmbeddingProvider{
+ return {modelId:provider.modelId,async embed(texts,signal){
+  const claim=await calls.begin('QUERY_EMBEDDING',provider.modelId,signal),budget=providerDeadline(claim,signal);
+  try{
+   if(budget.signal.aborted){await calls.finish(claim.id,'SKIPPED',noUsage);throw new AdmissionError('DEADLINE_EXCEEDED');}
+   const result=await provider.embed(texts,budget.signal);
+   await calls.finish(claim.id,'SUCCEEDED',{costMicroUsd:result.costMicroUsd,inputTokens:null,outputTokens:null,actualModel:result.model});
+   if(budget.signal.aborted)throw new AdmissionError('DEADLINE_EXCEEDED');
+   return result;
+  }catch(error){
+   try{await calls.finish(claim.id,'UNKNOWN');}catch{/* Already recorded; an unknown outcome stays held. */}
+   if(error instanceof AdmissionError)throw error;
+   throw new AdmissionError(budget.expired?'DEADLINE_EXCEEDED':signal.aborted?'CONFLICT':'PROVIDER_UNAVAILABLE');
+  }finally{budget.stop();}
+ }};
 }

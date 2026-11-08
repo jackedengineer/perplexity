@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// FAST is the Web mode; DOCUMENTS answers from the signed-in user's own uploaded files.
+export const RUN_MODES = ["FAST","CHAT","DOCUMENTS"] as const;
+export type RunMode = typeof RUN_MODES[number];
 export const CONTRACT_VERSION = 1;
 export const MAX_SUBMISSION_BYTES = 16_384; // Enforce while reading HTTP bytes, before JSON parsing (T05).
 export const MAX_QUESTION_CHARACTERS = 4_000;
@@ -20,7 +23,7 @@ export const submissionSchema = z.strictObject({
   conversationId: z.uuid(), clientRequestId: z.uuid(),
   expectedRevision: z.int().min(0).max(2_147_483_646),
   message: z.strictObject({ text: questionTextSchema }),
-  mode: z.enum(["FAST","CHAT"]), modelKey: z.enum([FAST_MODEL_KEY,"economy-nano","economy-mistral","economy-qwen","economy-gemini","standard-deepseek","standard-gemini-flash","standard-qwen-max","standard-qwen-397b"]),
+  mode: z.enum(RUN_MODES), modelKey: z.enum([FAST_MODEL_KEY,"economy-nano","economy-mistral","economy-qwen","economy-gemini","standard-deepseek","standard-gemini-flash","standard-qwen-max","standard-qwen-397b"]),
   locale: localeSchema.optional(), timezone: timezoneSchema.optional(),
 });
 export type SubmitQuery = z.infer<typeof submissionSchema>;

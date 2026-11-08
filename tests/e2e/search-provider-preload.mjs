@@ -12,6 +12,12 @@ const answer=[
 function record(stage,scenario){appendFileSync(".artifacts/t11-provider-calls.jsonl",JSON.stringify({stage,scenario})+"\n");}
 globalThis.fetch=async(input,init)=>{
   const url=String(input instanceof Request?input.url:input);
+  // Files mode: deterministic bag-of-words vectors, so related text scores higher than unrelated text.
+  if(url==="https://openrouter.ai/api/v1/embeddings"){
+    const request=JSON.parse(String(init?.body??"{}"));record("embedding",request.input.length);
+    const vector=text=>{const v=new Array(1536).fill(0);for(const word of text.toLowerCase().match(/[\p{L}\p{N}]+/gu)??[]){if(word.length<3)continue;let h=2166136261;for(const c of word)h=Math.imul(h^c.codePointAt(0),16777619);v[Math.abs(h)%1536]+=1;}const n=Math.hypot(...v)||1;return v.map(x=>x/n);};
+    return Response.json({object:"list",model:"text-embedding-3-small",data:request.input.map((text,index)=>({object:"embedding",index,embedding:vector(text)})),usage:{prompt_tokens:10,total_tokens:10,cost:4.6e-7}});
+  }
   if((url.includes("openrouter.ai")||url.includes("api.tavily.com"))&&url!=="https://openrouter.ai/api/v1/chat/completions"&&url!=="https://api.tavily.com/search"&&url!=="https://api.tavily.com/extract")throw new Error("Fixture forbids unmatched provider request");
   if(url!=="https://openrouter.ai/api/v1/chat/completions"&&url!=="https://api.tavily.com/search"&&url!=="https://api.tavily.com/extract")return originalFetch(input,init);
   const body=JSON.parse(String(init?.body??"{}")),raw=JSON.stringify(body);
@@ -50,7 +56,8 @@ globalThis.fetch=async(input,init)=>{
   if(stage==='answer'&&scenario==='output-block')return Response.json({error:{code:403,metadata:{error_type:'content_policy_violation',provider_name:'fixture'}}},{status:403});
   if(stage==='answer'&&system.includes('This is Chat mode'))return Response.json({id:'synthetic-chat',model:body.model,created:1,choices:[{index:0,finish_reason:'stop',message:{role:'assistant',content:JSON.stringify({markdown:'You have not told me your name in this chat.'})}}],usage:{prompt_tokens:100,completion_tokens:30,total_tokens:130,cost:.0001}});
   const blocked=scenario==="input-block"||(output&&scenario==="output-block");
-  const text=["test/answer","openai/gpt-4.1-mini","openai/gpt-4.1-nano"].includes(body.model)?(scenario==="conflicting"?"The reports disagree: source A gives 20 units [S1], while source B gives 30 units [S2]. The supplied evidence does not resolve the difference.":scenario==="t18-cancel"?"T18_PRIVATE_LATE_DRAFT [S1].":scenario==="output-block"?"UNREVIEWED_PRIVATE_DRAFT [S1].":scenario==="invalid-citation"?"UNREVIEWED_PRIVATE_DRAFT [S9].":answer):JSON.stringify({classification:blocked?["FRAUD"]:"ALLOW",policyVersion:"v1"});
+  const fromFiles=raw.includes("0.37 NTU");
+  const text=["test/answer","openai/gpt-4.1-mini","openai/gpt-4.1-nano"].includes(body.model)?(fromFiles?"Average turbidity in the third quarter was **0.37 NTU**, below the 1.0 NTU limit [S1].":scenario==="conflicting"?"The reports disagree: source A gives 20 units [S1], while source B gives 30 units [S2]. The supplied evidence does not resolve the difference.":scenario==="t18-cancel"?"T18_PRIVATE_LATE_DRAFT [S1].":scenario==="output-block"?"UNREVIEWED_PRIVATE_DRAFT [S1].":scenario==="invalid-citation"?"UNREVIEWED_PRIVATE_DRAFT [S9].":answer):JSON.stringify({classification:blocked?["FRAUD"]:"ALLOW",policyVersion:"v1"});
   return Response.json({id:"synthetic-t11",model:body.model,created:1,choices:[{index:0,finish_reason:"stop",message:{role:"assistant",content:["test/answer","openai/gpt-4.1-mini","openai/gpt-4.1-nano"].includes(body.model)?JSON.stringify({paragraphs:text.split("\n\n").map(text=>({text:text.replace(/\[S[1-9]\]/gu,""),sourceIds:[...new Set([...text.matchAll(/\[(S[1-9])\]/gu)].map(match=>match[1]))].length?[...new Set([...text.matchAll(/\[(S[1-9])\]/gu)].map(match=>match[1]))]:["S1"]}))}):text,reasoning:"PRIVATE_REASONING_MUST_NOT_LEAK"}}],usage:{prompt_tokens:100,completion_tokens:100,total_tokens:200,cost:.0001}});
 };
 

@@ -13,6 +13,8 @@ export const STAGE_LIMITS=Object.freeze({
  INPUT_SAFETY:Object.freeze({capMicroUsd:2250n,maxDurationMs:5000}),QUERY_SAFETY:Object.freeze({capMicroUsd:2250n,maxDurationMs:5000}),QUERY_SECOND:Object.freeze({capMicroUsd:2250n,maxDurationMs:5000}),
  SEARCH:Object.freeze({capMicroUsd:8000n,maxDurationMs:8000}),SEARCH_SECOND:Object.freeze({capMicroUsd:8000n,maxDurationMs:8000}),EXTRACT:Object.freeze({capMicroUsd:8000n,maxDurationMs:8000}),
  EVIDENCE_SAFETY:Object.freeze({capMicroUsd:2250n,maxDurationMs:5000}),ANSWER:Object.freeze({capMicroUsd:12500n,maxDurationMs:12000}),OUTPUT_SAFETY:Object.freeze({capMicroUsd:2250n,maxDurationMs:5000}),
+ // Files mode embeds the question once: a few hundred tokens at $0.02 per million.
+ QUERY_EMBEDDING:Object.freeze({capMicroUsd:100n,maxDurationMs:5000}),
 });
 // v3 is only used for the larger curated answer models. 20,000 wire bytes
 // conservatively bound input tokens; 20,000*2 + 1,200*6 = 47,200 microUSD.

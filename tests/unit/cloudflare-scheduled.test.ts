@@ -33,3 +33,11 @@ it('does not silently fall back to Trigger when native maintenance was selected'
  await expect(runCloudflareMaintenance({...env,JOB_EXECUTION_BACKEND:'cloudflare'},Date.now(),fetcher)).rejects.toThrow('Native maintenance unavailable');
  expect(fetcher).not.toHaveBeenCalled();
 });
+it('runs the document embedding backstop every minute only when documents are enabled',async()=>{
+ const requests:Request[]=[],fetcher=vi.fn(async(request:Request)=>{requests.push(request);return new Response('{}');});
+ await runCloudflareMaintenance({...env,ENABLE_DOCUMENTS:'true'},Date.UTC(2026,10,2,10,1),fetcher);
+ expect(requests.map(r=>new URL(r.url).pathname)).toEqual(['/api/internal/jobs-dispatch','/api/internal/documents']);
+ expect(requests[1].headers.get('authorization')).toBe('Bearer '+env.CRON_SECRET);
+ requests.length=0;await runCloudflareMaintenance({...env,ENABLE_DOCUMENTS:'false'},Date.UTC(2026,10,2,10,1),fetcher);
+ expect(requests.map(r=>new URL(r.url).pathname)).toEqual(['/api/internal/jobs-dispatch']);
+});

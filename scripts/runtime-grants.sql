@@ -37,3 +37,8 @@ GRANT UPDATE (subscription_id, state, provider_state, cancel_at_cycle_end, updat
 GRANT UPDATE (state, attempts, lease_token, lease_until, available_at) ON billing_inbox TO perplex_web;
 GRANT SELECT, INSERT ON job_research_inputs, job_checkpoints TO perplex_web;
 GRANT EXECUTE ON FUNCTION public.perplex_delete_job_content(uuid,text), public.perplex_prune_job_evidence() TO perplex_web;
+GRANT SELECT, INSERT, DELETE ON documents TO perplex_web;
+GRANT UPDATE (status, failure_code, embedded_count, cost_micro_usd, updated_at) ON documents TO perplex_web;
+GRANT SELECT, INSERT ON document_chunks TO perplex_web;
+GRANT UPDATE (embedding, embedding_model, lease_until, attempts) ON document_chunks TO perplex_web;
+GRANT SELECT, INSERT, UPDATE ON document_usage TO perplex_web;

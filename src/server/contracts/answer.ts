@@ -13,7 +13,7 @@ export const visibleSourceSchema = z.strictObject({
   passageIds: z.array(z.uuid()).length(1),
   contentHashes: z.array(hash).length(1),
   supportStatus: z.literal("NOT_CHECKED"),
-  retrievedAt:z.iso.datetime().optional(),contentKind:z.enum(["SEARCH_PASSAGE","EXTRACTED_PAGE"]).optional(),
+  retrievedAt:z.iso.datetime().optional(),contentKind:z.enum(["SEARCH_PASSAGE","EXTRACTED_PAGE","DOCUMENT_PAGE"]).optional(),
 });
 // Shape validation for storage/reload; this schema is NOT a release authorization.
 export const approvedPayloadSchema = z.strictObject({

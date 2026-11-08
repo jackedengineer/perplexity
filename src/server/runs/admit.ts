@@ -1,4 +1,5 @@
 import {extendedAnswerBudget} from '@/server/ai/catalog';
+import type { RunMode } from "@/server/contracts/chat";
 import {EXTENDED_RUN_RESERVE} from './budgets';
 import { prepareEntitlement } from "@/server/billing/entitlements";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -20,7 +21,7 @@ const denied = (code: PublicErrorCode): AdmissionResult => ({ kind: "DENIED", co
 const isActive = (status: Run["status"]) => ACTIVE_RUN_STATUSES.some((value)=>value === status);
 
 // Internal API: authSubject comes only from the verified application session, never from a body.
-export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, policyInput: unknown = FREE_ADMISSION_POLICY,assertNewRunAvailable?:(modelKey:string,mode:"FAST"|"CHAT")=>void,entitlements=false) {
+export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, policyInput: unknown = FREE_ADMISSION_POLICY,assertNewRunAvailable?:(modelKey:string,mode:RunMode)=>void,entitlements=false) {
   const config = parseAdmissionConfig(configInput);
   const parsedPolicy = admissionPolicySchema.safeParse(policyInput);
   if (!parsedPolicy.success) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");

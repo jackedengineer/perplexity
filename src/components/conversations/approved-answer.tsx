@@ -20,8 +20,14 @@ function Citation({ source }: { source: PublicAnswer["sources"][number] }) {
   return <><a className="answer-citation" href={source.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label={`Source ${source.number}: ${source.title}`} aria-describedby={tip?id:undefined}
     onFocus={event=>{const element=event.currentTarget;requestAnimationFrame(()=>{if(document.activeElement===element)open(element);});}} onBlur={()=>setTip(null)} onKeyDown={event=>{if(event.key==="Escape")setTip(null);}}
     onPointerEnter={event=>{if(event.pointerType!=="touch")open(event.currentTarget);}} onPointerLeave={event=>{if(document.activeElement!==event.currentTarget)setTip(null);}}>
-    <Icon name="link" size={10}/><span>{source.domain.replace(/\.(gov|com|org|edu)$/u,"")}</span>
+    <Icon name="link" size={10}/><span>{citationLabel(source)}</span>
   </a>{tip&&createPortal(<span className="citation-tooltip" role="tooltip" id={id} style={{left:tip.left,top:tip.top,width:tip.width,maxHeight:tip.maxHeight,transform:tip.above?"translateY(-100%)":undefined}}>{source.title}<small>{source.domain} · Source {source.number}</small></span>,document.body)}</>;
+}
+// A file citation names the file and page; a web citation names the site.
+function citationLabel(source:PublicAnswer['sources'][number]){
+  if(source.contentKind!=='DOCUMENT_PAGE')return source.domain.replace(/\.(gov|com|org|edu)$/u,"");
+  const label=source.title.replace(/, page (\d+)$/u,' · p. $1');
+  return label.length>32?label.slice(0,14)+'…'+label.slice(-14):label;
 }
 export function ApprovedAnswer({ messageId,answer,text,reveal,onSources }: {messageId:string; answer: PublicAnswer;text: string;reveal?:AnswerReveal;onSources: ()=>void }) {
   const [copied,setCopied] = useState(false),[copyFailed,setCopyFailed] = useState(false);
@@ -53,7 +59,7 @@ export function ApprovedAnswer({ messageId,answer,text,reveal,onSources }: {mess
     }
   }); }
   return <div className="approved-answer">
-    <div className="answer-researched">{answer.kind === "CHAT" ? "Chat · No web search" : answer.kind === "ANSWER" ? "Web · Sources used" : answer.kind === "NO_EVIDENCE" ? "Search complete" : "One more detail"}</div>
+    <div className="answer-researched">{answer.kind === "CHAT" ? "Chat · No web search" : answer.kind === "ANSWER" ? (answer.sources.some(source=>source.contentKind==="DOCUMENT_PAGE") ? "Files · Sources used" : "Web · Sources used") : answer.kind === "NO_EVIDENCE" ? "Search complete" : "One more detail"}</div>
     <div className="answer-prose" aria-busy={reveal?.active??false} aria-live="off">{render(reveal?.document??answer.document)}</div>
     {reveal&&<span className="sr-only" role="status">{reveal.active?'Showing approved answer':'Answer ready'}</span>}
     {reveal?.active?<button className="research-button answer-show-full" type="button" onClick={event=>{event.currentTarget.closest('article')?.focus({preventScroll:true});reveal.finish();}}>Show full answer<Icon name="down" size={13}/></button>:<div className="answer-actions">
@@ -80,8 +86,8 @@ export function SourcesPanel({ answer,open,onToggle }: { answer: PublicAnswer | 
   if (!answer?.sources.length) return null;
   const total=answer.sources.length+(answer.additionalSources?.length??0);
   function cards(sources:PublicAnswer['sources'],cited:boolean){return sources.map(source=><a key={source.sourceId} className="source-card" href={source.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">
-    <span className="source-monogram" aria-hidden="true">{source.domain[0].toUpperCase()}</span><div><span className="source-domain">{source.domain}<span className="source-number">{cited?source.number:'Retrieved'}</span></span><h3>{source.title}</h3>
-    {source.retrievedAt&&<small className="source-evidence-meta">{source.contentKind==='EXTRACTED_PAGE'?'Page excerpt':'Search snippet'} · {source.publishedAt?`Source date ${source.publishedAt.slice(0,10)} (provider estimate)`:'Source date unavailable'}<br/>Retrieved {source.retrievedAt.slice(0,10)}</small>}
+    <span className="source-monogram" aria-hidden="true">{(source.contentKind==='DOCUMENT_PAGE'?source.title:source.domain)[0].toUpperCase()}</span><div><span className="source-domain">{source.domain}<span className="source-number">{cited?source.number:'Retrieved'}</span></span><h3>{source.title}</h3>
+    {source.retrievedAt&&<small className="source-evidence-meta">{source.contentKind==='DOCUMENT_PAGE'?'From your file':source.contentKind==='EXTRACTED_PAGE'?'Page excerpt':'Search snippet'} · {source.publishedAt?`Source date ${source.publishedAt.slice(0,10)} (provider estimate)`:'Source date unavailable'}<br/>Retrieved {source.retrievedAt.slice(0,10)}</small>}
     </div><Icon name="external" size={13}/>
   </a>);}
   const list=<div className="source-list">

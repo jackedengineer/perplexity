@@ -10,7 +10,7 @@ export function useStartSearch() {
   return async(text: string)=>{
     if(intent.current?.text!==text||intent.current.modelKey!==modelKey||intent.current.mode!==mode)intent.current={text,modelKey,mode,clientRequestId:crypto.randomUUID()};
     const conversation=await mutateConversation("/api/conversations","POST",{title:"New search",clientRequestId:intent.current.clientRequestId});
-    questions.stage({mode:mode==='CHAT'?'CHAT':'FAST',modelKey,conversationId:conversation.id,text,clientRequestId:intent.current.clientRequestId});
+    questions.stage({mode:mode==='DEEP'?'FAST':mode,modelKey,conversationId:conversation.id,text,clientRequestId:intent.current.clientRequestId});
     router.push(`/search/${conversation.id}`);router.refresh();
   };
 }

@@ -1,0 +1,46 @@
+{
+  "version": "documents-v1",
+  "note": "Authored synthetic corpus. Each question names the page that answers it, or none when the files can't answer it. Exact-term questions favour keyword search; paraphrases favour vector search.",
+  "documents": [
+    { "title": "aurora-water-report.pdf", "pages": [
+      "Aurora Lake Water Authority. Quarterly water quality report for the third quarter. The authority serves 182,000 residents across four districts.",
+      "Turbidity. Average turbidity in the third quarter was 0.37 NTU, below the regulatory limit of 1.0 NTU. The highest single reading, 0.82 NTU, followed heavy rain on 14 August.",
+      "Maintenance. Crews replaced 12 membrane modules at the Eastside treatment plant in September. Filtration uptime was 98.6 percent for the quarter.",
+      "Chlorine. Residual chlorine stayed between 0.4 and 1.2 mg/L at every sampling point. No boil-water notices were issued."
+    ] },
+    { "title": "vendor-contract-ax17.pdf", "pages": [
+      "Supply agreement AX-17 between Northwind Components and Aurora Lake Water Authority. The vendor delivers 400 pump seals per month.",
+      "Pricing. Each unit costs INR 1,250. Prices are fixed for 24 months and then indexed to the wholesale price index.",
+      "Payment and termination. Invoices are payable within 30 days. Either party may terminate with 90 days written notice. Late deliveries incur a penalty of 2 percent per week."
+    ] },
+    { "title": "onboarding-handbook.pdf", "pages": [
+      "Welcome. New employees complete security training in their first week and receive a laptop on day one.",
+      "Leave policy. Staff accrue 1.5 days of paid annual leave per month. Up to 10 unused days carry over into the next calendar year.",
+      "Remote work. Employees may work remotely up to three days a week with their manager's approval. Core collaboration hours are 11:00 to 15:00."
+    ] },
+    { "title": "solar-pilot-results.pdf", "pages": [
+      "Rooftop solar pilot. Forty panels were installed on the Westside depot roof in March.",
+      "Results. The array produced 21.4 MWh over six months, covering 38 percent of the depot's electricity use. Payback is estimated at 7 years."
+    ] }
+  ],
+  "questions": [
+    { "id": "exact-turbidity", "kind": "exact", "text": "What was the average turbidity in NTU?", "expect": ["aurora-water-report.pdf", 2] },
+    { "id": "exact-price", "kind": "exact", "text": "What is the price per unit in INR?", "expect": ["vendor-contract-ax17.pdf", 2] },
+    { "id": "exact-ax17", "kind": "exact", "text": "How many pump seals does agreement AX-17 deliver each month?", "expect": ["vendor-contract-ax17.pdf", 1] },
+    { "id": "exact-uptime", "kind": "exact", "text": "What was filtration uptime?", "expect": ["aurora-water-report.pdf", 3] },
+    { "id": "exact-mwh", "kind": "exact", "text": "How many MWh did the array produce?", "expect": ["solar-pilot-results.pdf", 2] },
+    { "id": "exact-chlorine", "kind": "exact", "text": "What range did residual chlorine stay in?", "expect": ["aurora-water-report.pdf", 4] },
+    { "id": "para-cloudy", "kind": "paraphrase", "text": "How cloudy was the water on average this quarter?", "expect": ["aurora-water-report.pdf", 2] },
+    { "id": "para-filters", "kind": "paraphrase", "text": "How many filter parts were swapped out at the plant?", "expect": ["aurora-water-report.pdf", 3] },
+    { "id": "para-quit", "kind": "paraphrase", "text": "How much warning is needed to end the deal with the supplier?", "expect": ["vendor-contract-ax17.pdf", 3] },
+    { "id": "para-holiday", "kind": "paraphrase", "text": "Can I keep vacation days I didn't use?", "expect": ["onboarding-handbook.pdf", 2] },
+    { "id": "para-home", "kind": "paraphrase", "text": "How often am I allowed to work from home?", "expect": ["onboarding-handbook.pdf", 3] },
+    { "id": "para-payback", "kind": "paraphrase", "text": "How long until the panels pay for themselves?", "expect": ["solar-pilot-results.pdf", 2] },
+    { "id": "para-late", "kind": "paraphrase", "text": "What happens if the supplier ships late?", "expect": ["vendor-contract-ax17.pdf", 3] },
+    { "id": "para-storm", "kind": "paraphrase", "text": "What was the worst water clarity reading after the storm?", "expect": ["aurora-water-report.pdf", 2] },
+    { "id": "none-worldcup", "kind": "unanswerable", "text": "Who won the 2022 FIFA World Cup?", "expect": null },
+    { "id": "none-recipe", "kind": "unanswerable", "text": "How do I bake sourdough bread?", "expect": null },
+    { "id": "none-quantum", "kind": "unanswerable", "text": "Explain quantum entanglement simply.", "expect": null },
+    { "id": "none-ceo", "kind": "unanswerable", "text": "Who is the CEO of Northwind's competitor?", "expect": null }
+  ]
+}

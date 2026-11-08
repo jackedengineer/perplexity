@@ -45,7 +45,7 @@ const sourceSchema = z.strictObject({
 });
 const passageSchema = z.strictObject({
   passageId: z.uuid(), sourceId: sourceIdSchema, text: questionTextSchema,
-  contentKind: z.enum(["SEARCH_PASSAGE", "EXTRACTED_PAGE"]), contentHash: z.string().regex(/^[a-f0-9]{64}$/u),
+  contentKind: z.enum(["SEARCH_PASSAGE", "EXTRACTED_PAGE", "DOCUMENT_PAGE"]), contentHash: z.string().regex(/^[a-f0-9]{64}$/u),
 });
 export const evidencePackageSchema = z.strictObject({
   runId: z.uuid(), sources: z.array(sourceSchema).max(FAST_CONTRACT_LIMITS.sources),

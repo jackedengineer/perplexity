@@ -19,7 +19,7 @@ export const telemetryFieldsSchema=z.object({
  reason:z.enum([...INPUT_REASONS,'CITATION_INVALID','INVALID_PACKAGE']).optional(),categoryCodes:z.array(safetyCategorySchema).max(11).optional(),
  promptVersion:version.optional(),detectorVersion:version.optional(),
  modelId:modelIdSchema.optional(),actualModelMatch:z.enum(['MATCH','OTHER','UNAVAILABLE']).optional(),
- providerCallId:z.uuid().optional(),providerStage:z.enum(['PLANNER','INPUT_SAFETY','QUERY_SAFETY','QUERY_SECOND','SEARCH','SEARCH_SECOND','EXTRACT','EVIDENCE_SAFETY','ANSWER','OUTPUT_SAFETY']).optional(),
+ providerCallId:z.uuid().optional(),providerStage:z.enum(['PLANNER','INPUT_SAFETY','QUERY_SAFETY','QUERY_SECOND','SEARCH','SEARCH_SECOND','EXTRACT','EVIDENCE_SAFETY','ANSWER','OUTPUT_SAFETY','QUERY_EMBEDDING']).optional(),
  inputTokens:aggregateTokens.nullable().optional(),outputTokens:aggregateTokens.nullable().optional(),searchCredits:count.nullable().optional(),
  knownCostMicroUsd:money.optional(),estimatedUpperBoundMicroUsd:money.optional(),heldMicroUsd:money.optional(),bookedMicroUsd:money.optional(),
  plannerFailure:z.enum(PLANNER_FAILURES).optional(),plannerFallback:z.boolean().optional(),providerHttpStatus:z.int().min(100).max(599).optional(),
