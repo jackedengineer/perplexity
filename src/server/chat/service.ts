@@ -26,19 +26,19 @@ export const chatHttp = createChatHttp({
   load: (identity,runId)=>createAnswerDelivery(getDb()).load(identity,runId),
   backend() {
     const db = getDb(),keys = parseAdmissionEnvironment(process.env);
-    function configureExecution(modelKey:string,mode:RunMode) {
+    function configureExecution(modelKey:string,mode:RunMode,attachments:boolean) {
       const answer=catalogConfiguration(modelKey,process.env),planner=parsePlannerModel(process.env);
       const searchKey=z.string().min(16).max(512).regex(/^[A-Za-z0-9._-]+$/u).safeParse(process.env.TAVILY_API_KEY);
       if(!planner||!answer||!searchKey.success)throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
-      if(mode==="DOCUMENTS"&&!documentsEnabled())throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
+      if((mode==="DOCUMENTS"||attachments)&&!documentsEnabled())throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
       return createRunExecution(db,keys,{
-        ...(mode==="DOCUMENTS"?{embedding:embeddingProvider()}:{}),extract:createTavilyExtract(searchKey.data),planner:createPlannerProvider(planner),input:createLocalSafetyGuard(),query:createLocalSafetyGuard(),
+        ...(mode==="DOCUMENTS"||attachments?{embedding:embeddingProvider()}:{}),extract:createTavilyExtract(searchKey.data),planner:createPlannerProvider(planner),input:createLocalSafetyGuard(),query:createLocalSafetyGuard(),
         evidence:createLocalSafetyGuard(),output:createLocalSafetyGuard(),
         answer:(mode === "CHAT" ? createChatProvider : createAnswerProvider)(answer,fetch,MODEL_CATALOG.find(m=>m.key===modelKey)!.maxOutputTokens,12000,extendedAnswerBudget(modelKey)),search:createTavilySearch(searchKey.data),
       });
     }
     let execution:ReturnType<typeof configureExecution>|undefined;
-    const admission=createRunAdmission(db,keys,parseAdmissionPolicyEnvironment(process.env),(key,mode)=>{execution=configureExecution(key,mode);},true);
+    const admission=createRunAdmission(db,keys,parseAdmissionPolicyEnvironment(process.env),(key,mode,attachments)=>{execution=configureExecution(key,mode,attachments);},true);
     return {admit:admission.admit,execute:(...args)=>{
       if(!execution)throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
       return execution.execute(...args);

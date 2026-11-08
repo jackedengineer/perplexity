@@ -24,4 +24,5 @@ export const PUBLIC_ERRORS = {
   DOCUMENT_UNREADABLE: [422, "We couldn’t read text from this PDF. Scanned and password-protected files aren’t supported yet."],
   DOCUMENT_LIMIT_REACHED: [409, "You’ve reached the 20-file limit. Delete a file to upload another."],
   DOCUMENT_DAILY_LIMIT: [429, "You’ve reached today’s upload allowance. Try again tomorrow."],
+  DOCUMENT_NOT_READY: [409, "An attached file isn’t ready or was deleted. Remove it and try again."],
 } as const;

@@ -40,6 +40,8 @@ export function fingerprintSubmission(input: unknown, snapshot: AdmissionSnapsho
     conversationId: request.conversationId.toLowerCase(), clientRequestId: request.clientRequestId.toLowerCase(),
     expectedRevision: request.expectedRevision, text: request.message.text, mode: request.mode, modelKey: request.modelKey,
     locale: request.locale ?? null, timezone: request.timezone ?? null,
+    // Present only with attachments, so fingerprints of earlier requests are unchanged.
+    ...(request.documentIds ? { documentIds: request.documentIds.map((id) => id.toLowerCase()) } : {}),
     snapshot: { ...quote.data, providerReserveMicroUsd: quote.data.providerReserveMicroUsd.toString() },
   });
   return { hmac: createHmac("sha256", Buffer.from(valid.keys[valid.activeKeyId], "hex"))

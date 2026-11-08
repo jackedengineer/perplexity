@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
-import { bigint, check, customType, date, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, varchar, vector } from "drizzle-orm/pg-core";
+import { bigint, check, customType, date, foreignKey, index, integer, pgTable, primaryKey, smallint, text, timestamp, uniqueIndex, uuid, varchar, vector } from "drizzle-orm/pg-core";
 import { appUsers } from "./conversation-schema";
+import { runs } from "./run-schema";
 const instant = (name: string) => timestamp(name,{ withTimezone: true,precision: 3 });
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
@@ -62,4 +63,21 @@ export const documentUsage = pgTable("document_usage",{
 },t=>[
   primaryKey({ columns: [t.userId,t.day] }),
   check("document_usage_valid",sql`${t.characters} > 0`),
+]);
+
+// Files attached to one question. Retrieval for that run searches only these files.
+// Deleting a file nulls its document_id but keeps the row, so a run admitted with files can
+// tell one was deleted mid-run and fail, rather than searching everything or nothing.
+export const runDocuments = pgTable("run_documents",{
+  runId: uuid("run_id").notNull().references(()=>runs.id,{ onDelete: "cascade" }),
+  documentId: uuid("document_id"),
+  userId: uuid("user_id").notNull(),
+  position: smallint("position").notNull(),
+},t=>[
+  primaryKey({ columns: [t.runId,t.position] }),
+  // Migration 0041 narrows this to SET NULL (document_id); user_id stays set.
+  foreignKey({ columns: [t.documentId,t.userId],foreignColumns: [documents.id,documents.userId],name: "run_document_same_owner_fk" }).onDelete("set null"),
+  uniqueIndex("run_document_file_unique").on(t.runId,t.documentId),
+  index("run_documents_document_idx").on(t.documentId),
+  check("run_document_valid",sql`${t.position} BETWEEN 0 AND 4`),
 ]);

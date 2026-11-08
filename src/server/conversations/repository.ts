@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { and, desc, eq, ilike, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import * as schema from "@/db/schema";
-import { ACTIVE_RUN_STATUSES, appUsers, conversations, messages, messageFeedback, outputReviews, runs } from "@/db/schema";
+import { ACTIVE_RUN_STATUSES, appUsers, conversations, documents, inputSafetyReviews, messages, messageFeedback, outputReviews, runDocuments, runs } from "@/db/schema";
 import { encodeCursor, type Conversation, type CreateInput, type HistoryInput, type ListInput } from "./contracts";
 import { historyPageView } from "./views";
 import { createConversationPrivacy } from "./privacy";
@@ -121,7 +121,19 @@ export function createConversationRepository(db: PgDatabase<PgQueryResultHKT, ty
           return { ...row,answer: presentAnswer(canonical.payload),createdAt: row.createdAt.toISOString() };
         } catch { throw new ConversationError("UNAVAILABLE"); }
       });
-      return { conversation, items, nextBefore: rows.length > input.limit ? items[0].sequence : null };
+      // Files a question was asked with, in the order attached. A deleted file drops out.
+      const questions = items.filter(item => item.role === "USER").map(item => item.id);
+      const attached = questions.length ? await db.select({ messageId: inputSafetyReviews.acceptedMessageId, id: documents.id, title: documents.title })
+        .from(inputSafetyReviews).innerJoin(runDocuments, eq(runDocuments.runId, inputSafetyReviews.runId))
+        .innerJoin(documents, and(eq(documents.id, runDocuments.documentId), eq(documents.userId, runDocuments.userId)))
+        .innerJoin(conversations, eq(conversations.id, inputSafetyReviews.conversationId))
+        .where(and(owned(authSubject), eq(conversations.id, id), inArray(inputSafetyReviews.acceptedMessageId, questions)))
+        .orderBy(runDocuments.position) : [];
+      const withFiles = items.map(item => {
+        const files = attached.filter(file => file.messageId === item.id).map(({ id, title }) => ({ id, title }));
+        return files.length ? { ...item, attachments: files } : item;
+      });
+      return { conversation, items: withFiles, nextBefore: rows.length > input.limit ? items[0].sequence : null };
     },
   };
 }

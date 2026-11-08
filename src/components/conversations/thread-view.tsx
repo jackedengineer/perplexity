@@ -11,11 +11,16 @@ import { ConversationActions } from "./conversation-actions";
 import { ConversationHistory } from "./conversation-history";
 import { QuestionComposer } from "./question-composer";
 import {useAnswerReveal} from './use-answer-reveal';
+import {useDocuments} from "./documents";
+import {QuestionFiles} from "./attachments";
 export type ResearchState={question:string;pending:boolean;error:string;label:string;committed:CommittedAnswer|null;revealMessageId?:string;retry:()=>void;stop?:()=>void};
 export const idleResearch: ResearchState={question:"",pending:false,error:"",label:"Checking request",committed:null,retry:()=>{}};
-export function ThreadView({conversation,initial,research=idleResearch,submit}: {conversation:Conversation;initial:HistoryPage;research?:ResearchState;submit:(text:string,options?:RevisionOptions)=>void}) {
+export function ThreadView({conversation,initial,research=idleResearch,submit,askedWith,attachments,onAttachments}: {conversation:Conversation;initial:HistoryPage;research?:ResearchState;submit:(text:string,options?:RevisionOptions)=>void;askedWith?:string[];attachments?:string[];onAttachments?:(ids:string[])=>void}) {
   const [text,setText]=useState(""),[sourcesOpen,setSourcesOpen]=useState(false);
-  const [revision,setRevision]=useState<{text:string;action:"edit"|"retry"}|null>(null);
+  const [revision,setRevision]=useState<{text:string;action:"edit"|"retry";files:{id:string;title:string}[]}|null>(null);
+  const {documents}=useDocuments();
+  // The question being answered shows its files until the saved history includes them.
+  const askedFiles=(askedWith??[]).flatMap(id=>{const file=documents.find(document=>document.id===id);return file?[{id,title:file.title}]:[];});
   const {mode,setMode,select}=useModelAccess(),startDeep=useStartDeep();
   const [startingDeep,setStartingDeep]=useState(false),[deepError,setDeepError]=useState('');
   async function send(){
@@ -32,7 +37,7 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
   if(saved&&!initial.items.some(message=>message.id===saved.messageId)){
     const now=saved.createdAt;
     history={...initial,items:[...initial.items,
-      ...(research.question&&!initial.items.some(message=>message.role==="USER"&&message.sequence>baseSequence)?[{id:saved.runId,role:"USER" as const,kind:"QUESTION" as const,parts:[{type:"text" as const,text:research.question}],sequence:baseSequence+1,schemaVersion:1 as const,createdAt:now}]:[]),
+      ...(research.question&&!initial.items.some(message=>message.role==="USER"&&message.sequence>baseSequence)?[{id:saved.runId,role:"USER" as const,kind:"QUESTION" as const,parts:[{type:"text" as const,text:research.question}],sequence:baseSequence+1,schemaVersion:1 as const,createdAt:now,...(askedFiles.length?{attachments:askedFiles}:{})}]:[]),
       {id:saved.messageId,role:"ASSISTANT",kind:saved.answer.kind==="CLARIFICATION"?"CLARIFICATION":"ANSWER",parts:[{type:"text",text:saved.text}],sequence:baseSequence+2,schemaVersion:1,createdAt:now,answer:saved.answer}]};
   }
   const hasAnswer=history.items.some(message=>message.role==="ASSISTANT"),hasQuestion=history.items.some(message=>message.role==="USER");
@@ -44,8 +49,8 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
     <section className="thread-content" aria-label="Conversation history" tabIndex={0}>
       <h1>{conversation.title}</h1>
       <div className="thread-flow">
-      {history.items.length>0&&<ConversationHistory key={saved?.messageId??`saved:${initial.items.length}`} conversationId={conversation.id} initial={history} reveal={reveal} sourcesOpen={sourcesOpen} onSourcesOpenChange={setSourcesOpen} onRevise={!research.pending&&!startingDeep?(text,action)=>setRevision({text,action}):undefined}/>}
-      {research.question&&!history.items.some(message=>message.role==="USER"&&message.sequence>baseSequence)&&!saved&&<article className="history-message question-message pending-question" aria-label="Your question"><p>{research.question}</p></article>}
+      {history.items.length>0&&<ConversationHistory key={saved?.messageId??`saved:${initial.items.length}`} conversationId={conversation.id} initial={history} reveal={reveal} sourcesOpen={sourcesOpen} onSourcesOpenChange={setSourcesOpen} onRevise={!research.pending&&!startingDeep?(text,action,files)=>setRevision({text,action,files}):undefined}/>}
+      {research.question&&!history.items.some(message=>message.role==="USER"&&message.sequence>baseSequence)&&!saved&&<article className="history-message question-message pending-question" aria-label="Your question"><p>{research.question}</p><QuestionFiles files={askedFiles}/></article>}
       {research.pending&&!saved&&<div className="research-progress" role="status" aria-live="polite"><span className="progress-mark" aria-hidden="true"><ResearchMark/></span><span className="progress-label" key={research.label}>{research.label}</span><div className="answer-skeleton" aria-hidden="true"><span/><span/><span/></div></div>}
       {research.error&&!saved&&<div className="research-failure"><p role="alert">{research.error}</p><div className="failure-actions">
         <button className="research-button" disabled={research.pending} onClick={()=>void research.retry()}>Check same request</button>
@@ -54,10 +59,10 @@ export function ThreadView({conversation,initial,research=idleResearch,submit}: 
       {!history.items.length&&!research.question&&!research.pending&&!research.error&&<div className="thread-empty"><Icon name="search" size={24}/><h2>What would you like to explore?</h2><p>Ask a question to search the web and get an answer with sources.</p></div>}
       </div>
     </section>
-    {revision&&<ReviseQuestion question={revision.text} action={revision.action} onClose={()=>setRevision(null)} onSubmit={(text,options)=>{setRevision(null);setMode(options.mode);select(options.modelKey);submit(text,options);}}/>}
+    {revision&&<ReviseQuestion question={revision.text} files={revision.files} action={revision.action} onClose={()=>setRevision(null)} onSubmit={(text,options)=>{setRevision(null);setMode(options.mode);select(options.modelKey);submit(text,options);}}/>}
     <div className="thread-bottom">
       {research.pending?<QuestionComposer text="" onText={()=>{}} onSubmit={()=>{}} pending onStop={research.stop} placeholder={research.label}/>
-         :<QuestionComposer text={text} onText={setText} onSubmit={()=>void send()} pending={startingDeep} placeholder={mode==='DEEP'?'Start a new research report…':hasAnswer?'Ask a follow-up…':'Ask a question…'}/>}
+         :<QuestionComposer text={text} onText={setText} onSubmit={()=>void send()} pending={startingDeep} attachments={attachments} onAttachments={onAttachments} placeholder={mode==='DEEP'?'Start a new research report…':hasAnswer?'Ask a follow-up…':'Ask a question…'}/>}
       {deepError&&<p className="composer-feedback" role="alert">{deepError}</p>}
     </div>
   </main>;

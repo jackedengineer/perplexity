@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import {and,eq} from 'drizzle-orm';
-import {inputSafetyReviews,messages,runPlans,runs} from '@/db/schema';
-import {PLANNING_VERSION,PlanningError,literalQuestionPlan,preparePlanningInput,standaloneFallback,validatePlan} from '@/server/ai/plan';
+import {documents,inputSafetyReviews,messages,runDocuments,runPlans,runs} from '@/db/schema';
+import {PLANNING_VERSION,PlanningError,attachedFilesPlan,literalQuestionPlan,preparePlanningInput,standaloneFallback,validatePlan} from '@/server/ai/plan';
 import type {PlannerProvider} from '@/server/ai/planner-provider';
 import type {SubmitQuery} from '@/server/contracts/chat';
 import {lockOwnedRun} from './lock';
@@ -17,7 +17,9 @@ export async function planRun(db:AdmissionDatabase,subject:string,runId:string,s
   const [message]=review?.acceptedMessageId?await tx.select().from(messages).where(and(eq(messages.id,review.acceptedMessageId),eq(messages.conversationId,run.conversationId))):[];
   if(!message?.approvedAt||message.role!=='USER'||message.parts.length!==1||message.parts[0].text!==submission.message.text||review.attemptVersion!==run.attemptVersion)throw new AdmissionError('SAFETY_UNAVAILABLE');
   const context=await loadPlanningContext(tx,run.conversationId,message.sequence);
-  return {run,input:preparePlanningInput({original:{id:message.id,text:message.parts[0].text},context,now:now.toISOString(),timezone:submission.timezone??'UTC',locale:submission.locale??null})};
+  const files=(await tx.select({title:documents.title}).from(runDocuments).innerJoin(documents,and(eq(documents.id,runDocuments.documentId),eq(documents.userId,runDocuments.userId)))
+   .where(and(eq(runDocuments.runId,runId),eq(runDocuments.userId,run.userId))).orderBy(runDocuments.position)).map(row=>row.title);
+  return {run,input:preparePlanningInput({original:{id:message.id,text:message.parts[0].text},context,now:now.toISOString(),timezone:submission.timezone??'UTC',locale:submission.locale??null,...(files.length?{files}:{})})};
  });
  let plan;
  try{plan=validatePlan((await provider.plan(loaded.input,{signal,deadlineAt:loaded.run.deadlineAt})).plan,loaded.input,loaded.run.accountingVersion>=2?2:1);}
@@ -26,7 +28,7 @@ export async function planRun(db:AdmissionDatabase,subject:string,runId:string,s
   const failure=error instanceof PlanningError?error:new PlanningError();
   // A question the planner's model appears to have declined isn't sent on to search under a literal plan.
   const declined=failure.reason==='PROVIDER_REFUSED'||failure.reason==='OUTPUT_NOT_JSON';
-  plan=standaloneFallback(loaded.input)??(declined?null:literalQuestionPlan(loaded.input));
+  plan=standaloneFallback(loaded.input)??(declined?null:literalQuestionPlan(loaded.input)??attachedFilesPlan(loaded.input,loaded.run.mode==='DOCUMENTS'));
   recordTelemetry('research.planner_failure',{plannerFailure:failure.reason,providerHttpStatus:failure.httpStatus,plannerFallback:plan!==null});
   if(!plan)throw new AdmissionError('PROVIDER_UNAVAILABLE');
  }

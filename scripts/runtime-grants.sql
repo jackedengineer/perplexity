@@ -42,3 +42,4 @@ GRANT UPDATE (status, failure_code, embedded_count, cost_micro_usd, updated_at) 
 GRANT SELECT, INSERT ON document_chunks TO perplex_web;
 GRANT UPDATE (embedding, embedding_model, lease_until, attempts) ON document_chunks TO perplex_web;
 GRANT SELECT, INSERT, UPDATE ON document_usage TO perplex_web;
+GRANT SELECT, INSERT ON run_documents TO perplex_web;

@@ -6,7 +6,8 @@ import {freshnessTimeRange} from '@/server/search/freshness';
 export const PLANNING_VERSION="planner-v6";
 export const PLANNER_LIMITS=Object.freeze({contextMessages:6,inputBytes:MAX_SUBMISSION_BYTES,wireBytes:23000,queryCount:1,clarificationCharacters:240});
 const turn=z.strictObject({id:z.uuid(),role:z.enum(['USER','ASSISTANT']),text:questionTextSchema});
-const plannerInputShape=z.strictObject({original:z.strictObject({id:z.uuid(),text:questionTextSchema}),context:z.array(turn).max(6),now:z.iso.datetime(),timezone:timezoneSchema,locale:localeSchema.nullable()});
+// files: titles of the PDFs attached to this question. References such as "this report" mean them.
+const plannerInputShape=z.strictObject({original:z.strictObject({id:z.uuid(),text:questionTextSchema}),context:z.array(turn).max(6),now:z.iso.datetime(),timezone:timezoneSchema,locale:localeSchema.nullable(),files:z.array(z.string().min(1).max(200)).min(1).max(5).optional()});
 export const plannerInputSchema=plannerInputShape
  .refine(value=>new Set([value.original.id,...value.context.map(m=>m.id)]).size===value.context.length+1&&Buffer.byteLength(JSON.stringify(value),'utf8')<=PLANNER_LIMITS.inputBytes);
 export type PlannerInput=z.infer<typeof plannerInputSchema>;
@@ -51,17 +52,20 @@ function pricingReferenceEntity(input:PlannerInput):string|null{
 const negative=/\b(?:not|no|without|exclude|excluding|avoid|except|never|don't|doesn't)\b/giu;
 const clarificationWords=new Set('product products service services comparing mean refer referring information topic topics requirements requirement important matters matter aspect aspects options option criteria priorities priority goals goal purpose needs need looking clarify specify range location timeframe time region country currency audience case cases main budget workload constraints type detail details consider intended'.split(' '));
 function freeze<T>(value:T):T{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;}
-function requireQueryIntent(plan:Extract<QueryPlan,{action:'ANSWER'}>,original:string){
+// With attached files the files are the subject, so a question with no topic words of its
+// own ("Summarize this") is still answerable; every other constraint check still applies.
+function requireQueryIntent(plan:Extract<QueryPlan,{action:'ANSWER'}>,original:string,files=false,fileWords:Set<string>=new Set()){
  const exclusions=original.split(/[,;!?]|\.(?:\s|$)/u).flatMap(clause=>{
   const offset=clause.search(negative);return offset<0?[]:[clause.slice(offset)];
  });
  const budgets=original.match(/\b(?:budget|under|below|maximum|max|minimum|min|at most|at least|up to|less than|more than|within)\s*(?:(?:USD|INR|EUR|GBP|Rs)\s*)?[$₹€£]?\s*\d+(?:[.,]\d+)*/giu)??[];
  const material=[...exclusions,...budgets],constraintWords=new Set(material.flatMap(words));
- const topics=words(searchSubject(plan.standaloneQuestion)).filter(word=>!genericWords.has(word)&&!constraintWords.has(word)&&!/^\d/u.test(word)&&!['recommend','recommendation','best'].includes(word));
+ // Words only from a file's name aren't search topics: queries may not carry them.
+ const topics=words(searchSubject(plan.standaloneQuestion)).filter(word=>!genericWords.has(word)&&!constraintWords.has(word)&&!/^\d/u.test(word)&&!['recommend','recommendation','best'].includes(word)&&!(fileWords.has(word)&&!words(original).includes(word)));
  const queryWords=plan.retrieval.queries.map(query=>new Set(words(query))),allWords=new Set(queryWords.flatMap(set=>[...set]));
- if(!topics.length||topics.some(topic=>!allWords.has(topic)))throw new PlanningError('PLAN_QUERY_INTENT');
+ if(!topics.length&&!files||topics.some(topic=>!allWords.has(topic)))throw new PlanningError('PLAN_QUERY_INTENT');
  for(const [index,query] of plan.retrieval.queries.entries()){
-  if(!topics.some(topic=>queryWords[index].has(topic))||material.some(value=>words(value).some(word=>!queryWords[index].has(word))||[...value.matchAll(/[$₹€£]/gu)].some(match=>!query.includes(match[0]))))throw new PlanningError('PLAN_QUERY_INTENT');
+  if(topics.length&&!topics.some(topic=>queryWords[index].has(topic))||material.some(value=>words(value).some(word=>!queryWords[index].has(word))||[...value.matchAll(/[$₹€£]/gu)].some(match=>!query.includes(match[0]))))throw new PlanningError('PLAN_QUERY_INTENT');
  }
  // Subject numbers may be split (e.g. React 18 / React 19); shared budgets and
  // exclusions above stay on every query. Other original numbers remain covered.
@@ -72,12 +76,19 @@ function requireQueryIntent(plan:Extract<QueryPlan,{action:'ANSWER'}>,original:s
 export function validatePlan(value:unknown,input:unknown,maxQueries:number=PLANNER_LIMITS.queryCount):QueryPlan{
  try{
   const original=plannerInputSchema.parse(input),plan=queryPlanSchema.parse(value);
-  const resolving=hasReference(original.original.text);
+  const resolving=hasReference(original.original.text),files=original.files??[];
   const context=resolving?original.context:[];
   const users=[original.original,...context.filter(m=>m.role==='USER')];
-  const vocabulary=new Set(words([original.original.text,...context.map(m=>m.text)].join(' ')));
+  // The rewritten question may name an attached file ("aurora-water-report.pdf" gives aurora,
+  // water and report), but a search query may only use the user's own words, so a file's name
+  // never reaches web search unless the user wrote it.
+  const userVocabulary=new Set(words([original.original.text,...context.map(m=>m.text)].join(' ')));
+  const fileWords=new Set(words([...files,...files.map(file=>file.replace(/[._-]+/gu,' '))].join(' ')));
+  const vocabulary=new Set([...userVocabulary,...fileWords]);
   const userNumbers=new Set(users.flatMap(m=>numeric(m.text)));
   if(plan.action==='CLARIFY'){
+   // With attached files the question is about them; asking "which document?" would be wrong.
+   if(files.length)throw new PlanningError('PLAN_CLARIFY');
    if(standaloneFallback(original)||resolvePricingFollowup(original))throw new PlanningError('PLAN_CLARIFY');
    if(plan.question.length>240||(plan.question.match(/\?/gu)?.length??0)>1||/[\r\n]/u.test(plan.question)||!safeEvidenceText(plan.question)||/https?:|www\./iu.test(plan.question))throw new PlanningError('PLAN_CLARIFY');
    if(words(plan.question).some(word=>!vocabulary.has(word)&&!genericWords.has(word)&&!clarificationWords.has(word))||numeric(plan.question).some(n=>!userNumbers.has(n)))throw new PlanningError('PLAN_CLARIFY');
@@ -90,19 +101,25 @@ export function validatePlan(value:unknown,input:unknown,maxQueries:number=PLANN
    if(constraint.name!=='EXPLICIT'||!source||!source.text.includes(constraint.value))throw new PlanningError('PLAN_CONSTRAINT');
   }
   if(/^what about its pricing\??$/iu.test(original.original.text.trim())&&!pricingReferenceEntity(original))throw new PlanningError('PLAN_REFERENCE');
-  const derived=[plan.standaloneQuestion,...plan.retrieval.queries];
-  if(derived.some(text=>!safeEvidenceText(text)||words(text).some(word=>!vocabulary.has(word)&&!genericWords.has(word))||numeric(text).some(n=>!userNumbers.has(n))))throw new PlanningError('PLAN_VOCABULARY');
+  const outside=(text:string,allowed:Set<string>)=>!safeEvidenceText(text)||words(text).some(word=>!allowed.has(word)&&!genericWords.has(word))||numeric(text).some(n=>!userNumbers.has(n));
+  if(outside(plan.standaloneQuestion,vocabulary)||plan.retrieval.queries.some(query=>outside(query,userVocabulary)))throw new PlanningError('PLAN_VOCABULARY');
   // Rewrites cannot erase explicit negation, numeric limits or named user topics.
   const standaloneWords=new Set(words(plan.standaloneQuestion));
   const anchors=words(original.original.text).filter(w=>!genericWords.has(w));
   if(anchors.some(w=>!standaloneWords.has(w))||numeric(original.original.text).some(n=>!numeric(plan.standaloneQuestion).includes(n)))throw new PlanningError('PLAN_ANCHOR');
   for(const negation of original.original.text.match(negative)??[])if(!standaloneWords.has(negation.toLowerCase()))throw new PlanningError('PLAN_NEGATION');
   if(hasReference(original.original.text)){
-   if(!original.context.length)throw new PlanningError('PLAN_REFERENCE');
-   const previous=new Set(original.context.flatMap(m=>words(m.text)).filter(w=>!genericWords.has(w)));
-   if(!words(plan.standaloneQuestion).some(w=>previous.has(w))||hasReference(plan.standaloneQuestion))throw new PlanningError('PLAN_REFERENCE');
+   if(!files.length){
+    if(!original.context.length)throw new PlanningError('PLAN_REFERENCE');
+    const previous=new Set(original.context.flatMap(m=>words(m.text)).filter(w=>!genericWords.has(w)));
+    if(!words(plan.standaloneQuestion).some(w=>previous.has(w))||hasReference(plan.standaloneQuestion))throw new PlanningError('PLAN_REFERENCE');
+   }else if(original.context.length){
+    // A follow-up with files may mean the files or an earlier turn; it must resolve to one of them.
+    const previous=new Set([...original.context.flatMap(m=>words(m.text)),...fileWords].filter(w=>!genericWords.has(w)));
+    if(!words(plan.standaloneQuestion).some(w=>previous.has(w)))throw new PlanningError('PLAN_REFERENCE');
+   }
   }
-  requireQueryIntent(plan,original.original.text);
+  requireQueryIntent(plan,original.original.text,files.length>0,fileWords);
   if(plan.retrieval.freshness==='RECENT'&&!freshnessTimeRange(users.map(m=>m.text).join(' ')))throw new PlanningError('PLAN_FRESHNESS');
   if(plan.retrieval.freshness==='SPECIFIC_RANGE'&&![plan.retrieval.startDate,plan.retrieval.endDate].every(date=>users.some(m=>m.text.includes(date!))))throw new PlanningError('PLAN_FRESHNESS');
   return freeze(plan);
@@ -134,6 +151,22 @@ export function literalQuestionPlan(value:unknown):QueryPlan|null{
  }catch{return null;}
 }
 
+// With attached files, the user's exact words are a safe plan when nothing but their own files
+// is searched (filesOnly), or on a conversation's first question, where "this report" can only
+// mean the files. Like literalQuestionPlan, it never guesses at a follow-up that reaches the web.
+export function attachedFilesPlan(value:unknown,filesOnly:boolean):QueryPlan|null{
+ try{
+  const input=plannerInputSchema.parse(value);
+  if(!input.files?.length||input.original.text.length>300||input.context.length&&!filesOnly)return null;
+  return exactOriginalPlan(input,'RESEARCH');
+ }catch{return null;}
+}
+// Whether a query has anything to search the web for. "Summarize this" doesn't: with files
+// attached it is about them, so a Web question like it searches only the files.
+export function hasSearchTopic(query:string){
+ return words(searchSubject(query)).some(word=>!genericWords.has(word)&&!/^\d/u.test(word)&&!['recommend','recommendation','best'].includes(word));
+}
+
 // A deliberately narrow local planning rule, not semantic memory or a fallback
 // after an unknown model call: one literal USER topic and one exact pricing follow-up.
 export function resolvePricingFollowup(value:unknown):QueryPlan|null{
@@ -152,6 +185,7 @@ export function resolvePricingFollowup(value:unknown):QueryPlan|null{
 export function clarifyUnresolvedReference(value:unknown):QueryPlan|null{
  try{
   const input=plannerInputSchema.parse(value);
+  if(input.files?.length)return null;
   if(input.context.length){
    if(!/^(?:what|how) about its pricing\??$/iu.test(input.original.text.trim())||pricingReferenceEntity(input))return null;
    return queryPlanSchema.parse({action:'CLARIFY',question:'Which product or service do you mean?',reasonCode:'AMBIGUOUS_REFERENCE'});

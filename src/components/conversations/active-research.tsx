@@ -5,8 +5,8 @@ import type { Conversation,HistoryPage } from "@/server/conversations/views";
 import type { PendingQuestion } from "./question-intent";
 import { useResearch } from "./use-research";
 import { ThreadView } from "./thread-view";
-export default function ActiveResearch({conversation,initial,question,runId,onFollowUp}: {conversation:Conversation;initial:HistoryPage;question?:PendingQuestion&{expectedRevision?:number};runId?:string;onFollowUp:(text:string,expectedRevision?:number,options?:RevisionOptions)=>void}) {
+export default function ActiveResearch({conversation,initial,question,runId,onFollowUp,attachments,onAttachments}: {conversation:Conversation;initial:HistoryPage;question?:PendingQuestion&{expectedRevision?:number};runId?:string;onFollowUp:(text:string,expectedRevision?:number,options?:RevisionOptions)=>void;attachments:string[];onAttachments:(ids:string[])=>void}) {
   const research=useResearch(conversation.id,question?.expectedRevision??conversation.revision,question?undefined:runId),{submit,recover}=research,launched=useRef(false);
-  useEffect(()=>{let disposed=false;queueMicrotask(()=>{if(!disposed&&!launched.current){launched.current=true;if(question)void submit(question.text,question.clientRequestId,question.modelKey,question.mode);else void recover();}});return()=>{disposed=true;};},[question,submit,recover]);
-  return <ThreadView conversation={conversation} initial={initial} research={research} submit={(text,options)=>onFollowUp(text,research.revision,options)}/>;
+  useEffect(()=>{let disposed=false;queueMicrotask(()=>{if(!disposed&&!launched.current){launched.current=true;if(question)void submit(question.text,question.clientRequestId,question.modelKey,question.mode,question.documentIds);else void recover();}});return()=>{disposed=true;};},[question,submit,recover]);
+  return <ThreadView conversation={conversation} initial={initial} research={research} askedWith={question?.documentIds} attachments={attachments} onAttachments={onAttachments} submit={(text,options)=>onFollowUp(text,research.revision,options)}/>;
 }

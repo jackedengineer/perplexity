@@ -7,24 +7,25 @@ const listSchema=z.object({data:z.array(documentSchema),limits:z.object({maxDocu
 const errorSchema=z.object({error:z.object({message:z.string()})});
 export type UserDocument=z.infer<typeof documentSchema>;
 type Limits=z.infer<typeof listSchema>['limits'];
+export type UploadResult={document:UserDocument}|{error:string};
 type DocumentsState={enabled:boolean;documents:UserDocument[];limits:Limits|null;loaded:boolean;error:string;refresh:()=>void;
-  upload:(file:File)=>Promise<string|null>;remove:(id:string)=>Promise<string|null>};
-const Documents=createContext<DocumentsState>({enabled:false,documents:[],limits:null,loaded:false,error:'',refresh:()=>{},upload:async()=>null,remove:async()=>null});
+  upload:(file:File)=>Promise<UploadResult>;remove:(id:string)=>Promise<string|null>};
+const Documents=createContext<DocumentsState>({enabled:false,documents:[],limits:null,loaded:false,error:'',refresh:()=>{},upload:async()=>({error:'Your files are temporarily unavailable. Please try again.'}),remove:async()=>null});
 const FALLBACK_MESSAGE='Your files are temporarily unavailable. Please try again.';
 async function failure(response:Response){
   try{return errorSchema.parse(await response.json()).error.message;}catch{return FALLBACK_MESSAGE;}
 }
 
-// One list shared by the composer and the files dialog. It polls only while a file is
-// still being prepared, and only while Files mode is in use.
-export function DocumentsProvider({enabled,active,children}:{enabled:boolean;active:boolean;children:ReactNode}){
+// One list shared by the composer, its attach menu and the files dialog. It loads once
+// the feature is available and polls only while a file is still being prepared.
+export function DocumentsProvider({enabled,children}:{enabled:boolean;children:ReactNode}){
   const [documents,setDocuments]=useState<UserDocument[]>([]),[limits,setLimits]=useState<Limits|null>(null);
   const [loaded,setLoaded]=useState(false),[error,setError]=useState(''),[version,setVersion]=useState(0);
   const refresh=useCallback(()=>setVersion(v=>v+1),[]);
   const live=useRef(true);
   useEffect(()=>()=>{live.current=false;},[]);
   useEffect(()=>{
-    if(!enabled||!active)return;
+    if(!enabled)return;
     const abort=new AbortController();
     void (async()=>{try{
       const response=await fetch('/api/documents',{credentials:'same-origin',cache:'no-store',signal:AbortSignal.any([abort.signal,AbortSignal.timeout(8000)])});
@@ -34,20 +35,23 @@ export function DocumentsProvider({enabled,active,children}:{enabled:boolean;act
       setDocuments(result.data);setLimits(result.limits);setError('');setLoaded(true);
     }catch(problem){if(!abort.signal.aborted){setError(problem instanceof Error&&problem.message?problem.message:FALLBACK_MESSAGE);setLoaded(true);}}})();
     return()=>abort.abort();
-  },[enabled,active,version]);
+  },[enabled,version]);
   const preparing=documents.some(document=>document.status==='PROCESSING');
   useEffect(()=>{
-    if(!enabled||!active||!preparing)return;
+    if(!enabled||!preparing)return;
     const timer=setInterval(refresh,3000);
     return()=>clearInterval(timer);
-  },[enabled,active,preparing,refresh]);
+  },[enabled,preparing,refresh]);
   const upload=useCallback(async(file:File)=>{
     try{
       const response=await fetch('/api/documents',{method:'POST',credentials:'same-origin',body:file,
         headers:{'Content-Type':'application/pdf','X-File-Name':encodeURIComponent(file.name)}});
-      if(!response.ok)return await failure(response);
-      refresh();return null;
-    }catch{return FALLBACK_MESSAGE;}
+      if(!response.ok)return {error:await failure(response)};
+      const {data}=z.object({data:documentSchema}).parse(await response.json());
+      // Shown at once, so its chip has a title before the list refreshes.
+      if(live.current)setDocuments(current=>[data,...current.filter(document=>document.id!==data.id)]);
+      refresh();return {document:data};
+    }catch{return {error:FALLBACK_MESSAGE};}
   },[refresh]);
   const remove=useCallback(async(id:string)=>{
     try{
@@ -60,4 +64,4 @@ export function DocumentsProvider({enabled,active,children}:{enabled:boolean;act
   return <Documents.Provider value={{enabled,documents,limits,loaded,error,refresh,upload,remove}}>{children}</Documents.Provider>;
 }
 export const useDocuments=()=>useContext(Documents);
-export const readyDocuments=(documents:UserDocument[])=>documents.filter(document=>document.status==='READY').length;
+

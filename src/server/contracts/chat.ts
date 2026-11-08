@@ -1,7 +1,10 @@
 import { z } from "zod";
 
-// FAST is the Web mode; DOCUMENTS answers from the signed-in user's own uploaded files.
+// FAST is the Web mode. DOCUMENTS answers only from the signed-in user's own files: the
+// browser sends CHAT with attached files, and admission records the run as DOCUMENTS.
 export const RUN_MODES = ["FAST","CHAT","DOCUMENTS"] as const;
+// Files attached to one question. Order is kept so the composer and history show them as sent.
+export const MAX_ATTACHED_DOCUMENTS = 5;
 export type RunMode = typeof RUN_MODES[number];
 export const CONTRACT_VERSION = 1;
 export const MAX_SUBMISSION_BYTES = 16_384; // Enforce while reading HTTP bytes, before JSON parsing (T05).
@@ -25,5 +28,7 @@ export const submissionSchema = z.strictObject({
   message: z.strictObject({ text: questionTextSchema }),
   mode: z.enum(RUN_MODES), modelKey: z.enum([FAST_MODEL_KEY,"economy-nano","economy-mistral","economy-qwen","economy-gemini","standard-deepseek","standard-gemini-flash","standard-qwen-max","standard-qwen-397b"]),
   locale: localeSchema.optional(), timezone: timezoneSchema.optional(),
+  documentIds: z.array(z.uuid()).min(1).max(MAX_ATTACHED_DOCUMENTS)
+    .refine((ids) => new Set(ids.map((id) => id.toLowerCase())).size === ids.length).optional(),
 });
 export type SubmitQuery = z.infer<typeof submissionSchema>;

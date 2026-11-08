@@ -3,7 +3,7 @@ import type { RunMode } from "@/server/contracts/chat";
 import {EXTENDED_RUN_RESERVE} from './budgets';
 import { prepareEntitlement } from "@/server/billing/entitlements";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { ACTIVE_RUN_STATUSES, appUsers, conversations, runs, usageReservations } from "@/db/schema";
+import { ACTIVE_RUN_STATUSES, appUsers, conversations, documents, runDocuments, runs, usageReservations } from "@/db/schema";
 import { submissionSchema } from "@/server/contracts/chat";
 import type { PublicErrorCode } from "@/server/contracts/errors";
 import { AdmissionError } from "./errors";
@@ -21,7 +21,7 @@ const denied = (code: PublicErrorCode): AdmissionResult => ({ kind: "DENIED", co
 const isActive = (status: Run["status"]) => ACTIVE_RUN_STATUSES.some((value)=>value === status);
 
 // Internal API: authSubject comes only from the verified application session, never from a body.
-export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, policyInput: unknown = FREE_ADMISSION_POLICY,assertNewRunAvailable?:(modelKey:string,mode:RunMode)=>void,entitlements=false) {
+export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, policyInput: unknown = FREE_ADMISSION_POLICY,assertNewRunAvailable?:(modelKey:string,mode:RunMode,attachments:boolean)=>void,entitlements=false) {
   const config = parseAdmissionConfig(configInput);
   const parsedPolicy = admissionPolicySchema.safeParse(policyInput);
   if (!parsedPolicy.success) throw new AdmissionError("CONFIGURATION_UNAVAILABLE");
@@ -31,6 +31,9 @@ export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, 
       const parsed = submissionSchema.safeParse(input);
       if (!parsed.success) throw new AdmissionError("INVALID_INPUT");
       const request = parsed.data;
+      const attached = request.documentIds ?? [];
+      // Chat with files answers only from those files; Web with files also searches the web.
+      const mode: RunMode = attached.length && request.mode === "CHAT" ? "DOCUMENTS" : request.mode;
       return db.transaction(async (tx) => {
         let policy = basePolicy, carryPeriod = 0, carryDay = 0;
         await tx.execute(sql`SET LOCAL lock_timeout = '2s'`);
@@ -47,7 +50,7 @@ export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, 
         }
         // Synchronous configuration checks only; replay/recovery never needs a provider.
         // Keep this before counters/reservations and never perform network I/O under the lock.
-        try { assertNewRunAvailable?.(request.modelKey,request.mode); }
+        try { assertNewRunAvailable?.(request.modelKey,mode,attached.length>0); }
         catch(error) { if(error instanceof AdmissionError)return denied(error.code);throw error; }
         const [{ now }] = await tx.select({ now: sql<string>`clock_timestamp()::text`.mapWith((value) => new Date(value)) }).from(appUsers).where(eq(appUsers.id,owner.id));
         if(entitlements) {
@@ -57,6 +60,13 @@ export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, 
         const extended=extendedAnswerBudget(request.modelKey);
         if(extended)policy={...policy,providerReserveMicroUsd:policy.providerReserveMicroUsd>EXTENDED_RUN_RESERVE?policy.providerReserveMicroUsd:EXTENDED_RUN_RESERVE,
           catalogVersion:'trials-v2',priceVersion:'credits-v2'};
+        if (attached.length) {
+          // Only the owner's READY files: a file still being prepared has no searchable text yet.
+          // KEY SHARE holds off a concurrent delete until this admission commits its rows.
+          const ready = await tx.select({ id: documents.id }).from(documents)
+            .where(and(eq(documents.userId,owner.id),inArray(documents.id,attached),eq(documents.status,"READY"))).for("key share");
+          if (ready.length !== attached.length) return denied("DOCUMENT_NOT_READY");
+        }
         if (!await consumeAttempts(tx,owner.id,now,policy)) return denied("RATE_LIMITED");
         // Expected denials roll back this savepoint, retaining only the consumed attempt counters.
         try {
@@ -72,7 +82,7 @@ export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, 
             const [run] = await reserve.insert(runs).values({
               accountingVersion: extended?3:2, userId: owner.id, conversationId: conversation.id, clientRequestId: request.clientRequestId,
               payloadHmac: fingerprint.hmac, hmacKeyId: fingerprint.keyId, payloadVersion: fingerprint.version,
-              mode: request.mode, modelKey: request.modelKey, policyVersion: policy.policyVersion,
+              mode, modelKey: request.modelKey, policyVersion: policy.policyVersion,
               catalogVersion: policy.catalogVersion, priceVersion: policy.priceVersion, entitlementVersion: snapshot.entitlementVersion,
               operatorBudgetKey: policy.operatorBudgetKey, answerCredits: policy.answerCredits, providerReserveMicroUsd: policy.providerReserveMicroUsd,
               admittedRevision: conversation.revision+1, deadlineAt: new Date(now.getTime()+policy.deadlineMs), createdAt: now, updatedAt: now,
@@ -81,6 +91,7 @@ export function createRunAdmission(db: AdmissionDatabase, configInput: unknown, 
               periodBucketId: budgets.period.id, dayBucketId: budgets.day.id,
               operatorPeriodBucketId: budgets.operatorPeriod.id, operatorDayBucketId: budgets.operatorDay.id,
               answerCredits: policy.answerCredits, providerReserveMicroUsd: policy.providerReserveMicroUsd, createdAt: now });
+            if (attached.length) await reserve.insert(runDocuments).values(attached.map((documentId,position)=>({ runId: run.id, documentId, userId: owner.id, position })));
             await reserve.update(conversations).set({ revision: run.admittedRevision, updatedAt: now }).where(and(eq(conversations.id,conversation.id),eq(conversations.userId,owner.id)));
             return { kind: "ADMITTED", run: reference(run) };
           });
