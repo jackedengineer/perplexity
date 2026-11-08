@@ -87,3 +87,38 @@ describe("embedding client", () => {
     expect(embeddingCapMicroUsd(["é".repeat(1000)])).toBe(41n);
   });
 });
+
+describe("abuse resistance", () => {
+  it("refuses a tiny PDF that expands into millions of characters, quickly", async () => {
+    const { compressedTextPdf } = await import("../helpers/documents");
+    const bomb = compressedTextPdf(Array.from({ length: 3 }, () => "A".repeat(1_000_000)));
+    expect(bomb.length).toBeLessThan(20_000);
+    const started = performance.now();
+    await expect(parsePdf(bomb)).rejects.toMatchObject({ code: "DOCUMENT_TOO_LARGE" });
+    expect(performance.now() - started).toBeLessThan(5_000);
+  });
+  it("stops at the whole-file character budget across many modest pages", async () => {
+    const { compressedTextPdf } = await import("../helpers/documents");
+    const pages = compressedTextPdf(Array.from({ length: 4 }, () => "Word ".repeat(1_000)), 100);
+    await expect(parsePdf(pages)).rejects.toMatchObject({ code: "DOCUMENT_TOO_LARGE" });
+    const fine = compressedTextPdf(["Turbidity was 0.37 NTU in the third quarter."], 2);
+    expect((await parsePdf(fine)).pages).toHaveLength(2);
+  });
+  it("chunks a very long unbroken run in linear time", () => {
+    const started = performance.now();
+    const chunks = chunkPages(["x".repeat(2_000_000)]);
+    expect(performance.now() - started).toBeLessThan(2_000);
+    expect(chunks.every(chunk => chunk.text.length <= DOCUMENT_LIMITS.chunkCharacters)).toBe(true);
+    expect(chunks.reduce((total, chunk) => total + chunk.text.length, 0)).toBe(2_000_000);
+  });
+});
+
+it("bounds the embedded question to 4,000 UTF-8 bytes on a character boundary", async () => {
+  const { boundedQuestion } = await import("@/server/documents/retrieve");
+  expect(boundedQuestion("short")).toBe("short");
+  const tamil = "தமிழ்".repeat(1000);
+  const bounded = boundedQuestion(tamil);
+  expect(new TextEncoder().encode(bounded).length).toBeLessThanOrEqual(4000);
+  expect(tamil.startsWith(bounded)).toBe(true);
+  expect(embeddingCapMicroUsd([bounded])).toBeLessThanOrEqual(100n);
+});

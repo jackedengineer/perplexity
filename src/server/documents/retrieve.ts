@@ -57,6 +57,20 @@ export function documentPageUrl(documentId: string, page: number) {
   return `${DOCUMENT_LINK_ORIGIN}/documents/${documentId}?page=${page}`;
 }
 
+// A token is at least one UTF-8 byte, so 4,000 bytes stay under the query embedding's
+// 100 microUSD cap (5,000 tokens) whatever the language. Truncates on a code point.
+export function boundedQuestion(text: string, maxBytes = 4000) {
+  const encoder = new TextEncoder();
+  if (encoder.encode(text).length <= maxBytes) return text;
+  let result = "", bytes = 0;
+  for (const character of text) {
+    const size = encoder.encode(character).length;
+    if (bytes + size > maxBytes) break;
+    result += character; bytes += size;
+  }
+  return result;
+}
+
 export type DocumentFinder = {
   readonly modelId: string;
   find(input: { ownerId: string; question: string; queries: string[] }, options: { signal: AbortSignal }): Promise<RankedResult[]>;
@@ -68,7 +82,7 @@ export function createDocumentFinder(db: AdmissionDatabase, embedder: EmbeddingP
   return {
     modelId: embedder.modelId,
     async find({ ownerId, question, queries }, options) {
-      const { vectors: [vector] } = await embedder.embed([question], options.signal);
+      const { vectors: [vector] } = await embedder.embed([boundedQuestion(question)], options.signal);
       const matches = await searchDocuments(db, ownerId, { text: [question, ...queries].join(" "), vector });
       const seen = new Set<string>(), results: RankedResult[] = [], retrievedAt = new Date().toISOString();
       for (const match of matches) {

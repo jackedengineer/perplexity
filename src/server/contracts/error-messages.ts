@@ -23,4 +23,5 @@ export const PUBLIC_ERRORS = {
   DOCUMENT_TOO_LARGE: [413, "PDFs can be up to 10 MB and 300 pages."],
   DOCUMENT_UNREADABLE: [422, "We couldn’t read text from this PDF. Scanned and password-protected files aren’t supported yet."],
   DOCUMENT_LIMIT_REACHED: [409, "You’ve reached the 20-file limit. Delete a file to upload another."],
+  DOCUMENT_DAILY_LIMIT: [429, "You’ve reached today’s upload allowance. Try again tomorrow."],
 } as const;

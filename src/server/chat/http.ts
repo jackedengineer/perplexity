@@ -15,7 +15,7 @@ const categories:Record<PublicErrorCode|'COMPLETED',OutcomeCategory>={
   COMPLETED:'success',RATE_LIMITED:'rate',BUDGET_EXCEEDED:'quota',DEADLINE_EXCEEDED:'deadline',REQUEST_TIMEOUT:'deadline',
   INPUT_BLOCKED:'policy',OUTPUT_BLOCKED:'policy',SAFETY_UNAVAILABLE:'infrastructure',PROVIDER_UNAVAILABLE:'infrastructure',CONFIGURATION_UNAVAILABLE:'infrastructure',
   UNAUTHENTICATED:'access',INVALID_ORIGIN:'access',NOT_FOUND:'access',CONFLICT:'state',RUN_IN_PROGRESS:'state',RUN_ALREADY_FINISHED:'state',
-  MALFORMED_JSON:'validation',DOCUMENT_UNSUPPORTED:'validation',DOCUMENT_TOO_LARGE:'validation',DOCUMENT_UNREADABLE:'validation',DOCUMENT_LIMIT_REACHED:'quota',TOO_LARGE:'validation',UNSUPPORTED_MEDIA_TYPE:'validation',INVALID_INPUT:'validation',IDEMPOTENCY_MISMATCH:'validation',
+  MALFORMED_JSON:'validation',DOCUMENT_UNSUPPORTED:'validation',DOCUMENT_TOO_LARGE:'validation',DOCUMENT_UNREADABLE:'validation',DOCUMENT_LIMIT_REACHED:'quota',DOCUMENT_DAILY_LIMIT:'quota',TOO_LARGE:'validation',UNSUPPORTED_MEDIA_TYPE:'validation',INVALID_INPUT:'validation',IDEMPOTENCY_MISMATCH:'validation',
 };
 export type ChatBackend = {
   admit(subject: string,input: SubmitQuery): Promise<AdmissionResult>;

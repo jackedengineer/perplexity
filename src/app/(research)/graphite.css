@@ -213,6 +213,7 @@ body:has(.research-shell) { background: #191919; }
 .files-actions .files-limits { font-size: 12px; flex: 1 1 220px; }
 .files-feedback { min-height: 18px; font-size: 12px; color: var(--r-muted); }
 .files-error { margin: 4px 0 8px; color: #f0a8a8; font-size: 13px; }
+.files-error p { margin: 0 0 4px; }
 .files-empty { padding: 24px 0 8px; text-align: center; }
 .files-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: min(50vh, 420px); overflow-y: auto; border-top: 1px solid var(--r-line); }
 .file-row { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 0; border-bottom: 1px solid var(--r-line); color: var(--r-muted); }

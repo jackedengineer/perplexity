@@ -49,7 +49,7 @@ export const documentsHttp = createDocumentsHttp({
   identity: getCurrentSession,
   origin: () => getServerEnv().BETTER_AUTH_URL,
   enabled: documentsEnabled,
-  consumeRequest: subject => createRequestLimiter(getDb(), "documents-upload-v1", { userMinute: 10, userDay: 60, anonymousMinute: 1, anonymousDay: 1 }).consume(subject),
+  consumeRequest: subject => createRequestLimiter(getDb(), "documents-upload-v1", { userMinute: 10, userDay: 60, anonymousMinute: 1, anonymousDay: 1 }).consume("documents:" + subject),
   backend: documentService,
   afterUpload: documentId => after(() => embedSoon(documentId)),
   log: event => console.info(JSON.stringify(event)),

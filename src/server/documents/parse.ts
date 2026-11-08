@@ -1,4 +1,4 @@
-import { extractText, getDocumentProxy } from "unpdf";
+import { getDocumentProxy } from "unpdf";
 import { DOCUMENT_LIMITS, DocumentError } from "./limits";
 
 const PDF_SIGNATURE = [0x25, 0x50, 0x44, 0x46, 0x2d]; // "%PDF-"
@@ -22,10 +22,12 @@ export function normalizePageText(text: string) {
     .split("\n").map(line => line.replace(/[^\S\n]+/gu, " ").trim()).filter(Boolean).join("\n");
 }
 
-export type ParsedPdf = { pages: string[] };
+type TextItem = { str?: string; hasEOL?: boolean };
+export type ParsedPdf = { pages: string[]; characters: number };
 
-// Text-based PDFs only. Scanned, encrypted and malformed files are rejected with one
-// public code; the reason is not exposed beyond that.
+// Text-based PDFs only. Pages are read one at a time against a running budget, so a tiny
+// file that expands into millions of characters is refused after the first oversized page
+// instead of exhausting the Worker. Scanned, encrypted and malformed files are rejected.
 export async function parsePdf(bytes: Uint8Array): Promise<ParsedPdf> {
   if (!hasPdfSignature(bytes)) throw new DocumentError("DOCUMENT_UNSUPPORTED");
   let pdf: Awaited<ReturnType<typeof getDocumentProxy>> | undefined;
@@ -33,11 +35,31 @@ export async function parsePdf(bytes: Uint8Array): Promise<ParsedPdf> {
     // pdf.js may detach the buffer it is given, so it gets a copy.
     pdf = await getDocumentProxy(new Uint8Array(bytes));
     if (pdf.numPages > DOCUMENT_LIMITS.maxPages) throw new DocumentError("DOCUMENT_TOO_LARGE");
-    const { text } = await extractText(pdf, { mergePages: false });
-    const pages = text.map(normalizePageText);
-    const characters = pages.reduce((total, page) => total + page.length, 0);
+    const pages: string[] = [];
+    let characters = 0;
+    for (let number = 1; number <= pdf.numPages; number++) {
+      const page = await pdf.getPage(number);
+      // Streamed, so reading stops as soon as one page passes its budget.
+      const reader = page.streamTextContent().getReader() as ReadableStreamDefaultReader<{ items: TextItem[] }>;
+      let raw = "";
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          for (const item of value.items) raw += (item.str ?? "") + (item.hasEOL ? "\n" : "");
+          if (raw.length > DOCUMENT_LIMITS.maxPageCharacters * 2) throw new DocumentError("DOCUMENT_TOO_LARGE");
+        }
+      } finally {
+        await reader.cancel().catch(() => undefined);
+        page.cleanup();
+      }
+      const text = normalizePageText(raw);
+      characters += text.length;
+      if (text.length > DOCUMENT_LIMITS.maxPageCharacters || characters > DOCUMENT_LIMITS.maxCharacters) throw new DocumentError("DOCUMENT_TOO_LARGE");
+      pages.push(text);
+    }
     if (!pages.length || characters < Math.max(DOCUMENT_LIMITS.minimumCharactersPerPage * pages.length, 40)) throw new DocumentError("DOCUMENT_UNREADABLE");
-    return { pages };
+    return { pages, characters };
   } catch (error) {
     if (error instanceof DocumentError) throw error;
     throw new DocumentError("DOCUMENT_UNREADABLE");

@@ -9,16 +9,20 @@ function units(page: string): Unit[] {
     .map((text, index) => ({ text, separator: index === 0 ? "\n" as const : " " as const })));
 }
 
-// Splits one overlong unit at whitespace where possible, never mid-surrogate.
+// Splits one overlong unit at whitespace where possible, never mid-surrogate. Linear in the
+// unit's length: the code points are materialised once and walked with an index.
 function pieces(text: string, size: number) {
-  const result: string[] = [];
-  let rest = text;
-  while ([...rest].length > size) {
-    const window = [...rest].slice(0, size).join("");
-    const cut = window.lastIndexOf(" ") > size / 2 ? window.lastIndexOf(" ") : window.length;
-    result.push(rest.slice(0, cut).trim());
-    rest = rest.slice(cut).trim();
+  const points = [...text], result: string[] = [];
+  let start = 0;
+  while (points.length - start > size) {
+    let cut = start + size;
+    for (let i = start + size - 1; i > start + size / 2; i--) if (points[i] === " ") { cut = i; break; }
+    const piece = points.slice(start, cut).join("").trim();
+    if (piece) result.push(piece);
+    start = cut;
+    while (start < points.length && points[start] === " ") start++;
   }
+  const rest = points.slice(start).join("").trim();
   if (rest) result.push(rest);
   return result;
 }
@@ -31,23 +35,27 @@ export function chunkPages(pages: string[], size: number = DOCUMENT_LIMITS.chunk
   const chunks: DocumentChunk[] = [];
   pages.forEach((pageText, index) => {
     const page = index + 1;
-    let current: Unit[] = [];
+    let current: Unit[] = [], length = 0;
     const flush = () => {
       const text = joined(current).trim();
       if (text) chunks.push({ ordinal: chunks.length, page, text });
     };
     for (const unit of units(pageText).flatMap(unit => pieces(unit.text, size).map((text, i) => ({ text, separator: i === 0 ? unit.separator : " " as const })))) {
-      if (current.length && joined([...current, unit]).length > size) {
+      if (current.length && length + 1 + unit.text.length > size) {
         flush();
         // Carry trailing units up to the overlap budget into the next chunk.
         const carried: Unit[] = [];
-        for (const previous of [...current].reverse()) {
-          if (joined([previous, ...carried]).length > overlap) break;
-          carried.unshift(previous);
+        let carriedLength = 0;
+        for (let i = current.length - 1; i >= 0; i--) {
+          if (carriedLength + current[i].text.length + (carried.length ? 1 : 0) > overlap) break;
+          carriedLength += current[i].text.length + (carried.length ? 1 : 0);
+          carried.unshift(current[i]);
         }
         // Overlap never pushes a chunk past its size limit.
-        current = joined([...carried, unit]).length > size ? [] : carried;
+        current = carriedLength + 1 + unit.text.length > size ? [] : carried;
+        length = current.length ? carriedLength : 0;
       }
+      length += (current.length ? 1 : 0) + unit.text.length;
       current.push(unit);
     }
     flush();

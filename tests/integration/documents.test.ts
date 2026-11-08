@@ -9,7 +9,7 @@ import { createDocumentService } from "@/server/documents/service";
 import { createDocumentsHttp } from "@/server/documents/http";
 import { createMemoryDocumentStore } from "@/server/documents/storage";
 import { DOCUMENT_LIMITS } from "@/server/documents/limits";
-import { fakeEmbeddings, fixturePdf } from "../helpers/documents";
+import { fakeEmbeddings, fixturePdf, lexicalVector } from "../helpers/documents";
 
 const pg = new PGlite(), db = drizzle(pg, { schema });
 const budgetKey = "documents-test";
@@ -176,5 +176,66 @@ describe("HTTP", () => {
     expect((await http.remove(new Request(`${origin}/api/documents/${data.id}`, { method: "DELETE", headers: { origin } }), data.id)).status).toBe(204);
     expect((await http.remove(new Request(`${origin}/api/documents/x`, { method: "DELETE", headers: { origin } }), "not-a-uuid")).status).toBe(404);
     expect((await http.file(new Request(`${origin}/api/documents/${data.id}/file`), data.id)).status).toBe(404);
+  });
+});
+
+describe("review hardening", () => {
+  const ownerOf = async (subject: string) => (await db.select().from(schema.appUsers).where(eq(schema.appUsers.authSubject, subject)))[0].id;
+  it("enforces a daily character allowance that deleting a file doesn't refund", async () => {
+    const subject = await person(), owner = await ownerOf(subject);
+    const today = new Date().toISOString().slice(0, 10);
+    await db.insert(schema.documentUsage).values({ userId: owner, day: today, characters: DOCUMENT_LIMITS.dailyCharacters - 100 });
+    await expect(service.upload(subject, { title: "w.pdf", bytes: await fixturePdf("water-report") })).rejects.toMatchObject({ code: "DOCUMENT_DAILY_LIMIT" });
+    expect(store.keys()).toHaveLength(0);
+    await db.update(schema.documentUsage).set({ characters: 1 });
+    const { document } = await service.upload(subject, { title: "w.pdf", bytes: await fixturePdf("water-report") });
+    const [usage] = await db.select().from(schema.documentUsage);
+    expect(usage.characters).toBeGreaterThan(300);
+    await service.remove(subject, document.id);
+    expect((await db.select().from(schema.documentUsage))[0].characters).toBe(usage.characters);
+  });
+  it("never embeds below the research floor, so uploads can't pause research", async () => {
+    const subject = await person();
+    await service.upload(subject, { title: "t.pdf", bytes: await fixturePdf("budget-table") });
+    // 100,001 left: enough for the batch alone, not for the batch plus the 100,000 floor.
+    await db.update(schema.operatorUsageBuckets).set({ settledProviderMicroUsd: 899_999n });
+    const provider = fakeEmbeddings();
+    expect(await embedAll(provider)).toEqual({ embedded: 0, failed: 0 });
+    expect(provider.calls).toHaveLength(0);
+    await db.update(schema.operatorUsageBuckets).set({ settledProviderMicroUsd: 0n });
+    expect((await embedAll(provider)).embedded).toBeGreaterThan(0);
+  });
+  it("fails a document whose attempts ran out while its workers were killed mid-batch", async () => {
+    const subject = await person();
+    await service.upload(subject, { title: "t.pdf", bytes: await fixturePdf("budget-table") });
+    await db.update(schema.documentChunks).set({ attempts: DOCUMENT_LIMITS.embeddingAttempts, leaseUntil: new Date(Date.now() - 1000) });
+    expect(await embedAll()).toEqual({ embedded: 0, failed: 0 });
+    expect((await service.list(subject))[0]).toMatchObject({ status: "FAILED", failure: "EMBEDDING_FAILED" });
+  });
+  it("leaves a live lease alone even when its attempts are spent", async () => {
+    const subject = await person();
+    await service.upload(subject, { title: "t.pdf", bytes: await fixturePdf("budget-table") });
+    await db.update(schema.documentChunks).set({ attempts: DOCUMENT_LIMITS.embeddingAttempts, leaseUntil: new Date(Date.now() + 60_000) });
+    await embedAll();
+    expect((await service.list(subject))[0].status).toBe("PROCESSING");
+  });
+  it("counts only vectors it actually wrote when another worker got there first", async () => {
+    const subject = await person();
+    const { document } = await service.upload(subject, { title: "w.pdf", bytes: await fixturePdf("water-report") });
+    const chunks = await db.select().from(schema.documentChunks).orderBy(schema.documentChunks.ordinal);
+    const late = fakeEmbeddings();
+    // While this worker waits on the provider, another one embeds the first chunk.
+    const original = late.embed.bind(late);
+    late.embed = async (texts, signal) => {
+      await db.update(schema.documentChunks).set({ embedding: lexicalVector("other"), embeddingModel: "other-worker" }).where(eq(schema.documentChunks.id, chunks[0].id));
+      await db.update(schema.documents).set({ embeddedCount: 1 }).where(eq(schema.documents.id, document.id));
+      return original(texts, signal);
+    };
+    const outcome = await service.embedPending(late, { deadline: performance.now() + 20_000 });
+    expect(outcome).toEqual({ embedded: chunks.length, failed: 0 });
+    const [row] = await db.select().from(schema.documents).where(eq(schema.documents.id, document.id));
+    // Each vector is counted once, by the worker that wrote it, so the total matches and the file is READY.
+    expect(row).toMatchObject({ embeddedCount: chunks.length, status: "READY" });
+    expect((await db.select().from(schema.documentChunks).where(eq(schema.documentChunks.id, chunks[0].id)))[0].embeddingModel).toBe("other-worker");
   });
 });

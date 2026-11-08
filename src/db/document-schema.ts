@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { bigint, check, customType, foreignKey, index, integer, pgTable, text, timestamp, uniqueIndex, uuid, varchar, vector } from "drizzle-orm/pg-core";
+import { bigint, check, customType, date, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, varchar, vector } from "drizzle-orm/pg-core";
 import { appUsers } from "./conversation-schema";
 const instant = (name: string) => timestamp(name,{ withTimezone: true,precision: 3 });
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
@@ -51,4 +51,15 @@ export const documentChunks = pgTable("document_chunks",{
   index("document_chunks_pending_idx").on(t.documentId).where(sql`${t.embedding} IS NULL`),
   index("document_chunks_search_idx").using("gin",t.searchText),
   check("document_chunk_valid",sql`${t.ordinal} >= 0 AND ${t.page} >= 1 AND length(${t.text}) BETWEEN 1 AND 1000 AND length(trim(${t.text})) > 0 AND (${t.embedding} IS NULL) = (${t.embeddingModel} IS NULL) AND ${t.attempts} BETWEEN 0 AND 10`),
+]);
+
+// Characters accepted per user per UTC day. Counted when a file is accepted and never
+// reduced by deleting it, so delete-and-reupload can't bypass the daily allowance.
+export const documentUsage = pgTable("document_usage",{
+  userId: uuid("user_id").notNull().references(()=>appUsers.id,{ onDelete: "cascade" }),
+  day: date("day").notNull(),
+  characters: bigint("characters",{ mode: "number" }).notNull(),
+},t=>[
+  primaryKey({ columns: [t.userId,t.day] }),
+  check("document_usage_valid",sql`${t.characters} > 0`),
 ]);
