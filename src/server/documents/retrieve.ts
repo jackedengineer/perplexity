@@ -10,8 +10,8 @@ export type DocumentMatch = { chunkId: string; documentId: string; page: number;
 
 // Candidates per signal before fusion, and the fusion constant from the Reciprocal Rank Fusion paper.
 const CANDIDATES = 20, RRF_K = 60;
-// Below this cosine similarity a chunk only counts if its words also match. Tuned with
-// `pnpm eval:documents`; text-embedding-3-small scores unrelated text around 0.1.
+// Below this cosine similarity a chunk only counts if its words also match. On the
+// `pnpm eval:documents` corpus the correct page scored 0.37-0.67 and unrelated questions at most 0.12.
 export const MIN_SIMILARITY = 0.25;
 const DOCUMENT_LINK_ORIGIN = "https://perplexity.jacked.dev";
 
