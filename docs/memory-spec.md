@@ -347,7 +347,7 @@ export const mentionsSelf = (message: string) => FIRST_PERSON.test(message);
 
 ## Open questions
 
-1. Should Pause also stop applying **About you**? This spec says no: About you is the user's own instruction and stays until cleared.
+1. ~~Should Pause also stop applying About you?~~ Decided: no. About you keeps applying while memory is paused.
 2. The first-person gate is English-only in v1. Messages in other languages skip extraction until v2. Is that fine?
 3. Memory is on by default for existing users too, explained in the Memory dialog and the privacy page. Is that fine, or should existing users start paused?
 4. Where should the **Temporary chat** switch sit: near the mode picker as proposed, or in the account menu as "New temporary chat"?

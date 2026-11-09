@@ -12,17 +12,17 @@ async function memoryRequest(method:'GET'|'PATCH'|'DELETE',body?:unknown){
 
 // Settings only. There is deliberately no list of what Perplex remembers.
 export function MemoryDialog({onClose}:{onClose:()=>void}){
-  const dialog=useRef<HTMLDialogElement>(null),confirmButton=useRef<HTMLButtonElement>(null),aboutId=useId();
+  const dialog=useRef<HTMLDialogElement>(null),confirmButton=useRef<HTMLButtonElement>(null),deleteButton=useRef<HTMLButtonElement>(null),aboutId=useId();
   const [settings,setSettings]=useState<Settings|null>(null),[about,setAbout]=useState('');
-  const [busy,setBusy]=useState(false),[confirming,setConfirming]=useState(false),[status,setStatus]=useState(''),[error,setError]=useState('');
+  const [busy,setBusy]=useState(false),[confirming,setConfirming]=useState<boolean|null>(null),[status,setStatus]=useState(''),[error,setError]=useState(''),[attempt,setAttempt]=useState(0);
   useEffect(()=>{dialog.current?.showModal();},[]);
   useEffect(()=>{
     let active=true;
-    memoryRequest('GET').then((data:Settings)=>{if(active){setSettings(data);setAbout(data.instructions??'');}}).catch((failure:Error)=>{if(active)setError(failure.message);});
+    memoryRequest('GET').then((data:Settings)=>{if(active){setSettings(data);setAbout(data.instructions??'');setError('');}}).catch((failure:Error)=>{if(active)setError(failure.message);});
     return ()=>{active=false;};
-  },[]);
-  // Keyboard focus follows the button into its confirmation.
-  useEffect(()=>{if(confirming)confirmButton.current?.focus();},[confirming]);
+  },[attempt]);
+  // Keyboard focus follows the button into its confirmation, and back out of it.
+  useEffect(()=>{if(confirming)confirmButton.current?.focus();else if(confirming===false)deleteButton.current?.focus();},[confirming]);
   async function run(work:()=>Promise<string>){
     setBusy(true);setError('');setStatus('');
     try{setStatus(await work());}catch(failure){setError(failure instanceof Error?failure.message:'Couldn’t save that. Please try again.');}finally{setBusy(false);}
@@ -33,7 +33,7 @@ export function MemoryDialog({onClose}:{onClose:()=>void}){
     <div className="dialog-heading"><h2 id="memory-heading">Memory</h2><button type="button" className="research-icon-button" aria-label="Close memory settings" onClick={()=>dialog.current?.close()}><Icon name="close"/></button></div>
     <p className="research-muted">Perplex remembers things you tell it about yourself, like your work, where you live and how you like answers, so answers fit you better. It never uses them in web searches.</p>
     <label className="memory-switch">
-      <span><strong>Use and save memories</strong><small className="research-muted">{settings===null?'Loading…':paused?'Paused. Answers don’t use memories and nothing new is saved.':'Answers use what you’ve told Perplex, and it keeps learning.'}</small></span>
+      <span><strong>Use and save memories</strong><small className="research-muted">{settings===null?(error?'Couldn’t load memory settings.':'Loading…'):paused?'Paused. Answers don’t use memories and nothing new is saved.':'Answers use what you’ve told Perplex, and it keeps learning.'}</small></span>
       <input type="checkbox" role="switch" checked={!paused} disabled={settings===null||busy} onChange={event=>void update({paused:!event.target.checked},event.target.checked?'Memory is on.':'Memory is paused.')}/>
     </label>
     <form className="memory-about" onSubmit={event=>{event.preventDefault();if(!unchanged)void update({instructions:about.trim()||null},about.trim()?'Saved About you.':'Cleared About you.');}}>
@@ -47,10 +47,10 @@ export function MemoryDialog({onClose}:{onClose:()=>void}){
         <p>Delete all saved memories? This can’t be undone.</p>
         <span><button ref={confirmButton} type="button" className="research-button danger" onClick={()=>{setConfirming(false);void run(async()=>{await memoryRequest('DELETE');return 'Deleted all saved memories.';});}}>Delete all</button>
         <button type="button" className="research-button" onClick={()=>setConfirming(false)}>Cancel</button></span>
-      </div>:<button type="button" className="research-button danger" disabled={busy} onClick={()=>setConfirming(true)}><Icon name="trash" size={14}/>Delete all memories</button>}
+      </div>:<button ref={deleteButton} type="button" className="research-button danger" disabled={busy} onClick={()=>setConfirming(true)}><Icon name="trash" size={14}/>Delete all memories</button>}
     </div>
     <p className="research-muted memory-hint">To change something, just say so in a chat, like “I moved to Bengaluru”. Start a temporary chat to keep a conversation out of memory.</p>
     <div className="memory-status" role="status" aria-live="polite">{status}</div>
-    {error&&<p className="files-error" role="alert">{error}</p>}
+    {error&&<p className="files-error" role="alert">{error}{settings===null&&<> <button type="button" className="text-button" onClick={()=>{setError('');setAttempt(attempt+1);}}>Retry</button></>}</p>}
   </dialog>;
 }

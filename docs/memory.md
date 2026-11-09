@@ -13,22 +13,24 @@ Question answered (run COMPLETED or NEEDS_CLARIFICATION)
   → execute.ts schedules extractMemories(runId) with after(): the user never waits
   → skip without a model call when any of these hold, writing nothing:
       guest · memory paused · temporary chat · files attached
-      · message over 2,000 characters · no first-person word ("I", "my", "we"…)
+      · message over 2,000 characters, over 4 lines, quoted (>) or fenced (```) · no first-person word ("I", "my", "we"…)
       · 100 extractions already today
-  → claim the run's memory_extractions row (primary key = run id, so once per run)
+  → under a lock on the user's memory_settings row: count today's extractions and claim the run's
+      memory_extractions row (primary key = run id, so once per run)
   → planner model, memory-v1 prompt: the user's own accepted message
       + their saved memories under short ids (m1…), wire cap 16 KB, ≤400 output tokens, 8 s, zero retention
   → at most 3 operations: ADD {kind, text} · UPDATE {id, text} · DELETE {id}
   → free checks drop each bad operation on its own:
       foreign or repeated id · sensitive (contacts, ID numbers, links, health, religion, politics,
       sexuality, ethnicity, money, credentials, addresses) · ungrounded (<60% of content words are the user's)
-  → write under a lock on the user's memory_settings row; re-check pause; skip duplicates;
-      past 50, evict the oldest CONTEXT memory, then the oldest of any kind
+      · negated ("I'm not a doctor" never becomes "Works as a doctor")
+  → write under the same lock; write nothing if the settings changed after the claim (a pause or
+      Delete all always wins); skip duplicates; past 50, evict the oldest CONTEXT memory, then the oldest
   → finish the ledger row: status, cost, operations applied. Failures are recorded and swallowed.
 
 Next question
   → complete.ts loads the reader: About you, then PREFERENCE, PROFILE and CONTEXT memories, newest first, ≤2,000 characters
-      (absent for guests, paused memory and temporary chats)
+      (absent for guests and temporary chats; About you only while memory is paused)
   → answer-v11 / chat-v3 prompts get it as `reader`, with a rule sent only when there is a reader:
       use it for tone, depth, format, units, language and resolving references; never cite it; never mention memory
   → over the 20 KB packet budget, memories are dropped (least important first), then About you, before any evidence or history
@@ -74,7 +76,7 @@ LIVE_NEON_E2E=1 pnpm exec playwright test --config playwright.memory.config.ts  
 pnpm eval:memory                # live extraction eval on the real planner model; paid, opt-in only
 ```
 
-The offline eval (`evals/memory-cases.json`) has 40 labelled messages with hand-written replies that include typical model mistakes. Its targets are 0 sensitive saves, 0 ungrounded saves and at most 1 wrong case. The current result is 40 of 40, with 34 model calls and 6 messages skipped by the gate.
+The offline eval (`evals/memory-cases.json`) has 44 labelled messages with hand-written replies that include typical model mistakes. Its targets are 0 sensitive saves, 0 ungrounded saves and at most 1 wrong case. The current result is 44 of 44.
 
 ## Not in v1
 

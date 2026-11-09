@@ -33,21 +33,27 @@ export async function extractMemories(db: AdmissionDatabase, runId: string, prov
     if (!mentionsSelf(message)) return done("SKIPPED", { reason: "NOT_PERSONAL" });
     const [files] = await db.select({ n: sql<number>`count(*)::integer` }).from(runDocuments).where(eq(runDocuments.runId, runId));
     if (files.n > 0) return done("SKIPPED", { reason: "FILES" });
-    const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00.000Z");
-    const [used] = await db.select({ n: sql<number>`count(*)::integer` }).from(memoryExtractions).where(and(eq(memoryExtractions.userId, state.userId), gte(memoryExtractions.createdAt, today)));
-    if (used.n >= (options.dailyLimit ?? MEMORY_LIMITS.extractionsPerDay)) return done("SKIPPED", { reason: "DAILY_LIMIT" });
-    // The primary key makes this the one extraction for the run.
-    const [claimed] = await db.insert(memoryExtractions).values({ runId, userId: state.userId, status: "STARTED", model: provider.modelId, createdAt: new Date() })
-      .onConflictDoNothing().returning({ runId: memoryExtractions.runId });
-    if (!claimed) return done("SKIPPED", { reason: "ALREADY_RUN" });
+    // Counted and claimed under the user's settings lock, so concurrent answers can't pass the
+    // daily limit. The primary key makes this the one extraction for the run.
+    const claim = await db.transaction(async tx => {
+      const startedAt = new Date(), today = new Date(startedAt.toISOString().slice(0, 10) + "T00:00:00.000Z");
+      await tx.insert(memorySettings).values({ userId: state.userId, updatedAt: startedAt }).onConflictDoNothing();
+      await tx.select({ userId: memorySettings.userId }).from(memorySettings).where(eq(memorySettings.userId, state.userId)).for("update");
+      const [used] = await tx.select({ n: sql<number>`count(*)::integer` }).from(memoryExtractions).where(and(eq(memoryExtractions.userId, state.userId), gte(memoryExtractions.createdAt, today)));
+      if (used.n >= (options.dailyLimit ?? MEMORY_LIMITS.extractionsPerDay)) return "DAILY_LIMIT" as const;
+      const [claimed] = await tx.insert(memoryExtractions).values({ runId, userId: state.userId, status: "STARTED", model: provider.modelId, createdAt: startedAt })
+        .onConflictDoNothing().returning({ runId: memoryExtractions.runId });
+      return claimed ? startedAt : "ALREADY_RUN" as const;
+    });
+    if (!(claim instanceof Date)) return done("SKIPPED", { reason: claim });
 
     const finish = (status: "SUCCEEDED" | "FAILED" | "UNKNOWN", costMicroUsd: bigint | null, operations = 0) =>
       db.update(memoryExtractions).set({ status, costMicroUsd, operations, finishedAt: new Date() }).where(and(eq(memoryExtractions.runId, runId), eq(memoryExtractions.status, "STARTED")));
-    const saved = await listMemories(db, state.userId);
     try {
+      const saved = await listMemories(db, state.userId);
       const result = await provider.extract({ message, memories: saved }, { signal: AbortSignal.timeout(EXTRACTION_LIMITS.maxDurationMs + 2000), deadlineAt: new Date(Date.now() + EXTRACTION_LIMITS.maxDurationMs + 2000) });
       const { accepted, rejected } = checkOperations(result.operations, new Set(saved.map(memory => memory.id)), message);
-      const applied = await applyOperations(db, state.userId, accepted, state.messageId);
+      const applied = await applyOperations(db, state.userId, accepted, state.messageId, claim);
       await finish("SUCCEEDED", result.usage?.costMicroUsd ?? null, applied);
       const count = (op: string) => accepted.filter(operation => operation.op === op).length;
       return done("SUCCEEDED", { proposed: result.operations.length, added: count("ADD"), updated: count("UPDATE"), deleted: count("DELETE"), applied, rejected });

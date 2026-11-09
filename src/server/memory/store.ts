@@ -45,10 +45,17 @@ export async function updateSettings(db: Database,subject: string,patch: { pause
   return { paused: row.paused,instructions: row.instructions };
 }
 
-// Permanent. About you is kept; it is cleared by saving it empty.
-export async function deleteAllMemories(db: Database,subject: string) {
+// Permanent. About you is kept; it is cleared by saving it empty. Takes the same lock as
+// applyOperations and bumps updated_at, so an extraction still in flight can't write back afterwards.
+export async function deleteAllMemories(db: AdmissionDatabase,subject: string) {
   const userId = await owner(db,subject);
-  return (await db.delete(memories).where(eq(memories.userId,userId)).returning({ id: memories.id })).length;
+  return db.transaction(async tx => {
+    const now = new Date();
+    await tx.insert(memorySettings).values({ userId,updatedAt: now }).onConflictDoNothing();
+    await tx.select({ userId: memorySettings.userId }).from(memorySettings).where(eq(memorySettings.userId,userId)).for("update");
+    await tx.update(memorySettings).set({ updatedAt: now }).where(eq(memorySettings.userId,userId));
+    return (await tx.delete(memories).where(eq(memories.userId,userId)).returning({ id: memories.id })).length;
+  });
 }
 
 export async function listMemories(db: Database,userId: string): Promise<StoredMemory[]> {
@@ -70,27 +77,29 @@ export function fitReader(instructions: string | null,items: Array<StoredMemory 
   return { ...(instructions ? { instructions } : {}),memories: chosen };
 }
 
-// What the answer may know about the asker. Null for guests, paused memory and temporary chats.
+// What the answer may know about the asker. Null for guests and temporary chats; About you alone while paused.
 export async function loadReader(db: Database,userId: string,conversationId: string): Promise<Reader | null> {
   const [state] = await db.select({ guest: user.isAnonymous,paused: memorySettings.paused,instructions: memorySettings.instructions,enabled: conversations.memoryEnabled })
     .from(conversations).innerJoin(appUsers,eq(appUsers.id,conversations.userId)).innerJoin(user,eq(user.id,appUsers.authSubject))
     .leftJoin(memorySettings,eq(memorySettings.userId,appUsers.id))
     .where(and(eq(conversations.id,conversationId),eq(conversations.userId,userId)));
-  if (!state || state.guest || state.paused || !state.enabled) return null;
+  if (!state || state.guest || !state.enabled) return null;
+  if (state.paused) return state.instructions ? { instructions: state.instructions,memories: [] } : null;
   const items = await db.select({ id: memories.id,kind: memories.kind,text: memories.text,createdAt: memories.createdAt }).from(memories)
     .where(eq(memories.userId,userId)).orderBy(desc(memories.createdAt)).limit(MEMORY_LIMITS.perUser);
   return fitReader(state.instructions,items);
 }
 
 // Applies already-validated operations. Serialized per user on the settings row, so two answers
-// finishing together can't push past the cap. Re-checks pause, which may have changed meanwhile.
-export async function applyOperations(db: AdmissionDatabase,userId: string,operations: readonly MemoryOperation[],sourceMessageId: string | null) {
+// finishing together can't push past the cap. With startedAt, nothing is written if the settings
+// changed after the extraction began: a pause or Delete all always wins over a late extraction.
+export async function applyOperations(db: AdmissionDatabase,userId: string,operations: readonly MemoryOperation[],sourceMessageId: string | null,startedAt?: Date) {
   if (!operations.length) return 0;
   return db.transaction(async tx => {
     const now = new Date();
     await tx.insert(memorySettings).values({ userId,updatedAt: now }).onConflictDoNothing();
-    const [settings] = await tx.select({ paused: memorySettings.paused }).from(memorySettings).where(eq(memorySettings.userId,userId)).for("update");
-    if (settings.paused) return 0;
+    const [settings] = await tx.select({ paused: memorySettings.paused,updatedAt: memorySettings.updatedAt }).from(memorySettings).where(eq(memorySettings.userId,userId)).for("update");
+    if (settings.paused || startedAt && settings.updatedAt > startedAt) return 0;
     let current = await tx.select({ id: memories.id,kind: memories.kind,text: memories.text,createdAt: memories.createdAt }).from(memories)
       .where(eq(memories.userId,userId)).orderBy(asc(memories.createdAt),asc(memories.id));
     let applied = 0;
@@ -108,14 +117,17 @@ export async function applyOperations(db: AdmissionDatabase,userId: string,opera
         continue;
       }
       if (current.some(m => sameText(m.text,text))) continue;
+      const [added] = await tx.insert(memories).values({ userId,kind: operation.kind,text,sourceMessageId,createdAt: now,updatedAt: now })
+        .onConflictDoNothing().returning({ id: memories.id,kind: memories.kind,text: memories.text,createdAt: memories.createdAt });
+      if (!added) continue;
+      // Evict only once the new memory is in, so a rejected insert never costs an old memory.
       if (current.length >= MEMORY_LIMITS.perUser) {
         const evicted = current.find(m => m.kind === "CONTEXT") ?? current[0];
         await tx.delete(memories).where(inArray(memories.id,[evicted.id]));
         current = current.filter(m => m.id !== evicted.id);
       }
-      const [added] = await tx.insert(memories).values({ userId,kind: operation.kind,text,sourceMessageId,createdAt: now,updatedAt: now })
-        .onConflictDoNothing().returning({ id: memories.id,kind: memories.kind,text: memories.text,createdAt: memories.createdAt });
-      if (added) { current.push(added); applied++; }
+      current.push(added);
+      applied++;
     }
     return applied;
   });

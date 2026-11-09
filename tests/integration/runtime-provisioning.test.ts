@@ -2,6 +2,11 @@ import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {afterAll,beforeAll,expect,it} from 'vitest';
 import {runtimePermissionQuery,assertRuntimePermissions} from '../../scripts/database-permissions';
+import {randomUUID} from 'node:crypto';
+import {drizzle} from 'drizzle-orm/pglite';
+import * as schema from '@/db/schema';
+import {applyOperations,deleteAllMemories,getSettings,listMemories,loadReader,updateSettings} from '@/server/memory/store';
+import {extractMemories} from '@/server/memory/run';
 
 const pg=new PGlite();
 beforeAll(async()=>{
@@ -58,4 +63,23 @@ it('lets the web role rewrite memory content but never its owner, source or ledg
   has_table_privilege('perplex_web','public.memory_extractions','DELETE') AS erase_ledger,
   has_column_privilege('perplex_web','public.memory_extractions','user_id','UPDATE') AS ledger_owner`);
  expect(rows[0]).toEqual({forget:true,rewrite:true,reassign:false,resource:false,settings_owner:false,erase_ledger:false,ledger_owner:false});
+});
+it('runs every memory query as the web role',async()=>{
+ const db=drizzle(pg,{schema}),subject=randomUUID();
+ await db.insert(schema.user).values({id:subject,name:'Reader',email:`${subject}@example.test`});
+ const [profile]=await db.insert(schema.appUsers).values({authSubject:subject}).returning();
+ const [conversation]=await db.insert(schema.conversations).values({userId:profile.id,creationRequestId:randomUUID(),creationFingerprint:'synthetic',title:'Memory'}).returning();
+ await pg.exec('SET ROLE perplex_web');
+ try{
+  await updateSettings(db,subject,{instructions:'Metric units'});
+  await updateSettings(db,subject,{paused:false});
+  expect(await getSettings(db,subject)).toEqual({paused:false,instructions:'Metric units'});
+  expect(await applyOperations(db,profile.id,[{op:'ADD',kind:'PROFILE',text:'Lives in Pune'}],null,new Date())).toBe(1);
+  const [memory]=await listMemories(db,profile.id);
+  expect(await applyOperations(db,profile.id,[{op:'UPDATE',id:memory.id,text:'Lives in Delhi'}],null)).toBe(1);
+  expect(await loadReader(db,profile.id,conversation.id)).toEqual({instructions:'Metric units',memories:['Lives in Delhi']});
+  const log=(event:Record<string,unknown>)=>{if(event.outcome==='ERROR')throw new Error('extraction query failed');};
+  await extractMemories(db,randomUUID(),{modelId:'test/memory',extract:async()=>({operations:[],usage:undefined})},{log});
+  expect(await deleteAllMemories(db,subject)).toBe(1);
+ }finally{await pg.exec('RESET ROLE');}
 });

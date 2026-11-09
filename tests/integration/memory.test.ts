@@ -71,6 +71,17 @@ describe("applying memory operations", () => {
     expect(await applyOperations(db, who.userId, [{ op: "UPDATE", id: pune.id, text: "prefers METRIC units" }], null)).toBe(0);
   });
 
+  it("lets a pause or Delete all win over an extraction that started earlier", async () => {
+    const who = await person();
+    const startedAt = new Date(Date.now() - 5000);
+    await db.insert(schema.memorySettings).values({ userId: who.userId, updatedAt: new Date(Date.now() - 10000) });
+    expect(await applyOperations(db, who.userId, [add("Lives in Pune")], null, startedAt)).toBe(1);
+    await deleteAllMemories(db, who.subject);
+    expect(await applyOperations(db, who.userId, [add("Works as a civil engineer")], null, startedAt)).toBe(0);
+    expect(await memoryCount(db, who.userId)).toBe(0);
+    expect(await applyOperations(db, who.userId, [add("Works as a civil engineer")], null, new Date())).toBe(1);
+  });
+
   it("saves nothing while paused", async () => {
     const who = await person();
     await updateSettings(db, who.subject, { paused: true });
@@ -108,7 +119,7 @@ describe("what an answer may know about the asker", () => {
     expect(await loadReader(db, who.userId, who.conversationId)).toEqual({ instructions: "Civil engineer", memories: ["Prefers short answers", "Lives in Pune", "Planning a Sedona launch"] });
   });
 
-  it("gives nothing for paused memory, temporary chats, guests or another person's conversation", async () => {
+  it("gives nothing for temporary chats, guests or another person's conversation, and only About you while paused", async () => {
     const who = await person(), temporary = await person({ temporary: true }), guest = await person({ guest: true });
     for (const p of [who, temporary, guest]) await applyOperations(db, p.userId, [add("Lives in Pune")], null);
     expect(await loadReader(db, temporary.userId, temporary.conversationId)).toBeNull();
@@ -116,6 +127,8 @@ describe("what an answer may know about the asker", () => {
     expect(await loadReader(db, who.userId, temporary.conversationId)).toBeNull();
     await updateSettings(db, who.subject, { paused: true });
     expect(await loadReader(db, who.userId, who.conversationId)).toBeNull();
+    await updateSettings(db, who.subject, { instructions: "Use metric units" });
+    expect(await loadReader(db, who.userId, who.conversationId)).toEqual({ instructions: "Use metric units", memories: [] });
   });
 });
 

@@ -9,8 +9,11 @@ const FIRST_PERSON = new Set(["i", "i'm", "i've", "i'd", "i'll", "im", "ive", "m
 // Long messages are mostly pasted text, which says nothing about the person pasting it.
 export const MAX_EXTRACTION_MESSAGE = 2000;
 
+// Code fences, quoted lines or many lines mean the words are probably someone else's.
+const PASTED = /```|^\s*>/mu;
 export function mentionsSelf(message: string) {
-  return message.length <= MAX_EXTRACTION_MESSAGE && words(message).some(word => FIRST_PERSON.has(word));
+  return message.length <= MAX_EXTRACTION_MESSAGE && !PASTED.test(message) && message.split("\n").length <= 4
+    && words(message).some(word => FIRST_PERSON.has(word));
 }
 
 const SENSITIVE_PATTERNS = [
@@ -58,4 +61,17 @@ export function isGrounded(text: string, message: string, threshold = 0.6) {
   const content = words(text).filter(word => !FRAMING.has(word)).map(stem);
   if (!content.length) return false;
   return content.filter(word => said.has(word)).length / content.length >= threshold;
+}
+
+// "I'm not a doctor" grounds every word of "Works as a doctor". A memory is rejected when one of
+// its words follows a negation in the same clause of the message, unless the memory itself is
+// negative ("Doesn't eat meat" from "I don't eat meat").
+const NEGATIONS = new Set(["not", "no", "never", "nor", "neither", "without", "don't", "doesn't", "didn't", "isn't", "aren't", "wasn't", "weren't", "won't", "can't", "cannot", "dont", "doesnt", "didnt", "isnt", "cant"]);
+export function isNegated(text: string, message: string) {
+  if (words(text).some(word => NEGATIONS.has(word))) return false;
+  const content = new Set(words(text).filter(word => !FRAMING.has(word)).map(stem));
+  return message.split(/[,.;:!?\n]|\bbut\b/iu).some(clause => {
+    const tokens = words(clause), first = tokens.findIndex(word => NEGATIONS.has(word));
+    return first >= 0 && tokens.slice(first + 1).some(word => content.has(stem(word)));
+  });
 }

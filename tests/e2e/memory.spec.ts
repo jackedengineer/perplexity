@@ -63,6 +63,7 @@ test("memory learns quietly, and its settings pause, explain and delete it", asy
     await dialog.getByRole("button", { name: "Delete all memories" }).click();
     await expect(dialog.getByRole("button", { name: "Delete all", exact: true })).toBeFocused();
     await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog.getByRole("button", { name: "Delete all memories" })).toBeFocused();
     expect(await saved()).toHaveLength(2);
     await dialog.getByRole("button", { name: "Delete all memories" }).click();
     await dialog.getByRole("button", { name: "Delete all", exact: true }).click();
