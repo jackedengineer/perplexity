@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { z } from "zod";
 import type { RunMode } from "@/server/contracts/chat";
 import { getDb } from "@/db";
@@ -20,6 +21,7 @@ import { createAnswerDelivery } from "./delivery";
 import { createChatHttp } from "./http";
 import { createRequestLimiter } from "@/server/runs/rate-limit";
 import { documentsEnabled,embeddingProvider } from "@/server/documents";
+import { createExtractionProvider } from "@/server/memory/extract";
 export const chatHttp = createChatHttp({
   identity: getCurrentSession,origin: ()=>getServerEnv().BETTER_AUTH_URL,
   consumeRequest: subject=>createRequestLimiter(getDb(),parseAdmissionPolicyEnvironment(process.env).operatorBudgetKey).consume(subject),
@@ -35,6 +37,8 @@ export const chatHttp = createChatHttp({
         ...(mode==="DOCUMENTS"||attachments?{embedding:embeddingProvider()}:{}),extract:createTavilyExtract(searchKey.data),planner:createPlannerProvider(planner),input:createLocalSafetyGuard(),query:createLocalSafetyGuard(),
         evidence:createLocalSafetyGuard(),output:createLocalSafetyGuard(),
         answer:(mode === "CHAT" ? createChatProvider : createAnswerProvider)(answer,fetch,MODEL_CATALOG.find(m=>m.key===modelKey)!.maxOutputTokens,12000,extendedAnswerBudget(modelKey)),search:createTavilySearch(searchKey.data),
+        // Uses the planner's model. after() keeps the Worker alive until extraction finishes.
+        memory:{provider:createExtractionProvider(planner),schedule:work=>after(work)},
       });
     }
     let execution:ReturnType<typeof configureExecution>|undefined;

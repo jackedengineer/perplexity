@@ -9,13 +9,14 @@ import {GoogleSignIn} from "@/components/google-sign-in";
 import { SessionControls } from "@/components/session-controls";
 import type { Conversation } from "@/server/conversations/contracts";
 import { Icon, ResearchMark } from "./icons";
+import { MemoryDialog } from "./memory-dialog";
 
 export function ResearchShell({ children, recent, pinned = [], name, initialCollapsed, jobsEnabled = false, deepResearchEnabled = false, visitor = false, guest = false }: {
   children: React.ReactNode; recent: Conversation[]; pinned?: Conversation[]; name: string; initialCollapsed: boolean; jobsEnabled?: boolean; deepResearchEnabled?: boolean; visitor?: boolean; guest?: boolean;
 }) {
   const {data}=useModelAccess();
   const pathname = usePathname();
-  const [searchOpen,setSearchOpen]=useState(false);
+  const [searchOpen,setSearchOpen]=useState(false),[memoryOpen,setMemoryOpen]=useState(false);
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [recentOpen, setRecentOpen] = useState(true);
   const mobileNav = useRef<HTMLDialogElement>(null);
@@ -82,11 +83,12 @@ export function ResearchShell({ children, recent, pinned = [], name, initialColl
       <div className="workspace-plan">{visitor||guest?<GoogleSignIn compact label="Sign up / Log in"/>:<PlanIndicator/>}</div>
       {children}
     </div>
+    {memoryOpen&&<MemoryDialog onClose={()=>setMemoryOpen(false)}/>}
     {searchOpen&&<QuickSearch initial={recent} onClose={()=>setSearchOpen(false)}/>}
     <dialog className="mobile-navigation" aria-label="Navigation" ref={mobileNav} onClick={(event) => { if (event.target === event.currentTarget) mobileNav.current?.close(); }}>{sidebar(false, true)}</dialog>
     {!visitor&&<dialog className="research-dialog account-dialog" aria-labelledby="account-heading" ref={account} onClick={(event) => { if (event.target === event.currentTarget) account.current?.close(); }}>
       <div className="dialog-heading"><h2 id="account-heading">Your account</h2><button className="research-icon-button" aria-label="Close account menu" onClick={() => account.current?.close()}><Icon name="close" size={17} /></button></div>
-      <p>{name}</p><PlanIndicator onNavigate={()=>account.current?.close()}/>{data?.usage.subscription&&<p className="research-muted">{data.usage.subscription.reportsRemaining} Deep Research reports remaining · Access until {new Date(data.usage.subscription.endsAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</p>}{data?.usage.tier==="GUEST"&&<GoogleSignIn compact label="Sign in with Google to save guest history"/>}<p className="research-muted">Your conversations are private.</p><SessionControls />
+      <p>{name}</p><PlanIndicator onNavigate={()=>account.current?.close()}/>{data?.usage.subscription&&<p className="research-muted">{data.usage.subscription.reportsRemaining} Deep Research reports remaining · Access until {new Date(data.usage.subscription.endsAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</p>}{data?.usage.tier==="GUEST"&&<GoogleSignIn compact label="Sign in with Google to save guest history"/>}<p className="research-muted">Your conversations are private.</p>{!guest&&data?.usage.tier!=="GUEST"&&<button type="button" className="text-button account-memory" onClick={()=>{account.current?.close();setMemoryOpen(true);}}>Memory</button>}<SessionControls />
     </dialog>}
   </div>;
 }

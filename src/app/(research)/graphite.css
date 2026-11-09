@@ -281,3 +281,37 @@ a.file-title:hover { text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) { .attach-menu, .attachment-chip { transition: opacity 150ms ease; } @starting-style { .attach-menu, .attachment-chip { scale: 1; } } }
 /* iOS Safari zooms into any field under 16px on focus and never zooms back out. */
 @media (pointer: coarse) { .research-shell input, .research-shell select, .research-shell textarea, .model-popover input { font-size: 16px; } }
+
+/* Memory: settings only, no list. The switch row is one large tap target. */
+.memory-dialog { width: min(480px, calc(100% - 32px)); }
+.memory-dialog > p.research-muted { font-size: 13px; line-height: 1.5; margin: 8px 0 16px; }
+.memory-switch { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-block: 1px solid var(--r-line); cursor: pointer; }
+.memory-switch > span, .memory-about label { display: grid; gap: 2px; }
+.memory-switch small, .memory-about small { font-size: 12px; line-height: 1.4; }
+.memory-switch input { appearance: none; flex-shrink: 0; position: relative; width: 36px; height: 20px; margin: 0; border-radius: 999px; background: var(--r-line); cursor: pointer; transition: background-color 150ms ease; }
+.memory-switch input::before { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--r-muted); transition: transform 150ms var(--r-ease-out), background-color 150ms ease; }
+.memory-switch input:checked { background: var(--r-text); }
+.memory-switch input:checked::before { transform: translateX(16px); background: var(--r-bg); }
+.memory-switch input:focus-visible { outline: 2px solid var(--r-text); outline-offset: 2px; }
+.memory-switch input:disabled { opacity: .5; cursor: default; }
+.memory-about { display: grid; gap: 8px; padding: 16px 0; }
+.memory-about textarea { width: 100%; resize: vertical; min-height: 88px; border: 1px solid var(--r-line); border-radius: 8px; padding: 10px 12px; color: var(--r-text); background: var(--r-side); font: inherit; font-size: 14px; line-height: 1.5; }
+.memory-about textarea:focus-visible { outline: 2px solid var(--r-muted); outline-offset: 1px; }
+.memory-about-actions { display: flex; align-items: center; justify-content: space-between; }
+.memory-delete { padding-top: 16px; border-top: 1px solid var(--r-line); }
+.memory-delete .research-button.danger { gap: 6px; }
+.memory-confirm p { margin: 0 0 10px; }
+.memory-confirm span { display: flex; gap: 8px; }
+.memory-hint { font-size: 12px; line-height: 1.5; margin: 16px 0 0; }
+.memory-status:not(:empty) { margin-top: 8px; font-size: 13px; color: var(--r-muted); }
+.account-dialog .account-memory { margin-bottom: 8px; }
+/* Temporary chat: a quiet toggle beside the model picker, lit when on. */
+.temporary-toggle { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 9px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--r-muted); font: inherit; font-size: 12px; cursor: pointer; transition: background-color 120ms ease, color 120ms ease, transform 120ms var(--r-ease-out); }
+.temporary-toggle[aria-pressed="true"] { color: var(--r-text); background: var(--r-hover); border-color: var(--r-line); }
+.temporary-toggle:active:not(:disabled) { transform: scale(.96); }
+.temporary-toggle:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.temporary-toggle:disabled { opacity: .5; cursor: default; }
+@media (hover: hover) and (pointer: fine) { .temporary-toggle:hover:not(:disabled) { background: var(--r-hover); color: var(--r-text); } }
+@media (max-width: 767px) { .temporary-toggle span { display: none; } .temporary-toggle { width: 32px; padding: 0; justify-content: center; } }
+@media (pointer: coarse) { .memory-confirm .research-button, .memory-delete > .research-button, .memory-about .research-button { min-height: 44px; } .temporary-toggle { min-width: 40px; height: 40px; } .memory-about textarea { font-size: 16px; } }
+@media (prefers-reduced-motion: reduce) { .memory-switch input::before { transition: background-color 150ms ease; } }

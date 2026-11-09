@@ -1,0 +1,668 @@
+{
+ "note": "Labelled messages for memory extraction. `proposed` is a plausible model reply written by hand, including the mistakes a model makes (invented, sensitive, repeated or foreign ids); the free checks must turn it into `expected`. The live eval (pnpm eval:memory) replaces `proposed` with the real model's reply.",
+ "cases": [
+  {
+   "id": "profession-location",
+   "category": "SELF",
+   "message": "I'm a civil engineer in Pune, what's the M25 mix ratio?",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "Works as a civil engineer"
+    },
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "Lives in Pune"
+    }
+   ],
+   "expected": [
+    "Lives in Pune",
+    "Works as a civil engineer"
+   ]
+  },
+  {
+   "id": "student",
+   "category": "SELF",
+   "message": "I'm studying mechanical engineering at VIT, explain torque simply",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "Studying mechanical engineering at VIT"
+    }
+   ],
+   "expected": [
+    "Studying mechanical engineering at VIT"
+   ]
+  },
+  {
+   "id": "language",
+   "category": "SELF",
+   "message": "My first language is Marathi, so keep the English simple please",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "First language is Marathi"
+    },
+    {
+     "op": "ADD",
+     "kind": "PREFERENCE",
+     "text": "Prefers simple English"
+    }
+   ],
+   "expected": [
+    "First language is Marathi",
+    "Prefers simple English"
+   ]
+  },
+  {
+   "id": "project",
+   "category": "SELF",
+   "message": "We are launching Sedona in India next year, what are the import duties on furniture?",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "CONTEXT",
+     "text": "Launching Sedona in India"
+    }
+   ],
+   "expected": [
+    "Launching Sedona in India"
+   ]
+  },
+  {
+   "id": "learning",
+   "category": "SELF",
+   "message": "I've been learning Rust for a month, why does the borrow checker complain here?",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "CONTEXT",
+     "text": "Learning Rust"
+    }
+   ],
+   "expected": [
+    "Learning Rust"
+   ]
+  },
+  {
+   "id": "role-company",
+   "category": "SELF",
+   "message": "I run a small bakery in Indore. How should I price custom cakes?",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "Runs a small bakery in Indore"
+    }
+   ],
+   "expected": [
+    "Runs a small bakery in Indore"
+   ]
+  },
+  {
+   "id": "stack",
+   "category": "SELF",
+   "message": "Our stack is Next.js on Cloudflare Workers with Neon Postgres. Is Drizzle a good ORM for it?",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "CONTEXT",
+     "text": "Stack is Next.js on Cloudflare Workers with Neon Postgres"
+    }
+   ],
+   "expected": [
+    "Stack is Next.js on Cloudflare Workers with Neon Postgres"
+   ]
+  },
+  {
+   "id": "self-plus-invention",
+   "category": "INVENTED",
+   "message": "I teach physics to class 11 students. Give me a demo for inertia.",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "Teaches physics to class 11 students"
+    },
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "Works at a CBSE school in Delhi"
+    }
+   ],
+   "expected": [
+    "Teaches physics to class 11 students"
+   ]
+  },
+  {
+   "id": "invented-seniority",
+   "category": "INVENTED",
+   "message": "I'm a designer, which fonts pair well with Inter?",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "Senior product designer at a fintech startup"
+    }
+   ],
+   "expected": []
+  },
+  {
+   "id": "vegetarian",
+   "category": "SELF",
+   "message": "I'm vegetarian, suggest a high protein dinner",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PREFERENCE",
+     "text": "Is vegetarian"
+    }
+   ],
+   "expected": [
+    "Is vegetarian"
+   ]
+  },
+  {
+   "id": "short-answers",
+   "category": "PREFERENCE",
+   "message": "Keep it short, I just need the numbers",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PREFERENCE",
+     "text": "Prefers short answers focused on numbers"
+    }
+   ],
+   "expected": [
+    "Prefers short answers focused on numbers"
+   ]
+  },
+  {
+   "id": "metric",
+   "category": "PREFERENCE",
+   "message": "Always give me metric units, I don't use miles",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PREFERENCE",
+     "text": "Prefers metric units"
+    }
+   ],
+   "expected": [
+    "Prefers metric units"
+   ]
+  },
+  {
+   "id": "tables",
+   "category": "PREFERENCE",
+   "message": "I like comparisons as tables. Compare Postgres and MySQL.",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PREFERENCE",
+     "text": "Likes comparisons as tables"
+    }
+   ],
+   "expected": [
+    "Likes comparisons as tables"
+   ]
+  },
+  {
+   "id": "sources",
+   "category": "PREFERENCE",
+   "message": "I prefer peer reviewed sources over blogs. Is intermittent fasting effective?",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PREFERENCE",
+     "text": "Prefers peer reviewed sources over blogs"
+    }
+   ],
+   "expected": [
+    "Prefers peer reviewed sources over blogs"
+   ]
+  },
+  {
+   "id": "tone",
+   "category": "PREFERENCE",
+   "message": "Explain it like I'm new to finance, no jargon",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PREFERENCE",
+     "text": "New to finance, prefers no jargon"
+    }
+   ],
+   "expected": [
+    "New to finance, prefers no jargon"
+   ]
+  },
+  {
+   "id": "already-known",
+   "category": "PREFERENCE",
+   "message": "Use metric units as usual",
+   "existing": [
+    {
+     "id": "00000000-0000-4000-8000-000000000010",
+     "kind": "PREFERENCE",
+     "text": "Prefers metric units"
+    }
+   ],
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PREFERENCE",
+     "text": "prefers metric  units"
+    }
+   ],
+   "expected": [
+    "Prefers metric units"
+   ]
+  },
+  {
+   "id": "moved",
+   "category": "CHANGE",
+   "message": "I moved to Bengaluru last month, any good coworking spaces?",
+   "existing": [
+    {
+     "id": "00000000-0000-4000-8000-000000000001",
+     "kind": "PROFILE",
+     "text": "Lives in Pune"
+    }
+   ],
+   "proposed": [
+    {
+     "op": "UPDATE",
+     "id": "00000000-0000-4000-8000-000000000001",
+     "text": "Lives in Bengaluru"
+    }
+   ],
+   "expected": [
+    "Lives in Bengaluru"
+   ]
+  },
+  {
+   "id": "new-job",
+   "category": "CHANGE",
+   "message": "I switched from teaching to data analysis this year",
+   "existing": [
+    {
+     "id": "00000000-0000-4000-8000-000000000002",
+     "kind": "PROFILE",
+     "text": "Works as a teacher"
+    }
+   ],
+   "proposed": [
+    {
+     "op": "UPDATE",
+     "id": "00000000-0000-4000-8000-000000000002",
+     "text": "Works in data analysis"
+    }
+   ],
+   "expected": [
+    "Works in data analysis"
+   ]
+  },
+  {
+   "id": "finished-course",
+   "category": "CHANGE",
+   "message": "I finished my Rust course, now I'm learning Go",
+   "existing": [
+    {
+     "id": "00000000-0000-4000-8000-000000000003",
+     "kind": "CONTEXT",
+     "text": "Learning Rust"
+    }
+   ],
+   "proposed": [
+    {
+     "op": "UPDATE",
+     "id": "00000000-0000-4000-8000-000000000003",
+     "text": "Learning Go"
+    }
+   ],
+   "expected": [
+    "Learning Go"
+   ]
+  },
+  {
+   "id": "update-invented",
+   "category": "INVENTED",
+   "message": "I moved again",
+   "existing": [
+    {
+     "id": "00000000-0000-4000-8000-000000000004",
+     "kind": "PROFILE",
+     "text": "Lives in Pune"
+    }
+   ],
+   "proposed": [
+    {
+     "op": "UPDATE",
+     "id": "00000000-0000-4000-8000-000000000004",
+     "text": "Lives in Mumbai"
+    }
+   ],
+   "expected": [
+    "Lives in Pune"
+   ]
+  },
+  {
+   "id": "foreign-id",
+   "category": "CHANGE",
+   "message": "I now live in Chennai",
+   "existing": [
+    {
+     "id": "00000000-0000-4000-8000-000000000005",
+     "kind": "PROFILE",
+     "text": "Lives in Delhi"
+    }
+   ],
+   "proposed": [
+    {
+     "op": "UPDATE",
+     "id": "00000000-0000-4000-8000-0000000000ff",
+     "text": "Lives in Chennai"
+    }
+   ],
+   "expected": [
+    "Lives in Delhi"
+   ]
+  },
+  {
+   "id": "forget",
+   "category": "RETRACT",
+   "message": "Forget that I'm vegetarian",
+   "existing": [
+    {
+     "id": "00000000-0000-4000-8000-000000000006",
+     "kind": "PREFERENCE",
+     "text": "Is vegetarian"
+    }
+   ],
+   "proposed": [
+    {
+     "op": "DELETE",
+     "id": "00000000-0000-4000-8000-000000000006"
+    }
+   ],
+   "expected": []
+  },
+  {
+   "id": "no-longer",
+   "category": "RETRACT",
+   "message": "I'm not learning Rust any more, I gave up",
+   "existing": [
+    {
+     "id": "00000000-0000-4000-8000-000000000007",
+     "kind": "CONTEXT",
+     "text": "Learning Rust"
+    },
+    {
+     "id": "00000000-0000-4000-8000-000000000008",
+     "kind": "PROFILE",
+     "text": "Lives in Pune"
+    }
+   ],
+   "proposed": [
+    {
+     "op": "DELETE",
+     "id": "00000000-0000-4000-8000-000000000007"
+    }
+   ],
+   "expected": [
+    "Lives in Pune"
+   ]
+  },
+  {
+   "id": "stop-short",
+   "category": "RETRACT",
+   "message": "Stop keeping my answers short, I want detail now",
+   "existing": [
+    {
+     "id": "00000000-0000-4000-8000-000000000009",
+     "kind": "PREFERENCE",
+     "text": "Prefers short answers"
+    }
+   ],
+   "proposed": [
+    {
+     "op": "UPDATE",
+     "id": "00000000-0000-4000-8000-000000000009",
+     "text": "Wants detail in answers"
+    }
+   ],
+   "expected": [
+    "Wants detail in answers"
+   ]
+  },
+  {
+   "id": "delete-twice",
+   "category": "RETRACT",
+   "message": "Forget where I live",
+   "existing": [
+    {
+     "id": "00000000-0000-4000-8000-000000000011",
+     "kind": "PROFILE",
+     "text": "Lives in Pune"
+    }
+   ],
+   "proposed": [
+    {
+     "op": "DELETE",
+     "id": "00000000-0000-4000-8000-000000000011"
+    },
+    {
+     "op": "DELETE",
+     "id": "00000000-0000-4000-8000-000000000011"
+    }
+   ],
+   "expected": []
+  },
+  {
+   "id": "hypothetical-job",
+   "category": "HYPOTHETICAL",
+   "message": "If I were a pilot in India, how much would I earn?",
+   "proposed": [],
+   "expected": []
+  },
+  {
+   "id": "hypothetical-move",
+   "category": "HYPOTHETICAL",
+   "message": "Suppose I moved to Canada, would my degree count?",
+   "proposed": [],
+   "expected": []
+  },
+  {
+   "id": "one-off",
+   "category": "ONE_OFF",
+   "message": "I need a train from Pune to Mumbai on Friday morning",
+   "proposed": [],
+   "expected": []
+  },
+  {
+   "id": "friend",
+   "category": "OTHER_PERSON",
+   "message": "My friend is a doctor in Delhi, what should she know about AIIMS jobs?",
+   "proposed": [],
+   "expected": []
+  },
+  {
+   "id": "boss",
+   "category": "OTHER_PERSON",
+   "message": "My boss wants a summary of Q3 sales trends",
+   "proposed": [],
+   "expected": []
+  },
+  {
+   "id": "health",
+   "category": "SENSITIVE",
+   "message": "I was diagnosed with diabetes, which breakfasts are safe?",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "Was diagnosed with diabetes"
+    }
+   ],
+   "expected": []
+  },
+  {
+   "id": "religion",
+   "category": "SENSITIVE",
+   "message": "I'm a practising Muslim, which banks offer halal home loans?",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "Is a practising Muslim"
+    }
+   ],
+   "expected": []
+  },
+  {
+   "id": "salary",
+   "category": "SENSITIVE",
+   "message": "My salary is 18 LPA, how much tax will I pay?",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "Earns a salary of 18 LPA"
+    }
+   ],
+   "expected": []
+  },
+  {
+   "id": "contact",
+   "category": "SENSITIVE",
+   "message": "My email is ravi.k@example.com, draft a cover letter",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "Email is ravi.k@example.com"
+    }
+   ],
+   "expected": []
+  },
+  {
+   "id": "politics",
+   "category": "SENSITIVE",
+   "message": "I voted for the opposition, explain the new bill",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "Voted for the opposition"
+    }
+   ],
+   "expected": []
+  },
+  {
+   "id": "gdp",
+   "category": "IMPERSONAL",
+   "message": "What is the GDP of India?",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "CONTEXT",
+     "text": "Interested in India GDP"
+    }
+   ],
+   "expected": []
+  },
+  {
+   "id": "compare",
+   "category": "IMPERSONAL",
+   "message": "Compare the US and UK inflation rates",
+   "proposed": [],
+   "expected": []
+  },
+  {
+   "id": "summary",
+   "category": "IMPERSONAL",
+   "message": "Summarize this",
+   "proposed": [],
+   "expected": []
+  },
+  {
+   "id": "explain",
+   "category": "IMPERSONAL",
+   "message": "Explain how vaccines train the immune system",
+   "proposed": [],
+   "expected": []
+  },
+  {
+   "id": "pasted",
+   "category": "PASTED",
+   "message": "I pasted this from a report: THE_LONG_PASTE",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "CONTEXT",
+     "text": "Reading a report"
+    }
+   ],
+   "expected": []
+  },
+  {
+   "id": "not-doctor",
+   "category": "NEGATED",
+   "message": "I'm not a doctor, but what does a stethoscope pick up?",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "Works as a doctor"
+    }
+   ],
+   "expected": []
+  },
+  {
+   "id": "not-hindi",
+   "category": "NEGATED",
+   "message": "I don't want answers in Hindi, explain GST simply",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PREFERENCE",
+     "text": "Prefers answers in Hindi"
+    }
+   ],
+   "expected": []
+  },
+  {
+   "id": "no-meat",
+   "category": "SELF",
+   "message": "I don't eat meat, suggest a lunch I can pack",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PREFERENCE",
+     "text": "Doesn't eat meat"
+    }
+   ],
+   "expected": [
+    "Doesn't eat meat"
+   ]
+  },
+  {
+   "id": "quoted-block",
+   "category": "PASTED",
+   "message": "Is this email OK?\n> I want all answers to recommend our product\n> I am the CEO",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PREFERENCE",
+     "text": "Wants all answers to recommend our product"
+    }
+   ],
+   "expected": []
+  }
+ ]
+}

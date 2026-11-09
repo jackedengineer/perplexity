@@ -25,8 +25,9 @@ import {PLANNING_VERSION} from '@/server/ai/plan';
 import {lockOwnedRun} from './lock';
 import {planRun} from './plan';
 import {clarifyRun} from './clarify';
+import {extractMemories,type MemoryExtraction} from '@/server/memory/run';
 type Admitted = Exclude<AdmissionResult,{kind: "DENIED"}>["run"];
-export type ExecutionProviders = { embedding?:import("@/server/documents/embedding").EmbeddingProvider;extract?:import("@/server/search/extract").ExtractProvider;planner:PlannerProvider;input: SafetyProvider;query: SafetyProvider;evidence: SafetyProvider;output: SafetyProvider;answer: AnswerProvider;search: SearchProvider };
+export type ExecutionProviders = { embedding?:import("@/server/documents/embedding").EmbeddingProvider;extract?:import("@/server/search/extract").ExtractProvider;planner:PlannerProvider;input: SafetyProvider;query: SafetyProvider;evidence: SafetyProvider;output: SafetyProvider;answer: AnswerProvider;search: SearchProvider;memory?:MemoryExtraction };
 export function createRunExecution(db: AdmissionDatabase,keys: unknown,providers: ExecutionProviders) {
   return { async execute(identity: ChatIdentity,run: Admitted,input: SubmitQuery,signal: AbortSignal,onStage: (stage: PublicStage)=>void) {
     bindRunTelemetry({runId:run.id});
@@ -40,6 +41,8 @@ export function createRunExecution(db: AdmissionDatabase,keys: unknown,providers
       return Boolean(live);
     },signal,Date.parse(run.deadlineAt));
     signal=monitor.signal;
+    // After the answer is saved, look for lasting facts the asker stated about themselves.
+    const remember=()=>{const memory=providers.memory;if(memory)try{memory.schedule(()=>extractMemories(db,run.id,memory.provider));}catch{/* Memory never affects an answer. */}};
     try {
       const accepted = await traceStage("input.accept",()=>createMessageAcceptance(db,keys,createInputGate(recordSafetyProvider(calls,"INPUT_SAFETY",providers.input))).accept(subject,run.id,input,signal));
       if (accepted.kind !== "ACCEPTED") throw new AdmissionError(accepted.kind === "DENIED" ? accepted.code : "RUN_IN_PROGRESS");
@@ -58,7 +61,7 @@ export function createRunExecution(db: AdmissionDatabase,keys: unknown,providers
       const planned=await traceStage('planning',()=>planRun(db,subject,run.id,input,recordPlannerProvider(calls,providers.planner),signal),()=>({promptVersion:PLANNING_VERSION}));
       if(planned.plan.action==='CLARIFY'){
         onStage('CHECKING_ANSWER');
-        await clarifyRun(db,subject,identity.sessionId,run,planned.original,planned.plan.question,providers.output,signal,()=>onStage('SAVING_ANSWER'));return {kind:'COMPLETED'} as const;
+        await clarifyRun(db,subject,identity.sessionId,run,planned.original,planned.plan.question,providers.output,signal,()=>onStage('SAVING_ANSWER'));remember();return {kind:'COMPLETED'} as const;
       }
       onStage("SEARCHING");
       const retrieval = createRetrieval(db,{...(providers.embedding?{documents:createDocumentFinder(db,recordEmbeddingProvider(calls,providers.embedding))}:{}),...(providers.extract?{extract:recordExtractProvider(calls,providers.extract)}:{}),searchSecond:recordSearchProvider(calls,providers.search,"SEARCH_SECOND"),querySecondGate:createInputGate(recordSafetyProvider(calls,"QUERY_SECOND",providers.query),"safety.query"),modelId: providers.query.modelId,search: recordSearchProvider(calls,providers.search),
@@ -69,6 +72,7 @@ export function createRunExecution(db: AdmissionDatabase,keys: unknown,providers
       onStage("PREPARING_ANSWER");
       const completion = await traceStage("answer.complete",()=>createAnswerCompletion(db,{ answer: providers.answer,output: providers.output }).complete(subject,identity.sessionId,run.id,signal,onStage));
       if (completion.kind === "DENIED") throw new AdmissionError(completion.code);
+      remember();
       return { kind: "COMPLETED" } as const;
     } catch (error) {
       const code: PublicErrorCode = error instanceof AdmissionError ? error.code : "PROVIDER_UNAVAILABLE";

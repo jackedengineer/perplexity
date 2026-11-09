@@ -14,13 +14,14 @@ import { ConversationError } from "./errors";
 const fields = {
   pinnedAt: conversations.pinnedAt,
   id: conversations.id, title: conversations.title, revision: conversations.revision,
-  createdAt: conversations.createdAt, updatedAt: conversations.updatedAt,
+  createdAt: conversations.createdAt, updatedAt: conversations.updatedAt, memoryEnabled: conversations.memoryEnabled,
 };
 type Row = Omit<Conversation, "createdAt" | "updatedAt" | "pinnedAt"> & { createdAt: Date; updatedAt: Date; pinnedAt?: Date | null };
 const serialize = (row: Row): Conversation => ({
   pinnedAt: row.pinnedAt?.toISOString() ?? null,
   id: row.id, title: row.title, revision: row.revision,
   createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+  ...(row.memoryEnabled === undefined ? {} : { memoryEnabled: row.memoryEnabled }),
 });
 
 export function createConversationRepository(db: PgDatabase<PgQueryResultHKT, typeof schema>) {
@@ -52,12 +53,13 @@ export function createConversationRepository(db: PgDatabase<PgQueryResultHKT, ty
       },{isolationLevel:"repeatable read",accessMode:"read only"});
     },
     async create(authSubject: string, input: CreateInput) {
-      const fingerprint = createHash("sha256").update(input.title).digest("hex");
+      // A temporary chat fingerprints differently, so a replay can't flip the memory choice.
+      const fingerprint = createHash("sha256").update(input.memory === false ? `${input.title}\u0000temporary` : input.title).digest("hex");
       return db.transaction(async (tx) => {
         await tx.insert(appUsers).values({ authSubject }).onConflictDoNothing({ target: appUsers.authSubject });
         const [profile] = await tx.select({ id: appUsers.id }).from(appUsers).where(eq(appUsers.authSubject, authSubject));
         const inserted = await tx.insert(conversations).values({
-          userId: profile.id, creationRequestId: input.clientRequestId, creationFingerprint: fingerprint, title: input.title,
+          userId: profile.id, creationRequestId: input.clientRequestId, creationFingerprint: fingerprint, title: input.title, memoryEnabled: input.memory !== false,
         }).onConflictDoNothing({ target: [conversations.userId, conversations.creationRequestId] }).returning(fields);
         if (inserted[0]) return { conversation: serialize(inserted[0]), created: true };
         const [existing] = await tx.select({ ...fields, deletedAt: conversations.deletedAt, fingerprint: conversations.creationFingerprint }).from(conversations)

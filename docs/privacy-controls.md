@@ -34,3 +34,11 @@ Restoring a backup requires replaying deletion records before exposing restored
 content. Production launch must verify the actual backup window, provider data
 policies, cron schedule and operational retention requirements. Do not advertise
 immediate deletion from third-party systems.
+
+## Memory
+
+Signed-in users' memories (`memories`) and About you (`memory_settings`) belong to the account, not to a conversation. Conversation deletion clears a memory's `source_message_id` but keeps the memory. **Delete all memories** in Memory settings permanently removes every memory row. About you is cleared by saving it empty. Account deletion cascades to both.
+
+Pausing memory stops both reading and extraction. A temporary chat (`conversations.memory_enabled = false`) does neither.
+
+The extraction ledger (`memory_extractions`) keeps status, model, cost and an operation count for each run, but never memory text. It is removed with the run. Logs carry counts only. Memory never reaches the planner or the search provider. See `docs/memory.md`.

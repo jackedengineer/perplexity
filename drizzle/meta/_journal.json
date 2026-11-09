@@ -295,6 +295,13 @@
       "when": 1794125971100,
       "tag": "0041_attachment_deletes",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1794238931250,
+      "tag": "0042_memory",
+      "breakpoints": true
     }
   ]
 }

@@ -5,11 +5,14 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import {draftPrompt,prepareDraftInput} from "./draft-input";
 import type { EvidencePackage } from "@/server/contracts/pipeline";
 import { type SafetyModelConfig } from "./models";
-import { ANSWER_PROMPT } from "./prompts/answer";
+import { answerSystemPrompt } from "./prompts/answer";
 import { AnswerError, ProviderRefusalError, boundedModelFetch, boundedWork, type ExecutionOptions } from "./bounded";
 import { providerUsage, type ProviderUsage } from "./usage";
 import { citedDraftSchema,renderCitedDraft } from "./cited-draft";
-export type DraftInput = { question: string;context?:Array<{role:"USER"|"ASSISTANT";text:string}>;interpretation?:string;answerLanguage?:string;evidence: EvidencePackage };
+// reader: what the asker has told Perplex about themselves (About you and memories). It shapes
+// the answer's tone, depth and units only; it is never evidence and never reaches search.
+export type Reader = { instructions?: string;memories: string[] };
+export type DraftInput = { question: string;context?:Array<{role:"USER"|"ASSISTANT";text:string}>;interpretation?:string;answerLanguage?:string;reader?:Reader;evidence: EvidencePackage };
 export type PrivateDraft = { text: string;usage: ProviderUsage };
 export interface AnswerProvider { readonly modelId?: string;prepare?(input:DraftInput):DraftInput;generate(input: DraftInput,options: ExecutionOptions): Promise<PrivateDraft>; usage?(): ProviderUsage | undefined }
 export function createAnswerProvider(config: SafetyModelConfig,request: typeof fetch = fetch,maxOutputTokens:600|1200=1200,maxDurationMs:12000|45000=12000,extendedBudget=false): AnswerProvider {
@@ -37,7 +40,7 @@ export function createAnswerProvider(config: SafetyModelConfig,request: typeof f
           provider: { only: [config.provider],allow_fallbacks: false,require_parameters: true,data_collection: "deny",zdr: true,
             max_price: policy.max_price },
           usage: { include: true },extraBody: { plugins: [],...(policy.reasoning?{reasoning:policy.reasoning}:{}) },
-        }),output: Output.object({schema:citedDraftSchema(evidence)}),system: ANSWER_PROMPT,prompt: draftPrompt(input),
+        }),output: Output.object({schema:citedDraftSchema(evidence)}),system: answerSystemPrompt(input),prompt: draftPrompt(input),
           maxOutputTokens,maxRetries: 0,abortSignal: signal,timeout: maxDurationMs,tools: {},toolChoice: "none",
           experimental_telemetry: { isEnabled: false,recordInputs: false,recordOutputs: false },
         });

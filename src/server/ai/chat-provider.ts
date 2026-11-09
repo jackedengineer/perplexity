@@ -2,7 +2,7 @@ import {providerRefused} from './provider-refusal';
 import {answerProviderPolicy} from './answer-policy';
 import { generateText,Output } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import {chatPrompt,prepareChatInput,CHAT_PROMPT,chatDraftSchema,renderChatDraft} from "./chat-draft";
+import {chatPrompt,prepareChatInput,chatSystemPrompt,chatDraftSchema,renderChatDraft} from "./chat-draft";
 import type {AnswerProvider} from "./answer";
 import { type SafetyModelConfig } from "./models";
 import { AnswerError, ProviderRefusalError, boundedModelFetch, boundedWork } from "./bounded";
@@ -32,7 +32,7 @@ export function createChatProvider(config: SafetyModelConfig,request: typeof fet
           provider: { only: [config.provider],allow_fallbacks: false,require_parameters: true,data_collection: "deny",zdr: true,
             max_price: policy.max_price },
           usage: { include: true },extraBody: { plugins: [],...(policy.reasoning?{reasoning:policy.reasoning}:{}) },
-        }),output: Output.object({schema:chatDraftSchema}),system: CHAT_PROMPT,prompt: chatPrompt(input),
+        }),output: Output.object({schema:chatDraftSchema}),system: chatSystemPrompt(input),prompt: chatPrompt(input),
           maxOutputTokens,maxRetries: 0,abortSignal: signal,timeout: maxDurationMs,tools: {},toolChoice: "none",
           experimental_telemetry: { isEnabled: false,recordInputs: false,recordOutputs: false },
         });

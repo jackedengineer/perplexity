@@ -2,7 +2,8 @@ import { z } from "zod";
 
 const title = z.string().trim().transform((value) => value.replace(/\s+/gu, " "))
   .pipe(z.string().min(1).max(160).refine((value) => !/[\u0000-\u001f\u007f]/u.test(value)));
-export const createInput = z.strictObject({ clientRequestId: z.uuid(), title: title.default("Untitled") });
+// memory: false starts a temporary chat. It can only be chosen when the conversation is created.
+export const createInput = z.strictObject({ clientRequestId: z.uuid(), title: title.default("Untitled"), memory: z.literal(false).optional() });
 export const pinInput = z.strictObject({ pinned: z.boolean() });
 export const renameInput = z.strictObject({ title, expectedRevision: z.number().int().min(0).max(2_147_483_646) });
 const cursorShape = z.strictObject({ updatedAt: z.iso.datetime(), id: z.uuid() });

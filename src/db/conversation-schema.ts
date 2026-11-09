@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, jsonb, pgEnum, pgPolicy, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, jsonb, pgEnum, pgPolicy, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
 export const appUsers = pgTable("app_users", {
@@ -18,6 +18,8 @@ export const conversations = pgTable("conversations", {
   revision: integer("revision").notNull().default(0),
   deletedAt: timestamp("deleted_at", { withTimezone: true, precision: 3 }),
   nextSequence: integer("next_sequence").notNull().default(1),
+  // False for a temporary chat: answers neither use nor save memories. Fixed at creation.
+  memoryEnabled: boolean("memory_enabled").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
 }, (table) => [
