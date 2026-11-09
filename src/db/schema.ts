@@ -15,3 +15,4 @@ export * from "./job-schema";
 export * from "./billing-schema";
 
 export * from "./document-schema";
+export * from "./memory-schema";

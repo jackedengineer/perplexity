@@ -43,3 +43,7 @@ GRANT SELECT, INSERT ON document_chunks TO perplex_web;
 GRANT UPDATE (embedding, embedding_model, lease_until, attempts) ON document_chunks TO perplex_web;
 GRANT SELECT, INSERT, UPDATE ON document_usage TO perplex_web;
 GRANT SELECT, INSERT ON run_documents TO perplex_web;
+-- Memory: content columns of memories, the user's own settings, and the extraction outcome.
+GRANT SELECT, INSERT, DELETE ON memories TO perplex_web; GRANT UPDATE (kind, text, updated_at) ON memories TO perplex_web;
+GRANT SELECT, INSERT ON memory_settings TO perplex_web; GRANT UPDATE (paused, instructions, updated_at) ON memory_settings TO perplex_web;
+GRANT SELECT, INSERT ON memory_extractions TO perplex_web; GRANT UPDATE (status, model, cost_micro_usd, operations, finished_at) ON memory_extractions TO perplex_web;
