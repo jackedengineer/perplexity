@@ -48,6 +48,12 @@ globalThis.fetch=async(input,init)=>{
     const abort=()=>{record("answer-abort",scenario);clearTimeout(timer);reject(new Error("Synthetic provider aborted"));};
     if(init?.signal?.aborted)abort();else init?.signal?.addEventListener("abort",abort,{once:true});
   });
+  // Memory extraction runs on the planner's model; it learns only from the civil-engineer fixture question.
+  if(stage==='planner'&&system.startsWith('You keep a short list of lasting facts')){
+    const data=JSON.parse(body.messages.at(-1).content);
+    const operations=data.message.includes('civil engineer in Pune')?[{op:'ADD',kind:'PROFILE',text:'Works as a civil engineer'},{op:'ADD',kind:'PROFILE',text:'Lives in Pune'}]:[];
+    return Response.json({id:'synthetic-memory',model:body.model,created:1,choices:[{index:0,finish_reason:'stop',message:{role:'assistant',content:JSON.stringify({operations})}}],usage:{prompt_tokens:100,completion_tokens:20,total_tokens:120,cost:.00005}});
+  }
   if(stage==='planner'){
     const data=JSON.parse(body.messages.at(-1).content),question=data.original.text;
     const plan=question==='Is it better?'?{action:'CLARIFY',question:'Which products are you comparing?',reasonCode:'MISSING_ENTITY'}:{action:'ANSWER',standaloneQuestion:question,intent:'EXPLAIN',explicitConstraints:[],disclosedAssumptions:[],retrieval:{required:true,queries:[question],freshness:'ANY',startDate:null,endDate:null},answerLanguage:'en'};

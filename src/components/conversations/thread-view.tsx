@@ -44,7 +44,7 @@ export function ThreadView({conversation,initial,research=idleResearch,submit,as
   return <main id="main" className={`thread-page ${hasAnswer||hasQuestion||research.question||research.pending?"active-thread":""}`}>
     <header className="research-topbar answer-topbar"><span className="thread-tab"><ResearchMark/>Answer</span>
       {history.items.some(message=>message.answer?.sources.length)&&<button className="answer-tab-button" aria-pressed={sourcesOpen} onClick={()=>setSourcesOpen(!sourcesOpen)}><Icon name="link" size={16}/>Sources</button>}
-      <span className="toolbar-spacer"/><ConversationActions conversation={conversation} renameUnavailable={research.pending}/><span className="private-pill" role="img" aria-label="Private conversation" title="Private conversation"><Icon name="lock" size={13}/><span className="private-label">Private</span></span>
+      <span className="toolbar-spacer"/><ConversationActions conversation={conversation} renameUnavailable={research.pending}/>{conversation.memoryEnabled===false&&<span className="private-pill temporary-pill" role="img" aria-label="Temporary chat: answers don’t use or save memories" title="Temporary chat: answers don’t use or save memories"><Icon name="clock" size={13}/><span className="private-label">Temporary chat</span></span>}<span className="private-pill" role="img" aria-label="Private conversation" title="Private conversation"><Icon name="lock" size={13}/><span className="private-label">Private</span></span>
     </header>
     <section className="thread-content" aria-label="Conversation history" tabIndex={0}>
       <h1>{conversation.title}</h1>

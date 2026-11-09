@@ -13,8 +13,8 @@ import { ConversationRequestError } from "./client-api";
 const NO_ATTACHMENTS:string[]=[];
 // attachments/onAttachments: the files for this question, owned by the page so they can
 // carry into a follow-up. Without them the composer has no attach controls (guests).
-export function QuestionComposer({text,onText,onSubmit,pending,onStop,placeholder="Ask anything…",attachments=NO_ATTACHMENTS,onAttachments}: {
-  text:string;onText:(value:string)=>void;onSubmit:()=>void;pending:boolean;onStop?:()=>void;placeholder?:string;attachments?:string[];onAttachments?:(ids:string[])=>void;
+export function QuestionComposer({text,onText,onSubmit,pending,onStop,placeholder="Ask anything…",attachments=NO_ATTACHMENTS,onAttachments,tools}: {
+  text:string;onText:(value:string)=>void;onSubmit:()=>void;pending:boolean;onStop?:()=>void;placeholder?:string;attachments?:string[];onAttachments?:(ids:string[])=>void;tools?:React.ReactNode;
 }) {
   const {data,mode,deepAvailable}=useModelAccess();
   const deep=mode==='DEEP',needsPro=deep&&data&&!data.usage.subscription;
@@ -29,7 +29,7 @@ export function QuestionComposer({text,onText,onSubmit,pending,onStop,placeholde
     <textarea aria-label="Ask a question" placeholder={placeholder} rows={2} maxLength={maximum} value={text} disabled={pending} onChange={event=>onText(event.target.value)} onPaste={files.onPaste}
       onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();if(!pending&&available&&valid)onSubmit();}}} />
     <div className="composer-toolbar">
-      {files.usable&&<AttachButton attachments={attachments} files={files} disabled={pending}/>}{!deep&&<ModelSelector disabled={pending}/>}<span className="toolbar-spacer"/>
+      {files.usable&&<AttachButton attachments={attachments} files={files} disabled={pending}/>}{!deep&&<ModelSelector disabled={pending}/>}{!deep&&tools}<span className="toolbar-spacer"/>
       {deep&&<span className="deep-composer-hint">{text.length}/1,000</span>}
       {needsPro?<Link href="/pricing" className="composer-upgrade">Upgrade to Pro ↗</Link>:
       pending&&onStop ? <button className="send-button stop-button" type="button" onClick={onStop} aria-label="Stop research"><span/></button>
@@ -46,18 +46,20 @@ export function QuestionComposer({text,onText,onSubmit,pending,onStop,placeholde
 }
 const noop=()=>{};
 export function StartQuestion({compact=false}: {compact?:boolean}) {
-  const [text,setText]=useState(""),[pending,setPending]=useState(false),[error,setError]=useState(""),[attachments,setAttachments]=useState<string[]>([]);
+  const [text,setText]=useState(""),[pending,setPending]=useState(false),[error,setError]=useState(""),[attachments,setAttachments]=useState<string[]>([]),[temporary,setTemporary]=useState(false);
   const starting=useStartSearch(),startDeep=useStartDeep(),{mode,data}=useModelAccess(),router=useRouter();
   useEffect(()=>{try{const draft=sessionStorage.getItem(WORKSPACE_DRAFT_KEY);if(draft){sessionStorage.removeItem(WORKSPACE_DRAFT_KEY);queueMicrotask(()=>setText(draft.slice(0,4000)));}}catch{/* Storage is optional. */}},[]);
   async function submit() {
     if(pending||!text.trim())return;setPending(true);setError("");
-    try {if(mode==='DEEP')await startDeep(text);else await starting(text,data?.documents?attachments:[]);}catch(failure){if(failure instanceof ConversationRequestError&&failure.status===401)router.replace("/sign-in");
+    try {if(mode==='DEEP')await startDeep(text);else await starting(text,data?.documents?attachments:[],temporary);}catch(failure){if(failure instanceof ConversationRequestError&&failure.status===401)router.replace("/sign-in");
       setError(mode==='DEEP'&&failure instanceof Error?failure.message:"We couldn’t confirm that it was saved. Retry to safely check the same creation request.");setPending(false);}
   }
   return <section className={compact?"next-question":"new-thread"}>
     {!compact&&<div className="new-thread-heading"><ResearchMark/><h1>A little space to think.</h1><p>Start a conversation. Follow an idea. Find something worth knowing.</p></div>}
     {!compact&&<div className="starter-prompts" aria-label="Ideas to get started">{['Explain a complex idea simply','Help me plan my next project','Compare two options before deciding'].map(prompt=><button key={prompt} onClick={()=>setText(prompt)}>{prompt}<span aria-hidden="true">↗</span></button>)}</div>}
-    <QuestionComposer text={text} onText={setText} onSubmit={()=>void submit()} pending={pending} placeholder={compact?"Ask another question…":"Ask anything…"} attachments={attachments} onAttachments={setAttachments}/>
+    <QuestionComposer text={text} onText={setText} onSubmit={()=>void submit()} pending={pending} placeholder={compact?"Ask another question…":"Ask anything…"} attachments={attachments} onAttachments={setAttachments}
+      tools={!compact&&data&&data.usage.tier!=="GUEST"&&<button type="button" className="temporary-toggle" aria-label="Temporary chat" aria-pressed={temporary} disabled={pending} onClick={()=>setTemporary(!temporary)}
+        title={temporary?"This chat won’t use or save memories":"Start a chat that won’t use or save memories"}><Icon name="clock" size={14}/><span>Temporary</span></button>}/>
     <div className="composer-feedback" aria-live="polite">{error&&<p role="alert">{error}</p>}</div>
   </section>;
 }
