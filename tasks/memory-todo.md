@@ -1,0 +1,168 @@
+# Tasks: Memory v1
+
+Spec: `docs/memory-spec.md` · Plan: `tasks/memory-plan.md`
+
+- [ ] **T1 Schema and grants**
+  - Acceptance:
+    - `memories`, `memory_settings`, `memory_extractions`, the `memory_kind` enum and `conversations.memory_enabled` exist, with the checks and indexes from the spec.
+    - Grants are exactly as the spec lists.
+  - Verify:
+    - `pnpm db:generate`, then rename to `drizzle/0042_memory.sql` and add the grants DO block.
+    - `pnpm db:migrate` locally.
+    - `pnpm db:verify` reports 33 tables.
+    - The restricted-role integration test's grant list is updated and passes.
+  - Files:
+    - `src/db/memory-schema.ts`
+    - `src/db/schema.ts`
+    - `src/db/conversation-schema.ts`
+    - `drizzle/0042_memory.sql` (and meta)
+    - `scripts/runtime-grants.sql`
+    - `scripts/verify-db.mjs`
+
+- [ ] **T2 Memory store**
+  - Acceptance:
+    - `getSettings` and `updateSettings` create the settings row lazily.
+    - `deleteAll` returns a count and is idempotent.
+    - `loadReader(userId, conversationId)` returns null when paused, temporary or a guest. Otherwise it returns About you plus memories ordered PREFERENCE, PROFILE, CONTEXT, newest first, within 2,000 characters.
+    - `applyOperations` takes the `FOR UPDATE` lock, skips duplicates, and evicts the oldest CONTEXT memory, then the oldest of any kind, past 50.
+  - Verify: `tests/integration/memory.test.ts` store cases, including two concurrent applies that can't exceed 50.
+  - Files: `src/server/memory/store.ts`, `tests/integration/memory.test.ts`
+
+- [ ] **T3 Settings API**
+  - Acceptance:
+    - `GET`, `PATCH` and `DELETE /api/memory` follow the spec.
+    - Strict zod body; `instructions` at most 1,000 characters, empty becomes null.
+    - Guests get 403.
+    - Same origin, session and rate-limit checks as `/api/documents`.
+  - Verify: integration tests for each route, guest refusal, a foreign origin and bad bodies.
+  - Files:
+    - `src/server/memory/http.ts`
+    - `src/app/api/memory/route.ts`
+    - `src/server/contracts/error-messages.ts` (only if a new code is needed)
+    - tests
+
+- [ ] **T4 Memories in answers** (Checkpoint A)
+  - Acceptance:
+    - `DraftInput.reader` is optional and filled by `complete.ts` from `loadReader`.
+    - `draftPrompt` and `chatPrompt` include it.
+    - Over budget, memories are dropped first, then About you, before evidence or history.
+    - The answer prompt is `answer-v11` and the chat prompt `chat-v3`, each with the reader rules, including "never mention memory".
+    - Planner input and search queries are unchanged.
+  - Verify:
+    - A unit test for the budget order.
+    - An integration test: the answer and chat providers receive `reader`; the planner and search inputs contain no memory text; paused and temporary chats get no `reader`.
+    - Grep and update the prompt-version snapshots.
+  - Files:
+    - `src/server/ai/answer.ts`
+    - `src/server/ai/draft-input.ts`
+    - `src/server/ai/chat-draft.ts`
+    - `src/server/ai/prompts/answer.ts`
+    - `src/server/runs/complete.ts`
+
+- [ ] **T5 Pure checks**
+  - Acceptance:
+    - `words()` moves to `src/server/ai/text.ts`, and `plan.ts` imports it with no behaviour change.
+    - `mentionsSelf`.
+    - Sensitive patterns: email, phone, card, ID-number and the keyword list.
+    - `isGrounded(text, message)`: at least 60% of content words, after suffix stripping and framing-word exclusion.
+    - `checkOperations(ops, existingIds, message)` drops invalid operations one by one, with a reason.
+  - Verify:
+    - `tests/unit/memory-checks.test.ts`.
+    - The existing planner unit tests still pass unchanged.
+  - Files:
+    - `src/server/ai/text.ts`
+    - `src/server/ai/plan.ts`
+    - `src/server/memory/gate.ts`
+    - `src/server/memory/checks.ts`
+    - `tests/unit/memory-checks.test.ts`
+
+- [ ] **T6 Extraction provider**
+  - Acceptance:
+    - Prompt plus strict zod output schema: at most 3 operations, kinds and lengths as the spec says.
+    - `createExtractionProvider(config)` follows the bounded-fetch pattern in `planner-provider.ts`: 16 KB wire cap, 400 output tokens, 8-second timeout, and reports usage and refusal.
+    - A fake provider for tests.
+  - Verify: unit tests for oversize input (rejected before dispatch), non-JSON output, refusal, and usage capture with a mocked fetch.
+  - Files:
+    - `src/server/memory/extract.ts`
+    - `src/server/memory/prompt.ts`
+    - `tests/unit/memory-extract.test.ts`
+
+- [ ] **T7 Automatic extraction after each answer** (Checkpoint B)
+  - Acceptance:
+    - `execute.ts` calls `schedule(() => extractMemories(...))` only after a `COMPLETED` result.
+    - `extractMemories` checks: signed in and not a guest, not paused, `memory_enabled`, no files, `mentionsSelf`, and under 100 today.
+    - It inserts a `memory_extractions` STARTED row (the primary key stops duplicates), calls the provider, runs `checkOperations` and `applyOperations`, and finishes the row with status, cost and operation count.
+    - Errors are swallowed and logged as counts only.
+    - `service.ts` wires the provider from the planner configuration.
+  - Verify: integration tests for each skip condition (no row written), ADD, UPDATE and DELETE flows, a provider failure (answer unaffected, row FAILED), the daily cap, and run settlement unchanged.
+  - Files:
+    - `src/server/memory/run.ts`
+    - `src/server/runs/execute.ts`
+    - `src/server/chat/service.ts`
+    - `tests/integration/memory.test.ts`
+
+- [ ] **T8 Temporary chat contract**
+  - Acceptance:
+    - `submissionSchema` gains `memory?: false`. A request with `expectedRevision > 0` that sends it is rejected as invalid.
+    - Conversation creation stores `memory_enabled = false`.
+    - The history and conversation views expose `memoryEnabled`, so the thread can show its label.
+  - Verify: integration tests for creating a temporary conversation, rejecting the flag on a later message, and the views carrying the flag.
+  - Files:
+    - `src/server/contracts/chat.ts`
+    - `src/server/conversations/repository.ts`
+    - `src/server/conversations/views.ts`
+    - tests
+
+- [ ] **T9 Memory dialog and temporary chat UI** (Checkpoint C)
+  - Acceptance:
+    - A Memory item in the account popover opens `MemoryDialog`, styled like the Files dialog. It has the explanation, About you with Save, the "Use and save memories" switch, and Delete all with a confirm. No list, no count.
+    - A Temporary chat switch on a new, empty conversation, and a "Temporary chat" label in the thread.
+    - Mobile rules from the earlier work: 16px inputs on touch screens, press feedback on controls, hover gated to devices that hover.
+    - No memory UI anywhere in answers.
+  - Verify:
+    - `tests/e2e/memory.spec.ts` covers save About you, pause and resume, delete all with confirm, the temporary switch and label, and phone width.
+    - The foundation and documents suites still pass.
+  - Files:
+    - `src/components/conversations/memory-dialog.tsx`
+    - `research-shell.tsx`
+    - `question-composer.tsx`
+    - `thread-view.tsx`
+    - `src/app/(research)/graphite.css`
+
+- [ ] **T10 Extraction eval**
+  - Acceptance:
+    - `tests/evals/memory-cases.json` holds about 40 labelled messages: self-facts, preferences, changes, retractions, hypotheticals, other people, sensitive, and non-personal.
+    - An offline test scores recorded outputs through `checkOperations` in `pnpm check`.
+    - `pnpm eval:memory` runs live behind `LIVE_MEMORY_EVAL=1`.
+  - Verify:
+    - The offline run meets 0 sensitive, 0 ungrounded and ≤1 wrong.
+    - The live run only with the user's OK.
+  - Files:
+    - `tests/evals/memory-cases.json`
+    - `tests/unit/memory-eval.test.ts`
+    - `tests/evals/memory.live.test.ts`
+    - `vitest.memory-eval.config.ts`
+    - `package.json`
+
+- [ ] **T11 Docs**
+  - Acceptance:
+    - `docs/memory.md` describes what shipped.
+    - `docs/privacy-controls.md` and the public privacy page explain automatic memory, Pause, Delete all, Temporary chat, and that memories survive conversation deletion.
+    - The spec's status is set to "implemented".
+  - Verify: read through, and the e2e privacy-page link check passes.
+  - Files:
+    - `docs/memory.md`
+    - `docs/privacy-controls.md`
+    - `src/app/privacy/page.tsx`
+    - `docs/memory-spec.md`
+
+- [ ] **T12 Ship**
+  - Acceptance:
+    - A PR to `main` with CI green.
+    - **With the user's approval:** the production migration, then the merge, then the build and `wrangler deploy`.
+    - The read-only production script confirms the tables and grants.
+    - One manual round in the owner's account: state a fact, ask a question that uses it, say "forget that…".
+  - Verify: CI checks, `db:verify` on production, the deployment version, and the manual round's results reported back. The owner deletes any test memories with Delete all.
+  - Files:
+    - `.artifacts/rag-spike/prod-memory-verify.mjs`
+    - the PR description
