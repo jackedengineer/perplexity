@@ -41,7 +41,8 @@
     "billing:verify": "tsx scripts/verify-live-billing.ts",
     "cf:build": "node scripts/verify-cloudflare-build-env.mjs && opennextjs-cloudflare build && node scripts/verify-cloudflare-static-cache.mjs && opennextjs-cloudflare populateCache local",
     "cf:preview": "wrangler dev --local --port 8787",
-    "eval:documents": "LIVE_DOCUMENT_EVAL=1 vitest run --config vitest.documents-eval.config.ts"
+    "eval:documents": "LIVE_DOCUMENT_EVAL=1 vitest run --config vitest.documents-eval.config.ts",
+    "eval:memory": "LIVE_MEMORY_EVAL=1 vitest run --config vitest.memory-eval.config.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "4.0.152",
