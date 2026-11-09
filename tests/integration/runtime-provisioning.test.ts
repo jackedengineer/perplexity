@@ -48,3 +48,14 @@ it('grants narrow paid-content cleanup functions without raw deletion or undelet
   has_column_privilege('perplex_web','public.durable_jobs','deleted_at','UPDATE') AS undelete`);
  expect(rows[0]).toEqual({erase:true,prune:true,raw_delete:false,undelete:false});
 });
+it('lets the web role rewrite memory content but never its owner, source or ledger cost history',async()=>{
+ const {rows}=await pg.query(`SELECT
+  has_table_privilege('perplex_web','public.memories','DELETE') AS forget,
+  has_column_privilege('perplex_web','public.memories','text','UPDATE') AS rewrite,
+  has_column_privilege('perplex_web','public.memories','user_id','UPDATE') AS reassign,
+  has_column_privilege('perplex_web','public.memories','source_message_id','UPDATE') AS resource,
+  has_column_privilege('perplex_web','public.memory_settings','user_id','UPDATE') AS settings_owner,
+  has_table_privilege('perplex_web','public.memory_extractions','DELETE') AS erase_ledger,
+  has_column_privilege('perplex_web','public.memory_extractions','user_id','UPDATE') AS ledger_owner`);
+ expect(rows[0]).toEqual({forget:true,rewrite:true,reassign:false,resource:false,settings_owner:false,erase_ledger:false,ledger_owner:false});
+});
