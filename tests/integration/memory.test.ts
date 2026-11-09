@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import * as schema from "@/db/schema";
 import { applyOperations, deleteAllMemories, getSettings, listMemories, loadReader, memoryCount, updateSettings } from "@/server/memory/store";
+import { createMemoryHttp } from "@/server/memory/http";
 
 const pg = new PGlite(), db = drizzle(pg, { schema });
 beforeAll(async () => { const journal = JSON.parse(await readFile("drizzle/meta/_journal.json", "utf8")); for (const entry of journal.entries) await pg.exec(await readFile(`drizzle/${entry.tag}.sql`, "utf8")); });
@@ -106,5 +107,42 @@ describe("what an answer may know about the asker", () => {
     expect(await loadReader(db, who.userId, temporary.conversationId)).toBeNull();
     await updateSettings(db, who.subject, { paused: true });
     expect(await loadReader(db, who.userId, who.conversationId)).toBeNull();
+  });
+});
+
+describe("memory settings API", () => {
+  const origin = "https://perplex.test";
+  function api(who: { subject: string } | null, guest = false) {
+    const consumeRequest = async () => undefined;
+    return createMemoryHttp({ identity: async () => who ? { user: { id: who.subject, isAnonymous: guest }, sessionId: "s" } as never : null, origin: () => origin, consumeRequest,
+      backend: () => ({ settings: s => getSettings(db, s), update: (s, p) => updateSettings(db, s, p), deleteAll: s => deleteAllMemories(db, s) }), log: () => undefined });
+  }
+  const patch = (body: unknown, extra: Record<string, string> = {}) => new Request(`${origin}/api/memory`, { method: "PATCH", headers: { origin, "content-type": "application/json", ...extra }, body: typeof body === "string" ? body : JSON.stringify(body) });
+
+  it("reads, updates and deletes the signed-in person's memory settings", async () => {
+    const who = await person(), http = api(who);
+    expect(await (await http.read(new Request(`${origin}/api/memory`))).json()).toEqual({ data: { paused: false, instructions: null } });
+    const updated = await http.update(patch({ paused: true, instructions: "Metric units" }));
+    expect(updated.status).toBe(200);
+    expect(updated.headers.get("cache-control")).toBe("private, no-store");
+    expect(await updated.json()).toEqual({ data: { paused: true, instructions: "Metric units" } });
+    await applyOperations(db, who.userId, [add("Lives in Pune")], null);
+    await updateSettings(db, who.subject, { paused: false });
+    await applyOperations(db, who.userId, [add("Lives in Pune")], null);
+    const removed = await http.deleteAll(new Request(`${origin}/api/memory`, { method: "DELETE", headers: { origin } }));
+    expect(await removed.json()).toEqual({ data: { deleted: 1 } });
+  });
+
+  it("refuses guests, strangers, foreign origins and malformed changes", async () => {
+    const who = await person();
+    expect((await api(null).read(new Request(`${origin}/api/memory`))).status).toBe(401);
+    expect((await api(who, true).read(new Request(`${origin}/api/memory`))).status).toBe(401);
+    expect((await api(who).update(patch({ paused: true }, { origin: "https://evil.test" }))).status).toBe(403);
+    expect((await api(who).deleteAll(new Request(`${origin}/api/memory`, { method: "DELETE" }))).status).toBe(403);
+    for (const body of [{}, { paused: "yes" }, { instructions: "x".repeat(1001) }, { paused: true, extra: 1 }, "not json"]) {
+      expect((await api(who).update(patch(body))).status).toBe(422);
+    }
+    expect((await api(who).update(new Request(`${origin}/api/memory`, { method: "PATCH", headers: { origin, "content-type": "text/plain" }, body: "{}" }))).status).toBe(422);
+    expect(await getSettings(db, who.subject)).toEqual({ paused: false, instructions: null });
   });
 });

@@ -207,7 +207,7 @@ GRANT UPDATE (status, model, cost_micro_usd, operations, finished_at) ON memory_
 
 ## API
 
-All routes are signed-in only (guests get 403) and run the same origin, session and rate-limit checks as `/api/documents`. Errors use the existing error shape (`src/server/contracts/error-messages.ts`).
+All routes are signed-in only (guests get 401 `UNAUTHENTICATED`, as with `/api/documents`) and run the same origin, session and rate-limit checks as `/api/documents`. Errors use the existing error shape (`src/server/contracts/error-messages.ts`).
 
 | Route | Body | Response |
 |---|---|---|
