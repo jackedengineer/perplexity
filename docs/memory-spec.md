@@ -41,7 +41,8 @@ Extraction is one small structured-output model call per eligible question. It u
 - Memory isn't paused.
 - The conversation isn't temporary.
 - The question passed the input safety check and has no attached files.
-- The **first-person gate** passes. This is a free, deterministic check that the message talks about the user: it contains `I`, `I'm`, `I've`, `my`, `me`, `mine`, `myself`, `we`, `our` or `us` as a whole word. "What is the GDP of India?" never reaches the model.
+- The message is at most 2,000 characters. Longer messages are mostly pasted text, which says nothing about the person pasting it.
+- The **first-person gate** passes. This is a free, deterministic check that the message talks about the user: it contains `I`, `I'm`, `I've`, `my`, `me`, `mine`, `myself`, `we` or `our` as a whole word. `us` is left out, because "the US" is far more common in questions. "What is the GDP of India?" never reaches the model.
 
 **What it sees**
 

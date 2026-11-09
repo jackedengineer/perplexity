@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {words} from './text';
 import {queryPlanSchema,type QueryPlan} from '@/server/contracts/pipeline';
 import {MAX_SUBMISSION_BYTES,localeSchema,questionTextSchema,timezoneSchema} from '@/server/contracts/chat';
 import {safeEvidenceText} from '@/server/search/evidence';
@@ -27,7 +28,6 @@ export const PLANNER_FAILURES=['INPUT_INVALID','NOT_DISPATCHED','TIMEOUT','HTTP_
 export type PlannerFailure=typeof PLANNER_FAILURES[number];
 export class PlanningError extends Error{constructor(readonly reason:PlannerFailure='UNKNOWN',readonly httpStatus?:number){super('Planning unavailable');}}
 const genericWords=new Set(('a an and are as at about be between by can compare comparison cost costs current date dates describe differences do does explain explanation fact facts features find for from general give how in information is latest me of official on or overview plans please price prices pricing question recent research resources results review search sources than the their them then these they this those to topic use using vs versus was were what when where which why with without work works you your it its that one ones into details summary summarize provide tell more examples difference brief briefly concise sentence sentences word words').split(' '));
-const words=(text:string)=>(text.normalize('NFKC').replace(/[’‘]/gu,"'").toLowerCase().match(/[\p{L}\p{N}]+(?:[._'-][\p{L}\p{N}]+)*/gu)??[]).map(word=>word.replace(/'s$/u,''));
 const numeric=(text:string)=>text.normalize('NFKC').match(/\d+(?:[.,/-]\d+)*/gu)?.map(v=>v.replaceAll(',',''))??[];
 const referenceWords=new Set('it its they their them that this these those former latter'.split(' '));
 function hasReference(text:string){
