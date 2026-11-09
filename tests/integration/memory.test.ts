@@ -7,6 +7,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import * as schema from "@/db/schema";
 import { applyOperations, deleteAllMemories, getSettings, listMemories, loadReader, memoryCount, updateSettings } from "@/server/memory/store";
 import { createMemoryHttp } from "@/server/memory/http";
+import { extractMemories } from "@/server/memory/run";
+import { ExtractionError, type ExtractionProvider } from "@/server/memory/extract";
 import { submissionSchema, type RunMode } from "@/server/contracts/chat";
 import { createRunAdmission } from "@/server/runs/admit";
 import { createRunExecution, type ExecutionProviders } from "@/server/runs/execute";
@@ -165,8 +167,9 @@ describe("answers with memory", () => {
     const identity = { user: { id: who.subject }, sessionId: (await completionSession(db, who.subject)).sessionId };
     return { ...who, identity, admission: createRunAdmission(db, keys, { ...FREE_ADMISSION_POLICY, operatorBudgetKey: budgetKey }) };
   }
-  function providers(text = "Suppliers in the area [S1].") {
-    return { planner: { ...fakePlanner(), plan: vi.fn(fakePlanner().plan) }, input: fakeSafety(), query: fakeSafety(), evidence: fakeSafety(), output: fakeSafety(),
+  function providers(text = "Suppliers in the area [S1].", memory?: ExtractionProvider) {
+    const pending: Promise<void>[] = [];
+    return { pending, ...(memory ? { memory: { provider: memory, schedule: (work: () => Promise<void>) => { pending.push(work()); } } } : {}), planner: { ...fakePlanner(), plan: vi.fn(fakePlanner().plan) }, input: fakeSafety(), query: fakeSafety(), evidence: fakeSafety(), output: fakeSafety(),
       answer: { modelId: "test/answer", generate: vi.fn().mockResolvedValue({ text, usage: knownUsage }) },
       search: { search: vi.fn().mockResolvedValue({ results: [{ title: "Suppliers", url: "https://example.org/s", content: "Concrete suppliers list.", score: 0.9 }], credits: 1 }) } };
   }
@@ -203,5 +206,91 @@ describe("answers with memory", () => {
       expect(result).toMatchObject({ kind: "COMPLETED" });
       expect(p.answer.generate.mock.calls[0][0]).not.toHaveProperty("reader");
     }
+  });
+});
+
+describe("saving memories after an answer", () => {
+  async function asker(temporary = false) {
+    const who = await person({ temporary }), budgetKey = `memory-${randomUUID()}`;
+    await db.update(schema.user).set({ emailVerified: true }).where(eq(schema.user.id, who.subject));
+    for (const kind of ["PERIOD", "DAY"] as const) {
+      const window = { startsAt: new Date(Date.now() - 86400000), endsAt: new Date(Date.now() + 86400000) };
+      await db.insert(schema.usageBuckets).values({ userId: who.userId, kind, ...window, entitlementVersion: "test-v1", creditLimit: 20, providerLimitMicroUsd: 1_000_000n });
+      await db.insert(schema.operatorUsageBuckets).values({ budgetKey, kind, ...window, providerLimitMicroUsd: 1_000_000n });
+    }
+    const identity = { user: { id: who.subject }, sessionId: (await completionSession(db, who.subject)).sessionId };
+    return { ...who, identity, revision: 0, admission: createRunAdmission(db, keys, { ...FREE_ADMISSION_POLICY, operatorBudgetKey: budgetKey }) };
+  }
+  type Asker = Awaited<ReturnType<typeof asker>>;
+  const extractor = (operations: unknown[] | Error = []) => ({ modelId: "test/memory", usage: () => knownUsage,
+    extract: vi.fn(async () => { if (operations instanceof Error) throw operations; return { operations, usage: knownUsage }; }) }) as unknown as ExtractionProvider & { extract: ReturnType<typeof vi.fn> };
+  async function ask(who: Asker, text: string, memory: ExtractionProvider, mode: RunMode = "CHAT") {
+    const input = { conversationId: who.conversationId, clientRequestId: randomUUID(), expectedRevision: who.revision, mode, modelKey: "fast-default", message: { text } };
+    const admitted = await who.admission.admit(who.subject, input);
+    if (admitted.kind === "DENIED") throw new Error(admitted.code);
+    const p = { planner: fakePlanner(), input: fakeSafety(), query: fakeSafety(), evidence: fakeSafety(), output: fakeSafety(), search: { search: vi.fn() },
+      answer: { modelId: "test/answer", generate: vi.fn().mockResolvedValue({ text: "Here is an answer.", usage: knownUsage }) },
+      memory: { provider: memory, schedule: (work: () => Promise<void>) => { pending.push(work()); } } };
+    const pending: Promise<void>[] = [];
+    const result = await createRunExecution(db, keys, p as unknown as ExecutionProviders).execute(who.identity, admitted.run, submissionSchema.parse(input), new AbortController().signal, () => undefined);
+    await Promise.all(pending);
+    who.revision = (await db.select().from(schema.conversations).where(eq(schema.conversations.id, who.conversationId)))[0].revision;
+    return { result, runId: admitted.run.id };
+  }
+  const ledger = (runId: string) => db.select().from(schema.memoryExtractions).where(eq(schema.memoryExtractions.runId, runId));
+  const texts = async (userId: string) => (await listMemories(db, userId)).map(m => m.text).sort();
+
+  it("saves what the asker states about themselves, after the answer, and records its cost apart from the run", async () => {
+    const who = await asker(), memory = extractor([{ op: "ADD", kind: "PROFILE", text: "Works as a civil engineer" }, { op: "ADD", kind: "PROFILE", text: "Lives in Pune" }]);
+    const { result, runId } = await ask(who, "I'm a civil engineer in Pune, what's the M25 mix ratio?", memory);
+    expect(result).toMatchObject({ kind: "COMPLETED" });
+    expect(await texts(who.userId)).toEqual(["Lives in Pune", "Works as a civil engineer"]);
+    expect(await ledger(runId)).toMatchObject([{ status: "SUCCEEDED", model: "test/memory", costMicroUsd: knownUsage.costMicroUsd, operations: 2 }]);
+    const stages = (await db.select().from(schema.providerCalls).where(eq(schema.providerCalls.runId, runId))).map(c => c.stage);
+    expect(stages).not.toContain("MEMORY_EXTRACTION");
+    expect(memory.extract.mock.calls[0][0]).toEqual({ message: "I'm a civil engineer in Pune, what's the M25 mix ratio?", memories: [] });
+  });
+
+  it("updates and forgets through what the asker says, and drops invented or sensitive facts", async () => {
+    const who = await asker();
+    await applyOperations(db, who.userId, [add("Lives in Pune"), add("Eats fish", "PREFERENCE")], null);
+    const [fish, pune] = await listMemories(db, who.userId);
+    const memory = extractor([{ op: "UPDATE", id: pune.id, text: "Lives in Bengaluru" }, { op: "DELETE", id: fish.id }, { op: "ADD", kind: "PROFILE", text: "Was diagnosed with anxiety" }]);
+    const { runId } = await ask(who, "I moved to Bengaluru, and forget that I eat fish. My anxiety is better too.", memory);
+    expect(await texts(who.userId)).toEqual(["Lives in Bengaluru"]);
+    expect(await ledger(runId)).toMatchObject([{ status: "SUCCEEDED", operations: 2 }]);
+    const invented = extractor([{ op: "ADD", kind: "CONTEXT", text: "Is planning a wedding in Goa" }]);
+    await ask(who, "I need concrete suppliers", invented);
+    expect(await texts(who.userId)).toEqual(["Lives in Bengaluru"]);
+  });
+
+  it("makes no call for impersonal questions, paused memory or temporary chats", async () => {
+    const who = await asker(), temporary = await asker(true), paused = await asker();
+    await updateSettings(db, paused.subject, { paused: true });
+    for (const [person, text] of [[who, "What is the GDP of India?"], [temporary, "I live in Pune, any suppliers?"], [paused, "I live in Pune, any suppliers?"]] as const) {
+      const memory = extractor([{ op: "ADD", kind: "PROFILE", text: "Lives in Pune" }]);
+      const { result, runId } = await ask(person, text, memory);
+      expect(result).toMatchObject({ kind: "COMPLETED" });
+      expect(memory.extract).not.toHaveBeenCalled();
+      expect(await ledger(runId)).toEqual([]);
+    }
+  });
+
+  it("never lets a failed extraction touch the answer, and runs once per run and within the daily limit", async () => {
+    const who = await asker(), failing = extractor(new ExtractionError("TIMEOUT"));
+    const { result, runId } = await ask(who, "I live in Pune, any suppliers?", failing);
+    expect(result).toMatchObject({ kind: "COMPLETED" });
+    expect(await ledger(runId)).toMatchObject([{ status: "FAILED", costMicroUsd: knownUsage.costMicroUsd, operations: 0 }]);
+    const again = extractor([{ op: "ADD", kind: "PROFILE", text: "Lives in Pune" }]);
+    await extractMemories(db, runId, again, { log: () => undefined });
+    expect(again.extract).not.toHaveBeenCalled();
+    const next = await ask(who, "I work in construction, what about M30?", extractor());
+    expect(await ledger(next.runId)).toHaveLength(1);
+    const capped = extractor([{ op: "ADD", kind: "PROFILE", text: "Works in construction" }]);
+    await db.delete(schema.memoryExtractions).where(eq(schema.memoryExtractions.runId, next.runId));
+    const log = vi.fn();
+    await extractMemories(db, next.runId, capped, { dailyLimit: 1, log });
+    expect(capped.extract).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ outcome: "SKIPPED", reason: "DAILY_LIMIT" }));
   });
 });
