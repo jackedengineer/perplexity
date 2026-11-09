@@ -57,8 +57,11 @@ test("memory learns quietly, and its settings pause, explain and delete it", asy
     await expect(memorySwitch).not.toBeChecked();
     const [settings] = await f.owner.select().from(schema.memorySettings).where(eq(schema.memorySettings.userId, userId));
     expect(settings).toMatchObject({ paused: true, instructions: "Use metric units and keep answers short." });
+    // Pausing never discards an unsaved About you draft.
+    await dialog.getByRole("textbox", { name: /About you/u }).fill("Draft not saved yet");
     await memorySwitch.click();
     await expect(memorySwitch).toBeChecked();
+    await expect(dialog.getByRole("textbox", { name: /About you/u })).toHaveValue("Draft not saved yet");
 
     await dialog.getByRole("button", { name: "Delete all memories" }).click();
     await expect(dialog.getByRole("button", { name: "Delete all", exact: true })).toBeFocused();

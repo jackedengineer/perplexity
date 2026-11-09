@@ -27,7 +27,8 @@ export function MemoryDialog({onClose}:{onClose:()=>void}){
     setBusy(true);setError('');setStatus('');
     try{setStatus(await work());}catch(failure){setError(failure instanceof Error?failure.message:'Couldn’t save that. Please try again.');}finally{setBusy(false);}
   }
-  const update=(body:Partial<Settings>,done:string)=>run(async()=>{const data:Settings=await memoryRequest('PATCH',body);setSettings(data);setAbout(data.instructions??'');return done;});
+  // Only a change to About you resets its box, so pausing never discards an unsaved draft.
+  const update=(body:Partial<Settings>,done:string)=>run(async()=>{const data:Settings=await memoryRequest('PATCH',body);setSettings(data);if('instructions' in body)setAbout(data.instructions??'');return done;});
   const paused=settings?.paused??false,unchanged=about.trim()===(settings?.instructions??'');
   return <dialog ref={dialog} className="research-dialog memory-dialog" aria-labelledby="memory-heading" onClose={onClose} onClick={event=>{if(event.target===event.currentTarget)dialog.current?.close();}}>
     <div className="dialog-heading"><h2 id="memory-heading">Memory</h2><button type="button" className="research-icon-button" aria-label="Close memory settings" onClick={()=>dialog.current?.close()}><Icon name="close"/></button></div>

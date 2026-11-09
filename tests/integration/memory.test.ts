@@ -291,6 +291,15 @@ describe("saving memories after an answer", () => {
     }
   });
 
+  it("writes nothing when Delete all lands while an extraction is in flight", async () => {
+    const who = await asker();
+    const memory = extractor([{ op: "ADD", kind: "PROFILE", text: "Lives in Pune" }]);
+    memory.extract.mockImplementationOnce(async () => { await new Promise(resolve => setTimeout(resolve, 5)); await deleteAllMemories(db, who.subject); return { operations: [{ op: "ADD", kind: "PROFILE", text: "Lives in Pune" }], usage: knownUsage }; });
+    const { runId } = await ask(who, "I live in Pune, any suppliers?", memory);
+    expect(await texts(who.userId)).toEqual([]);
+    expect(await ledger(runId)).toMatchObject([{ status: "SUCCEEDED", operations: 0 }]);
+  });
+
   it("never lets a failed extraction touch the answer, and runs once per run and within the daily limit", async () => {
     const who = await asker(), failing = extractor(new ExtractionError("TIMEOUT"));
     const { result, runId } = await ask(who, "I live in Pune, any suppliers?", failing);

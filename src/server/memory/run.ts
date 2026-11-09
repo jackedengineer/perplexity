@@ -15,6 +15,9 @@ const defaultLog: Log = event => console.info(JSON.stringify(event));
 // answers. Every failure is recorded and swallowed. Logs carry counts, never memory text.
 export async function extractMemories(db: AdmissionDatabase, runId: string, provider: ExtractionProvider, options: { dailyLimit?: number; log?: Log } = {}) {
   const log = options.log ?? defaultLog, started = performance.now();
+  // The fence is taken before anything is read: a pause or Delete all after this moment bumps the
+  // settings row past it, and applyOperations then writes nothing.
+  const fence = new Date();
   const done = (outcome: string, extra: Record<string, unknown> = {}) => { try { log({ event: "memory.extraction", outcome, ...extra, durationMs: Math.round(performance.now() - started) }); } catch { /* Logging never matters here. */ } };
   try {
     const [state] = await db.select({ userId: runs.userId, status: runs.status, guest: user.isAnonymous, enabled: conversations.memoryEnabled, paused: memorySettings.paused,
@@ -37,13 +40,13 @@ export async function extractMemories(db: AdmissionDatabase, runId: string, prov
     // daily limit. The primary key makes this the one extraction for the run.
     const claim = await db.transaction(async tx => {
       const startedAt = new Date(), today = new Date(startedAt.toISOString().slice(0, 10) + "T00:00:00.000Z");
-      await tx.insert(memorySettings).values({ userId: state.userId, updatedAt: startedAt }).onConflictDoNothing();
+      await tx.insert(memorySettings).values({ userId: state.userId, updatedAt: fence }).onConflictDoNothing();
       await tx.select({ userId: memorySettings.userId }).from(memorySettings).where(eq(memorySettings.userId, state.userId)).for("update");
       const [used] = await tx.select({ n: sql<number>`count(*)::integer` }).from(memoryExtractions).where(and(eq(memoryExtractions.userId, state.userId), gte(memoryExtractions.createdAt, today)));
       if (used.n >= (options.dailyLimit ?? MEMORY_LIMITS.extractionsPerDay)) return "DAILY_LIMIT" as const;
       const [claimed] = await tx.insert(memoryExtractions).values({ runId, userId: state.userId, status: "STARTED", model: provider.modelId, createdAt: startedAt })
         .onConflictDoNothing().returning({ runId: memoryExtractions.runId });
-      return claimed ? startedAt : "ALREADY_RUN" as const;
+      return claimed ? fence : "ALREADY_RUN" as const;
     });
     if (!(claim instanceof Date)) return done("SKIPPED", { reason: claim });
 

@@ -35,8 +35,10 @@ const SENSITIVE_WORDS = new Set(`
   address street apartment flat
 `.split(/\s+/u).filter(Boolean));
 
+// Split on every non-letter, so joined forms like "HIV-positive" or "anxiety-related" can't hide a keyword.
+const parts = (text: string) => text.normalize("NFKC").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 export function isSensitive(text: string) {
-  return SENSITIVE_PATTERNS.some(pattern => pattern.test(text)) || words(text).some(word => SENSITIVE_WORDS.has(word));
+  return SENSITIVE_PATTERNS.some(pattern => pattern.test(text)) || [...words(text), ...parts(text)].some(word => SENSITIVE_WORDS.has(word));
 }
 
 // Words that frame a memory ("Lives in Pune") without being part of the fact itself.

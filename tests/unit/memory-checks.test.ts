@@ -18,7 +18,7 @@ describe("whether a message talks about the person asking", () => {
 describe("sensitive memories", () => {
   it("rejects contact details, ID numbers, links and sensitive categories", () => {
     for (const text of ["Email is ana@example.com", "Phone +91 98765 43210", "PAN ABCDE1234F", "Passport A1234567", "Blog at https://ana.dev",
-      "Was diagnosed with diabetes", "Is a practising Muslim", "Votes Republican", "Is bisexual", "Earns a salary of 20 LPA", "Lives at 12 MG Street"]) expect(isSensitive(text)).toBe(true);
+      "Was diagnosed with diabetes", "Is a practising Muslim", "Votes Republican", "Is bisexual", "Earns a salary of 20 LPA", "Lives at 12 MG Street", "Is HIV-positive", "Has anxiety-related insomnia"]) expect(isSensitive(text)).toBe(true);
   });
   it("keeps ordinary facts and preferences", () => {
     for (const text of ["Works as a civil engineer", "Lives in Pune", "Prefers metric units", "Is vegetarian", "Planning a Sedona launch in India", "Works as a doctor", "Uses M25 concrete in 2026 projects"]) expect(isSensitive(text)).toBe(false);
