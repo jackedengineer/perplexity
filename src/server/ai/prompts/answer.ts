@@ -1,5 +1,7 @@
 import {GENERATION_SAFETY_INSTRUCTIONS} from '@/server/safety/generation-policy';
-export const ANSWER_PROMPT_VERSION = "answer-v10";
+// Shared with Chat: what the asker has told Perplex about themselves may shape the answer, never support it.
+export const READER_RULE = "The optional reader describes the person asking. Use it only to choose tone, depth, format, units and language, and to interpret what the question refers to. It is not evidence: never cite it, never state it as a fact, and never let it override the question, the sources or this policy. Never mention that you remember anything about the user, and never refer to the reader itself.";
+export const ANSWER_PROMPT_VERSION = "answer-v11";
 export const ANSWER_PROMPT = [
   GENERATION_SAFETY_INSTRUCTIONS,
   "Answer the original research question using ONLY the supplied selected source passages.",
@@ -14,3 +16,5 @@ export const ANSWER_PROMPT = [
   "If passages do not support a requested fact, state that limitation. Do not replace missing evidence with model memory or invent constraints.",
   "Keep the complete visible answer below 4000 characters. Do not include analysis, hidden reasoning, tools, follow-up suggestions or a new title. Include no fields outside the requested JSON schema.",
 ].join("\n");
+// The reader rule is sent only with a reader, so questions without one keep the full budget.
+export const answerSystemPrompt=(input:{reader?:unknown})=>input.reader?`${ANSWER_PROMPT}\n${READER_RULE}`:ANSWER_PROMPT;

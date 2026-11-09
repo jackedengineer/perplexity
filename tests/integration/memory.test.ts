@@ -3,14 +3,19 @@ import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "@/db/schema";
 import { applyOperations, deleteAllMemories, getSettings, listMemories, loadReader, memoryCount, updateSettings } from "@/server/memory/store";
 import { createMemoryHttp } from "@/server/memory/http";
+import { submissionSchema, type RunMode } from "@/server/contracts/chat";
+import { createRunAdmission } from "@/server/runs/admit";
+import { createRunExecution, type ExecutionProviders } from "@/server/runs/execute";
+import { FREE_ADMISSION_POLICY } from "@/server/runs/policy";
+import { completionSession, fakePlanner, fakeSafety, keys, knownUsage } from "../helpers/completion";
 
 const pg = new PGlite(), db = drizzle(pg, { schema });
 beforeAll(async () => { const journal = JSON.parse(await readFile("drizzle/meta/_journal.json", "utf8")); for (const entry of journal.entries) await pg.exec(await readFile(`drizzle/${entry.tag}.sql`, "utf8")); });
-beforeEach(async () => { await db.delete(schema.user); });
+beforeEach(async () => { await db.delete(schema.user); await db.delete(schema.operatorUsageBuckets); });
 afterAll(() => pg.close());
 
 async function person(options: { guest?: boolean; temporary?: boolean } = {}) {
@@ -144,5 +149,59 @@ describe("memory settings API", () => {
     }
     expect((await api(who).update(new Request(`${origin}/api/memory`, { method: "PATCH", headers: { origin, "content-type": "text/plain" }, body: "{}" }))).status).toBe(422);
     expect(await getSettings(db, who.subject)).toEqual({ paused: false, instructions: null });
+  });
+});
+
+describe("answers with memory", () => {
+  // A signed-in person with budget for a few answers, asking in a conversation of their own.
+  async function asker(temporary = false) {
+    const who = await person({ temporary }), budgetKey = `memory-${randomUUID()}`;
+    await db.update(schema.user).set({ emailVerified: true }).where(eq(schema.user.id, who.subject));
+    for (const kind of ["PERIOD", "DAY"] as const) {
+      const window = { startsAt: new Date(Date.now() - 86400000), endsAt: new Date(Date.now() + 86400000) };
+      await db.insert(schema.usageBuckets).values({ userId: who.userId, kind, ...window, entitlementVersion: "test-v1", creditLimit: 20, providerLimitMicroUsd: 1_000_000n });
+      await db.insert(schema.operatorUsageBuckets).values({ budgetKey, kind, ...window, providerLimitMicroUsd: 1_000_000n });
+    }
+    const identity = { user: { id: who.subject }, sessionId: (await completionSession(db, who.subject)).sessionId };
+    return { ...who, identity, admission: createRunAdmission(db, keys, { ...FREE_ADMISSION_POLICY, operatorBudgetKey: budgetKey }) };
+  }
+  function providers(text = "Suppliers in the area [S1].") {
+    return { planner: { ...fakePlanner(), plan: vi.fn(fakePlanner().plan) }, input: fakeSafety(), query: fakeSafety(), evidence: fakeSafety(), output: fakeSafety(),
+      answer: { modelId: "test/answer", generate: vi.fn().mockResolvedValue({ text, usage: knownUsage }) },
+      search: { search: vi.fn().mockResolvedValue({ results: [{ title: "Suppliers", url: "https://example.org/s", content: "Concrete suppliers list.", score: 0.9 }], credits: 1 }) } };
+  }
+  async function ask(who: Awaited<ReturnType<typeof asker>>, text: string, mode: RunMode, p = providers()) {
+    const input = { conversationId: who.conversationId, clientRequestId: randomUUID(), expectedRevision: 0, mode, modelKey: "fast-default", message: { text } };
+    const admitted = await who.admission.admit(who.subject, input);
+    if (admitted.kind === "DENIED") throw new Error(admitted.code);
+    const result = await createRunExecution(db, keys, p as unknown as ExecutionProviders).execute(who.identity, admitted.run, submissionSchema.parse(input), new AbortController().signal, () => undefined);
+    return { result, p };
+  }
+  const seen = (p: ReturnType<typeof providers>) => JSON.stringify([p.planner.plan.mock.calls, p.search.search.mock.calls]);
+
+  it("gives Web and Chat answers the asker's memories, and never the planner or search", async () => {
+    const who = await asker();
+    await updateSettings(db, who.subject, { instructions: "Answer in metric units" });
+    await applyOperations(db, who.userId, [add("Lives in Pune")], null);
+    const web = await ask(who, "Concrete suppliers near me", "FAST");
+    expect(web.result).toMatchObject({ kind: "COMPLETED" });
+    expect(web.p.answer.generate.mock.calls[0][0].reader).toEqual({ instructions: "Answer in metric units", memories: ["Lives in Pune"] });
+    expect(seen(web.p)).not.toMatch(/Pune|metric/u);
+    const other = await asker();
+    await applyOperations(db, other.userId, [add("Prefers short answers", "PREFERENCE")], null);
+    const chat = await ask(other, "Explain recursion", "CHAT", providers("A function that calls itself."));
+    expect(chat.result).toMatchObject({ kind: "COMPLETED" });
+    expect(chat.p.answer.generate.mock.calls[0][0].reader).toEqual({ memories: ["Prefers short answers"] });
+  });
+
+  it("gives nothing when memory is paused or the chat is temporary", async () => {
+    const paused = await asker(), temporary = await asker(true);
+    for (const who of [paused, temporary]) await applyOperations(db, who.userId, [add("Lives in Pune")], null);
+    await updateSettings(db, paused.subject, { paused: true });
+    for (const who of [paused, temporary]) {
+      const { result, p } = await ask(who, "Concrete suppliers near me", "FAST");
+      expect(result).toMatchObject({ kind: "COMPLETED" });
+      expect(p.answer.generate.mock.calls[0][0]).not.toHaveProperty("reader");
+    }
   });
 });
