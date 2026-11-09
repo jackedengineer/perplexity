@@ -2,7 +2,7 @@ import {PublicPolicy} from '@/components/public-policy';
 
 export const metadata={title:'Privacy policy'};
 export default function PrivacyPage(){
-  return <PublicPolicy title="Privacy policy" notice="Updated 4 November 2026. Paid subscription availability is checked in Billing.">
+  return <PublicPolicy title="Privacy policy" notice="Updated 9 November 2026. Paid subscription availability is checked in Billing.">
     <p>Review-account update: 2 November 2026. An operator-provisioned temporary review account additionally
       uses an application password stored as a salted password hash. This is separate from Google sign-in;
       we do not receive a Google password. Review access expires within seven days. Account/security records
@@ -18,6 +18,11 @@ export default function PrivacyPage(){
         password or request access to your Gmail, Drive or Calendar.</li>
       <li><strong>Research:</strong> questions you submit, saved answers, conversation titles, cited links,
         retrieved excerpts, planning and safety-review records, and feedback you choose to give.</li>
+      <li><strong>Memory:</strong> if you are signed in, short facts you state about yourself in your questions
+        (such as your work, city, languages, answer preferences and ongoing projects) and the optional About you
+        text you write in Memory settings. Memory is on by default. It never saves health, religion, politics,
+        sexuality, ethnicity, money details, addresses, contact details or ID numbers, and it never learns from
+        web pages, files or answers.</li>
       <li><strong>Service and security records:</strong> session identifiers, session IP address and browser
         information, timestamps, request identifiers, quota usage, provider costs and error/latency metrics.
         Guest-abuse controls store a keyed hash of the trusted network address rather than the raw address.
@@ -27,13 +32,15 @@ export default function PrivacyPage(){
     <p>We use this information to sign you in, keep conversations private to their owner, retrieve sources,
       generate and check answers, save history, process feedback, enforce quotas, prevent abuse and diagnose
       failures. Basic Google profile details are used for account access; they are not automatically added
-      to AI prompts. Information you include in a question may be sent to research providers.</p>
+      to AI prompts. Information you include in a question may be sent to research providers. Memories and About
+      you are used only to tailor the tone, depth, units and language of your answers; they are never sent to
+      the search provider.</p>
     <h2>Who processes research data</h2>
     <ul>
       <li><strong>Google</strong> authenticates your account when you choose Google sign-in.</li>
       <li><strong>Cloudflare, Vercel and Neon</strong> provide application hosting, deployment infrastructure and the database.</li>
       <li><strong>OpenRouter and the selected model provider</strong> process questions, relevant conversation
-        context, source excerpts and proposed answers for planning, generation and safety checks. We configure
+        context, saved memories, source excerpts and proposed answers for planning, generation and safety checks. We configure
         non-training routes using OpenRouter’s data-retention controls. Some supported Google routes permit
         safety retention: Google may keep prompts flagged by its safety systems for up to 90 days for abuse
         monitoring, not training. These controls do not mean that your content stays on your device.</li>
@@ -74,9 +81,13 @@ export default function PrivacyPage(){
       not promise immediate erasure from backups or third-party systems. Backup, security-log and external
       provider retention follow the applicable service settings and provider policies; contact us for
       current details or help with a deletion request.</p>
+    <p>Memories belong to your account rather than a conversation, so deleting a conversation does not remove
+      what was learned from it. Delete all memories in Memory settings removes them from the active application
+      database; deleting your account removes them with it.</p>
     <h2>Your choices</h2>
     <p>Use the conversation menu to export approved messages and citation links as JSON or to delete a
-      conversation. Contact us for account-level access, correction or deletion requests; identity verification
+      conversation. In Memory settings (account menu) you can pause memory, write or clear About you, and delete
+      all memories. A temporary chat neither uses nor saves memories. Contact us for account-level access, correction or deletion requests; identity verification
       may be needed. You can revoke Google access in your Google Account, which does not itself delete saved
       conversations here. Do not submit credentials, confidential information or personal data you are not
       entitled to share.</p>

@@ -1,6 +1,6 @@
 # Spec: Memory v1
 
-Status: approved · 9 Nov 2026 · plan in `tasks/memory-plan.md`
+Status: implemented on `feature/memory-v1` · 9 Nov 2026 · what shipped: `docs/memory.md`
 
 Revision 2 makes saving **automatic** and drops the Remember/Forget commands.
 

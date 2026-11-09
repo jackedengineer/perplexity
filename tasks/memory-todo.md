@@ -2,7 +2,7 @@
 
 Spec: `docs/memory-spec.md` · Plan: `tasks/memory-plan.md`
 
-- [ ] **T1 Schema and grants**
+- [x] **T1 Schema and grants**
   - Acceptance:
     - `memories`, `memory_settings`, `memory_extractions`, the `memory_kind` enum and `conversations.memory_enabled` exist, with the checks and indexes from the spec.
     - Grants are exactly as the spec lists.
@@ -19,7 +19,7 @@ Spec: `docs/memory-spec.md` · Plan: `tasks/memory-plan.md`
     - `scripts/runtime-grants.sql`
     - `scripts/verify-db.mjs`
 
-- [ ] **T2 Memory store**
+- [x] **T2 Memory store**
   - Acceptance:
     - `getSettings` and `updateSettings` create the settings row lazily.
     - `deleteAll` returns a count and is idempotent.
@@ -28,7 +28,7 @@ Spec: `docs/memory-spec.md` · Plan: `tasks/memory-plan.md`
   - Verify: `tests/integration/memory.test.ts` store cases, including two concurrent applies that can't exceed 50.
   - Files: `src/server/memory/store.ts`, `tests/integration/memory.test.ts`
 
-- [ ] **T3 Settings API**
+- [x] **T3 Settings API**
   - Acceptance:
     - `GET`, `PATCH` and `DELETE /api/memory` follow the spec.
     - Strict zod body; `instructions` at most 1,000 characters, empty becomes null.
@@ -41,7 +41,7 @@ Spec: `docs/memory-spec.md` · Plan: `tasks/memory-plan.md`
     - `src/server/contracts/error-messages.ts` (only if a new code is needed)
     - tests
 
-- [ ] **T4 Memories in answers** (Checkpoint A)
+- [x] **T4 Memories in answers** (Checkpoint A)
   - Acceptance:
     - `DraftInput.reader` is optional and filled by `complete.ts` from `loadReader`.
     - `draftPrompt` and `chatPrompt` include it.
@@ -59,7 +59,7 @@ Spec: `docs/memory-spec.md` · Plan: `tasks/memory-plan.md`
     - `src/server/ai/prompts/answer.ts`
     - `src/server/runs/complete.ts`
 
-- [ ] **T5 Pure checks**
+- [x] **T5 Pure checks**
   - Acceptance:
     - `words()` moves to `src/server/ai/text.ts`, and `plan.ts` imports it with no behaviour change.
     - `mentionsSelf`.
@@ -76,7 +76,7 @@ Spec: `docs/memory-spec.md` · Plan: `tasks/memory-plan.md`
     - `src/server/memory/checks.ts`
     - `tests/unit/memory-checks.test.ts`
 
-- [ ] **T6 Extraction provider**
+- [x] **T6 Extraction provider**
   - Acceptance:
     - Prompt plus strict zod output schema: at most 3 operations, kinds and lengths as the spec says.
     - `createExtractionProvider(config)` follows the bounded-fetch pattern in `planner-provider.ts`: 16 KB wire cap, 400 output tokens, 8-second timeout, and reports usage and refusal.
@@ -87,7 +87,7 @@ Spec: `docs/memory-spec.md` · Plan: `tasks/memory-plan.md`
     - `src/server/memory/prompt.ts`
     - `tests/unit/memory-extract.test.ts`
 
-- [ ] **T7 Automatic extraction after each answer** (Checkpoint B)
+- [x] **T7 Automatic extraction after each answer** (Checkpoint B)
   - Acceptance:
     - `execute.ts` calls `schedule(() => extractMemories(...))` only after a `COMPLETED` result.
     - `extractMemories` checks: signed in and not a guest, not paused, `memory_enabled`, no files, `mentionsSelf`, and under 100 today.
@@ -101,7 +101,7 @@ Spec: `docs/memory-spec.md` · Plan: `tasks/memory-plan.md`
     - `src/server/chat/service.ts`
     - `tests/integration/memory.test.ts`
 
-- [ ] **T8 Temporary chat contract**
+- [x] **T8 Temporary chat contract**
   - Acceptance:
     - `POST /api/conversations` accepts `memory: false`, which is part of the creation fingerprint.
     - Conversation creation stores `memory_enabled = false`.
@@ -113,7 +113,7 @@ Spec: `docs/memory-spec.md` · Plan: `tasks/memory-plan.md`
     - `src/server/conversations/views.ts`
     - tests
 
-- [ ] **T9 Memory dialog and temporary chat UI** (Checkpoint C)
+- [x] **T9 Memory dialog and temporary chat UI** (Checkpoint C)
   - Acceptance:
     - A Memory item in the account popover opens `MemoryDialog`, styled like the Files dialog. It has the explanation, About you with Save, the "Use and save memories" switch, and Delete all with a confirm. No list, no count.
     - A Temporary chat switch on a new, empty conversation, and a "Temporary chat" label in the thread.
@@ -129,7 +129,7 @@ Spec: `docs/memory-spec.md` · Plan: `tasks/memory-plan.md`
     - `thread-view.tsx`
     - `src/app/(research)/graphite.css`
 
-- [ ] **T10 Extraction eval**
+- [x] **T10 Extraction eval**
   - Acceptance:
     - `tests/evals/memory-cases.json` holds about 40 labelled messages: self-facts, preferences, changes, retractions, hypotheticals, other people, sensitive, and non-personal.
     - An offline test scores recorded outputs through `checkOperations` in `pnpm check`.
@@ -144,7 +144,7 @@ Spec: `docs/memory-spec.md` · Plan: `tasks/memory-plan.md`
     - `vitest.memory-eval.config.ts`
     - `package.json`
 
-- [ ] **T11 Docs**
+- [x] **T11 Docs**
   - Acceptance:
     - `docs/memory.md` describes what shipped.
     - `docs/privacy-controls.md` and the public privacy page explain automatic memory, Pause, Delete all, Temporary chat, and that memories survive conversation deletion.
