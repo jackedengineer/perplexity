@@ -103,7 +103,7 @@ Spec: `docs/memory-spec.md` · Plan: `tasks/memory-plan.md`
 
 - [ ] **T8 Temporary chat contract**
   - Acceptance:
-    - `submissionSchema` gains `memory?: false`. A request with `expectedRevision > 0` that sends it is rejected as invalid.
+    - `POST /api/conversations` accepts `memory: false`, which is part of the creation fingerprint.
     - Conversation creation stores `memory_enabled = false`.
     - The history and conversation views expose `memoryEnabled`, so the thread can show its label.
   - Verify: integration tests for creating a temporary conversation, rejecting the flag on a later message, and the views carrying the flag.

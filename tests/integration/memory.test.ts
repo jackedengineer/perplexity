@@ -8,6 +8,8 @@ import * as schema from "@/db/schema";
 import { applyOperations, deleteAllMemories, getSettings, listMemories, loadReader, memoryCount, updateSettings } from "@/server/memory/store";
 import { createMemoryHttp } from "@/server/memory/http";
 import { extractMemories } from "@/server/memory/run";
+import { createConversationRepository } from "@/server/conversations/repository";
+import { createInput } from "@/server/conversations/contracts";
 import { ExtractionError, type ExtractionProvider } from "@/server/memory/extract";
 import { submissionSchema, type RunMode } from "@/server/contracts/chat";
 import { createRunAdmission } from "@/server/runs/admit";
@@ -292,5 +294,18 @@ describe("saving memories after an answer", () => {
     await extractMemories(db, next.runId, capped, { dailyLimit: 1, log });
     expect(capped.extract).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith(expect.objectContaining({ outcome: "SKIPPED", reason: "DAILY_LIMIT" }));
+  });
+});
+
+describe("temporary chats", () => {
+  it("are chosen only when the conversation is created, and replays can't flip the choice", async () => {
+    const who = await person(), repository = createConversationRepository(db), clientRequestId = randomUUID();
+    const temporary = await repository.create(who.subject, createInput.parse({ clientRequestId, title: "New search", memory: false }));
+    expect(temporary).toMatchObject({ created: true, conversation: { memoryEnabled: false } });
+    expect(await repository.create(who.subject, createInput.parse({ clientRequestId, title: "New search", memory: false }))).toMatchObject({ created: false, conversation: { memoryEnabled: false } });
+    await expect(repository.create(who.subject, createInput.parse({ clientRequestId, title: "New search" }))).rejects.toMatchObject({ code: "IDEMPOTENCY_MISMATCH" });
+    expect((await repository.create(who.subject, createInput.parse({ clientRequestId: randomUUID(), title: "New search" }))).conversation.memoryEnabled).toBe(true);
+    expect((await repository.history(who.subject, temporary.conversation.id, { limit: 20 })).conversation).toMatchObject({ memoryEnabled: false });
+    expect(createInput.safeParse({ clientRequestId, memory: true }).success).toBe(false);
   });
 });

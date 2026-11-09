@@ -216,7 +216,7 @@ All routes are signed-in only (guests get 401 `UNAUTHENTICATED`, as with `/api/d
 | `PATCH /api/memory` | `{ paused?: boolean, instructions?: string \| null }` (strict zod; `instructions` at most 1,000 characters, empty becomes null) | `{ paused, instructions }` |
 | `DELETE /api/memory` | none | `{ deleted: number }`. Idempotent; a repeat returns `0` |
 
-The chat submission contract (`submissionSchema`) gains `memory?: false`. It is accepted only when `expectedRevision` is `0`, so it can be set only when the conversation is created.
+Conversation creation (`POST /api/conversations`) accepts `memory: false` to start a temporary chat. The choice is part of the creation fingerprint, so replaying the same request without it fails with `IDEMPOTENCY_MISMATCH`. Conversation responses carry `memoryEnabled`.
 
 ## Cost (Neon free tier and OpenRouter)
 

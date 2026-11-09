@@ -6,6 +6,8 @@ export const conversationView = z.strictObject({
   pinnedAt: z.optional(z.nullable(z.iso.datetime())),
   id: z.uuid(), title: z.string(), revision: z.int(),
   createdAt: z.iso.datetime(), updatedAt: z.iso.datetime(),
+  // False for a temporary chat, which neither uses nor saves memories.
+  memoryEnabled: z.optional(z.boolean()),
 });
 export type Conversation = z.infer<typeof conversationView>;
 export const historyPageView = z.object({
