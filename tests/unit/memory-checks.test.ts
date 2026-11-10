@@ -69,9 +69,16 @@ describe("one fact per memory", () => {
   it("splits combined facts on save and refuses to merge them on update", () => {
     expect(facts("Works as a civil engineer. Lives in Pune.")).toEqual(["Works as a civil engineer", "Lives in Pune"]);
     expect(facts("Uses Next.js 16 on Workers")).toEqual(["Uses Next.js 16 on Workers"]);
+    for (const text of ["Lives in St. Louis", "Works with Dr. Rao", "Served in the U.S. Army"]) expect(facts(text)).toEqual([text]);
     const message = "I'm a civil engineer based in Pune and I moved to Bengaluru";
     const { accepted, rejected } = checkOperations([{ op: "ADD", kind: "PROFILE", text: "Works as a civil engineer. Lives in Pune." }, { op: "UPDATE", id: "city", text: "Lives in Bengaluru. Works as a civil engineer." }], new Set(["city"]), message);
     expect(accepted).toEqual([{ op: "ADD", kind: "PROFILE", text: "Works as a civil engineer" }, { op: "ADD", kind: "PROFILE", text: "Lives in Pune" }]);
     expect(rejected).toEqual(["COMBINED"]);
   });
+});
+
+it("applies at most three operations even after splitting", () => {
+  const message = "I'm a civil engineer in Pune, I speak Marathi, I like tables and I'm learning Rust";
+  const { accepted } = checkOperations([{ op: "ADD", kind: "PROFILE", text: "Works as a civil engineer. Lives in Pune." }, { op: "ADD", kind: "PROFILE", text: "Speaks Marathi" }, { op: "ADD", kind: "PREFERENCE", text: "Likes tables" }], new Set(), message);
+  expect(accepted.map(op => op.op === "ADD" && op.text)).toEqual(["Works as a civil engineer", "Lives in Pune", "Speaks Marathi"]);
 });

@@ -1,11 +1,14 @@
 import { isGrounded, isNegated, isSensitive } from "./gate";
 import { memoryText, type MemoryOperation } from "./store";
+const EXTRACTION_OPERATIONS = 3;
 
 export type RejectionReason = "UNKNOWN_ID" | "REPEATED_ID" | "SENSITIVE" | "UNGROUNDED" | "NEGATED" | "COMBINED";
 
 // One fact per memory, so forgetting one never takes another with it. "Works as a civil engineer.
 // Lives in Pune." becomes two memories; an UPDATE that merges facts is dropped instead.
-export const facts = (text: string) => memoryText(text).split(/(?<=[.;!])\s+/u).map(part => part.replace(/[.;!]+$/u, "").trim()).filter(part => part.length >= 3);
+// Splits only after a word of three or more lower-case letters or digits and before a capital, so
+// "St. Louis", "Dr. Rao" and "U.S. Army" stay whole.
+export const facts = (text: string) => memoryText(text).split(/(?<=[\p{Ll}\d]{3}[.;!])\s+(?=\p{Lu})/u).map(part => part.replace(/[.;!]+$/u, "").trim()).filter(part => part.length >= 3);
 
 // Every operation the model proposes is checked on its own: one bad operation is dropped and
 // the rest still apply. Ids must be ones we sent, and saved text must be the user's own words.
@@ -27,5 +30,6 @@ export function checkOperations(operations: readonly MemoryOperation[], existing
     if (operation.op !== "ADD") touched.add(operation.id);
     accepted.push(operation);
   }
-  return { accepted, rejected };
+  // Splitting can turn three operations into more; one extraction applies at most three.
+  return { accepted: accepted.slice(0, EXTRACTION_OPERATIONS), rejected };
 }

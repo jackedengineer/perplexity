@@ -211,7 +211,17 @@ describe("answers with memory", () => {
     await applyOperations(db, other.userId, [add("Prefers short answers", "PREFERENCE")], null);
     const chat = await ask(other, "Explain recursion", "CHAT", providers("A function that calls itself."));
     expect(chat.result).toMatchObject({ kind: "COMPLETED" });
-    expect(chat.p.answer.generate.mock.calls[0][0].reader).toEqual({ memories: ["Prefers short answers"], learning: true });
+    // "Explain recursion" says nothing about the asker, so the answer uses memories but promises nothing.
+    expect(chat.p.answer.generate.mock.calls[0][0].reader).toEqual({ memories: ["Prefers short answers"] });
+  });
+
+  it("only promises to remember when the message will be learned from", async () => {
+    const who = await asker();
+    const personal = await ask(who, "I'm a civil engineer, which concrete suppliers are good?", "FAST");
+    expect(personal.p.answer.generate.mock.calls[0][0].reader).toEqual({ memories: [], learning: true });
+    const other = await asker();
+    const impersonal = await ask(other, "Concrete suppliers in Pune", "FAST");
+    expect(impersonal.p.answer.generate.mock.calls[0][0]).not.toHaveProperty("reader");
   });
 
   it("gives nothing when memory is paused or the chat is temporary", async () => {
