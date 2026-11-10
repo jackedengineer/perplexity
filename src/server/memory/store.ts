@@ -9,7 +9,7 @@ export type MemoryOperation =
   | { op: "ADD"; kind: MemoryKind; text: string }
   | { op: "UPDATE"; id: string; text: string }
   | { op: "DELETE"; id: string };
-export type Reader = { instructions?: string; memories: string[] };
+export type Reader = { instructions?: string; memories: string[]; learning?: boolean };
 export type MemorySettingsView = { paused: boolean; instructions: string | null };
 type Database = AdmissionDatabase | AdmissionTransaction;
 
@@ -87,7 +87,8 @@ export async function loadReader(db: Database,userId: string,conversationId: str
   if (state.paused) return state.instructions ? { instructions: state.instructions,memories: [] } : null;
   const items = await db.select({ id: memories.id,kind: memories.kind,text: memories.text,createdAt: memories.createdAt }).from(memories)
     .where(eq(memories.userId,userId)).orderBy(desc(memories.createdAt)).limit(MEMORY_LIMITS.perUser);
-  return fitReader(state.instructions,items);
+  // While memory is on, the reader is sent even when empty, so an answer never claims it can't remember.
+  return { ...(fitReader(state.instructions,items) ?? { memories: [] }),learning: true };
 }
 
 // Applies already-validated operations. Serialized per user on the settings row, so two answers

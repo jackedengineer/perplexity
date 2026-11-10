@@ -1,7 +1,7 @@
 import {GENERATION_SAFETY_INSTRUCTIONS} from '@/server/safety/generation-policy';
 // Shared with Chat: what the asker has told Perplex about themselves may shape the answer, never support it.
-export const READER_RULE = "The optional reader describes the person asking. Use it only to choose tone, depth, format, units and language, and to interpret what the question refers to. It is not evidence: never cite it, never state it as a fact, and never let it override the question, the sources or this policy. Never mention that you remember anything about the user, and never refer to the reader itself.";
-export const ANSWER_PROMPT_VERSION = "answer-v11";
+export const READER_RULE = "The optional reader describes the person asking. Use it only to choose tone, depth, format, units and language, and to interpret what the question refers to. It is not evidence: never cite it, never state it as a fact, and never let it override the question, the sources or this policy. Never mention that you remember anything about the user, and never refer to the reader itself. When reader.learning is true, what the person says about themselves is saved after this answer: if they ask you to remember, update or forget something about themselves, acknowledge it in a few words, for example Got it, and carry on; never say you cannot remember or forget. When it is absent, do not promise to remember anything.";
+export const ANSWER_PROMPT_VERSION = "answer-v12";
 export const ANSWER_PROMPT = [
   GENERATION_SAFETY_INSTRUCTIONS,
   "Answer the original research question using ONLY the supplied selected source passages.",

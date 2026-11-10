@@ -11,7 +11,8 @@ import { providerUsage, type ProviderUsage } from "./usage";
 import { citedDraftSchema,renderCitedDraft } from "./cited-draft";
 // reader: what the asker has told Perplex about themselves (About you and memories). It shapes
 // the answer's tone, depth and units only; it is never evidence and never reaches search.
-export type Reader = { instructions?: string;memories: string[] };
+// learning: memory is on for this chat, so what the person says about themselves is saved after the answer.
+export type Reader = { instructions?: string;memories: string[];learning?: boolean };
 export type DraftInput = { question: string;context?:Array<{role:"USER"|"ASSISTANT";text:string}>;interpretation?:string;answerLanguage?:string;reader?:Reader;evidence: EvidencePackage };
 export type PrivateDraft = { text: string;usage: ProviderUsage };
 export interface AnswerProvider { readonly modelId?: string;prepare?(input:DraftInput):DraftInput;generate(input: DraftInput,options: ExecutionOptions): Promise<PrivateDraft>; usage?(): ProviderUsage | undefined }

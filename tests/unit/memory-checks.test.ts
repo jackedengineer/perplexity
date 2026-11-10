@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isGrounded, isNegated, isSensitive, mentionsSelf } from "@/server/memory/gate";
-import { checkOperations } from "@/server/memory/checks";
+import { checkOperations, facts } from "@/server/memory/checks";
 
 describe("whether a message talks about the person asking", () => {
   it("passes first-person messages and skips everything else", () => {
@@ -62,5 +62,16 @@ describe("checking proposed operations", () => {
     ], existing, message);
     expect(accepted).toEqual([{ op: "UPDATE", id: "pune", text: "Lives in Bengaluru" }, { op: "ADD", kind: "PREFERENCE", text: "Is vegetarian" }, { op: "DELETE", id: "fish" }]);
     expect(rejected).toEqual(["UNKNOWN_ID", "REPEATED_ID", "SENSITIVE", "UNGROUNDED"]);
+  });
+});
+
+describe("one fact per memory", () => {
+  it("splits combined facts on save and refuses to merge them on update", () => {
+    expect(facts("Works as a civil engineer. Lives in Pune.")).toEqual(["Works as a civil engineer", "Lives in Pune"]);
+    expect(facts("Uses Next.js 16 on Workers")).toEqual(["Uses Next.js 16 on Workers"]);
+    const message = "I'm a civil engineer based in Pune and I moved to Bengaluru";
+    const { accepted, rejected } = checkOperations([{ op: "ADD", kind: "PROFILE", text: "Works as a civil engineer. Lives in Pune." }, { op: "UPDATE", id: "city", text: "Lives in Bengaluru. Works as a civil engineer." }], new Set(["city"]), message);
+    expect(accepted).toEqual([{ op: "ADD", kind: "PROFILE", text: "Works as a civil engineer" }, { op: "ADD", kind: "PROFILE", text: "Lives in Pune" }]);
+    expect(rejected).toEqual(["COMBINED"]);
   });
 });

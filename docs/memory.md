@@ -19,7 +19,8 @@ Question answered (run COMPLETED or NEEDS_CLARIFICATION)
       memory_extractions row (primary key = run id, so once per run)
   → planner model, memory-v1 prompt: the user's own accepted message
       + their saved memories under short ids (m1…), wire cap 16 KB, ≤400 output tokens, 8 s, zero retention
-  → at most 3 operations: ADD {kind, text} · UPDATE {id, text} · DELETE {id}
+  → at most 3 operations: ADD {kind, text} · UPDATE {id, text} · DELETE {id}, one fact each (memory-v2)
+      (an ADD that joins facts is split; an UPDATE that joins them is dropped)
   → free checks drop each bad operation on its own:
       foreign or repeated id · sensitive (contacts, ID numbers, links, health, religion, politics,
       sexuality, ethnicity, money, credentials, addresses) · ungrounded (<60% of content words are the user's)
@@ -30,9 +31,11 @@ Question answered (run COMPLETED or NEEDS_CLARIFICATION)
 
 Next question
   → complete.ts loads the reader: About you, then PREFERENCE, PROFILE and CONTEXT memories, newest first, ≤2,000 characters
-      (absent for guests and temporary chats; About you only while memory is paused)
-  → answer-v11 / chat-v3 prompts get it as `reader`, with a rule sent only when there is a reader:
-      use it for tone, depth, format, units, language and resolving references; never cite it; never mention memory
+      (absent for guests and temporary chats; About you only while memory is paused;
+       otherwise always sent with learning: true, even with no memories yet)
+  → answer-v12 / chat-v4 prompts get it as `reader`, with a rule sent only when there is a reader:
+      use it for tone, depth, format, units, language and resolving references; never cite it; never mention memory;
+      while learning, acknowledge "remember / forget that…" in a few words and never claim it can't
   → over the 20 KB packet budget, memories are dropped (least important first), then About you, before any evidence or history
   → the planner and search never see it
 ```
@@ -76,7 +79,7 @@ LIVE_NEON_E2E=1 pnpm exec playwright test --config playwright.memory.config.ts  
 pnpm eval:memory                # live extraction eval on the real planner model; paid, opt-in only
 ```
 
-The offline eval (`evals/memory-cases.json`) has 44 labelled messages with hand-written replies that include typical model mistakes. Its targets are 0 sensitive saves, 0 ungrounded saves and at most 1 wrong case. The current result is 44 of 44.
+The offline eval (`evals/memory-cases.json`) has 46 labelled messages with hand-written replies that include typical model mistakes. Its targets are 0 sensitive saves, 0 ungrounded saves and at most 1 wrong case. The current result is 46 of 46.
 
 ## Not in v1
 

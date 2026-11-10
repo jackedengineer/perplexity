@@ -16,12 +16,21 @@ describe("what the asker told Perplex, inside the answer budget", () => {
     const steps = [...readerCandidates({ instructions: "About", memories: ["a", "b"] })];
     expect(steps).toEqual([{ instructions: "About", memories: ["a", "b"] }, { instructions: "About", memories: ["a"] }, { instructions: "About", memories: [] }]);
     expect([...readerCandidates({ memories: ["a"] })]).toEqual([{ memories: ["a"] }]);
+    // With memory on, the learning flag is the last thing to go, so answers keep acknowledging "forget that…".
+    expect([...readerCandidates({ instructions: "About", memories: ["a"], learning: true })]).toEqual([{ instructions: "About", memories: ["a"], learning: true }, { instructions: "About", memories: [], learning: true }, { memories: [], learning: true }]);
+  });
+
+  it("tells the model to acknowledge remember and forget requests only while memory is on", () => {
+    const rule = answerSystemPrompt({ reader: { memories: [], learning: true } });
+    expect(rule).toContain("When reader.learning is true");
+    expect(rule).toContain("never say you cannot remember or forget");
+    expect(rule).toContain("When it is absent, do not promise to remember anything");
   });
 
   it("goes into the answer prompt as data, under a rule that keeps it out of evidence and out of the text", () => {
     const prepared = prepareDraftInput({ question: "Concrete suppliers near me", reader: { memories: ["Lives in Pune"] }, evidence: evidence(2, 200) });
     expect(JSON.parse(draftPrompt(prepared)).reader).toEqual({ memories: ["Lives in Pune"] });
-    expect(ANSWER_PROMPT_VERSION).toBe("answer-v11");
+    expect(ANSWER_PROMPT_VERSION).toBe("answer-v12");
     expect(answerSystemPrompt(prepared)).toContain("never cite it");
     expect(answerSystemPrompt(prepared)).toContain("Never mention that you remember");
     expect(answerSystemPrompt({})).toBe(ANSWER_PROMPT);
@@ -50,7 +59,7 @@ describe("what the asker told Perplex, inside the answer budget", () => {
     expect(prepared.context).toHaveLength(4);
     expect(prepared.reader!.memories.length).toBeLessThan(50);
     expect(JSON.parse(chatPrompt(prepared)).reader.instructions).toBe(reader.instructions);
-    expect(CHAT_PROMPT_VERSION).toBe("chat-v3");
+    expect(CHAT_PROMPT_VERSION).toBe("chat-v4");
     expect(chatSystemPrompt(prepared)).toContain("never cite it");
     expect(chatSystemPrompt({})).toBe(CHAT_PROMPT);
     expect(() => prepareChatInput({ ...input, reader: { memories: ["x".repeat(201)] } })).toThrow();

@@ -77,7 +77,7 @@ it('runs every memory query as the web role',async()=>{
   expect(await applyOperations(db,profile.id,[{op:'ADD',kind:'PROFILE',text:'Lives in Pune'}],null,new Date())).toBe(1);
   const [memory]=await listMemories(db,profile.id);
   expect(await applyOperations(db,profile.id,[{op:'UPDATE',id:memory.id,text:'Lives in Delhi'}],null)).toBe(1);
-  expect(await loadReader(db,profile.id,conversation.id)).toEqual({instructions:'Metric units',memories:['Lives in Delhi']});
+  expect(await loadReader(db,profile.id,conversation.id)).toEqual({instructions:'Metric units',memories:['Lives in Delhi'],learning:true});
   const log=(event:Record<string,unknown>)=>{if(event.outcome==='ERROR')throw new Error('extraction query failed');};
   await extractMemories(db,randomUUID(),{modelId:'test/memory',extract:async()=>({operations:[],usage:undefined})},{log});
   expect(await deleteAllMemories(db,subject)).toBe(1);

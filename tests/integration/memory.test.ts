@@ -116,7 +116,9 @@ describe("what an answer may know about the asker", () => {
     const who = await person();
     await updateSettings(db, who.subject, { instructions: "Civil engineer" });
     await applyOperations(db, who.userId, [add("Planning a Sedona launch", "CONTEXT"), add("Lives in Pune"), add("Prefers short answers", "PREFERENCE")], null);
-    expect(await loadReader(db, who.userId, who.conversationId)).toEqual({ instructions: "Civil engineer", memories: ["Prefers short answers", "Lives in Pune", "Planning a Sedona launch"] });
+    expect(await loadReader(db, who.userId, who.conversationId)).toEqual({ instructions: "Civil engineer", memories: ["Prefers short answers", "Lives in Pune", "Planning a Sedona launch"], learning: true });
+    const fresh = await person();
+    expect(await loadReader(db, fresh.userId, fresh.conversationId)).toEqual({ memories: [], learning: true });
   });
 
   it("gives nothing for temporary chats, guests or another person's conversation, and only About you while paused", async () => {
@@ -203,13 +205,13 @@ describe("answers with memory", () => {
     await applyOperations(db, who.userId, [add("Lives in Pune")], null);
     const web = await ask(who, "Concrete suppliers near me", "FAST");
     expect(web.result).toMatchObject({ kind: "COMPLETED" });
-    expect(web.p.answer.generate.mock.calls[0][0].reader).toEqual({ instructions: "Answer in metric units", memories: ["Lives in Pune"] });
+    expect(web.p.answer.generate.mock.calls[0][0].reader).toEqual({ instructions: "Answer in metric units", memories: ["Lives in Pune"], learning: true });
     expect(seen(web.p)).not.toMatch(/Pune|metric/u);
     const other = await asker();
     await applyOperations(db, other.userId, [add("Prefers short answers", "PREFERENCE")], null);
     const chat = await ask(other, "Explain recursion", "CHAT", providers("A function that calls itself."));
     expect(chat.result).toMatchObject({ kind: "COMPLETED" });
-    expect(chat.p.answer.generate.mock.calls[0][0].reader).toEqual({ memories: ["Prefers short answers"] });
+    expect(chat.p.answer.generate.mock.calls[0][0].reader).toEqual({ memories: ["Prefers short answers"], learning: true });
   });
 
   it("gives nothing when memory is paused or the chat is temporary", async () => {
