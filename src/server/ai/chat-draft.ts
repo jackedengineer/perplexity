@@ -7,7 +7,7 @@ import {validateEvidence} from '@/server/search/evidence';
 import {validateCitations} from './citations';
 import {READER_RULE} from './prompts/answer';
 import {readerCandidates,validReader,withReader} from './reader';
-export const CHAT_PROMPT_VERSION='chat-v3';
+export const CHAT_PROMPT_VERSION='chat-v4';
 export const CHAT_PROMPT=[
  GENERATION_SAFETY_INSTRUCTIONS,
  'You are a helpful conversational assistant. Answer clearly and concisely in the language of the current question. Use English for an English question; do not switch languages unless the user requests it.',

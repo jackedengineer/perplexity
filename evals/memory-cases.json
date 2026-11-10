@@ -663,6 +663,44 @@
     }
    ],
    "expected": []
+  },
+  {
+   "id": "combined-facts",
+   "category": "SELF",
+   "message": "I'm a civil engineer based in Pune. What's the M20 mix ratio?",
+   "proposed": [
+    {
+     "op": "ADD",
+     "kind": "PROFILE",
+     "text": "Works as a civil engineer. Lives in Pune."
+    }
+   ],
+   "expected": [
+    "Lives in Pune",
+    "Works as a civil engineer"
+   ]
+  },
+  {
+   "id": "combined-update",
+   "category": "CHANGE",
+   "message": "I moved to Bengaluru and switched to data analysis",
+   "existing": [
+    {
+     "id": "00000000-0000-4000-8000-000000000020",
+     "kind": "PROFILE",
+     "text": "Lives in Pune"
+    }
+   ],
+   "proposed": [
+    {
+     "op": "UPDATE",
+     "id": "00000000-0000-4000-8000-000000000020",
+     "text": "Lives in Bengaluru. Works in data analysis."
+    }
+   ],
+   "expected": [
+    "Lives in Pune"
+   ]
   }
  ]
 }

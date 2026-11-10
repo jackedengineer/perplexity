@@ -4,6 +4,7 @@ import {CHAT_PROMPT_VERSION} from '@/server/ai/chat-draft';
 import {ANSWER_PROMPT_VERSION} from '@/server/ai/prompts/answer';
 import {traceStage} from '@/server/telemetry/trace';
 import {loadReader} from '@/server/memory/store';
+import {skipReason} from '@/server/memory/run';
 import { z } from "zod";
 import type { PublicStage } from "@/server/contracts/progress";
 import { and,eq } from "drizzle-orm";
@@ -45,7 +46,12 @@ export function createAnswerCompletion(db: AdmissionDatabase,dependencies: { ans
         const answerLanguage=planning?.plan.action==='ANSWER'?planning.plan.answerLanguage:'en';
         const context=run.mode === "CHAT" ? (await loadPlanningContext(tx,run.conversationId,message.sequence,true)).map(({role,text})=>({role,text})) : undefined;
         // What the asker has told Perplex about themselves. Absent for guests, paused memory and temporary chats.
-        const reader=await loadReader(tx,run.userId,run.conversationId);
+        let reader=await loadReader(tx,run.userId,run.conversationId);
+        // Only promise to remember when this message will actually be learned from.
+        if(reader?.learning&&await skipReason(tx,run.id,run.userId,question.data)){
+          const {instructions,memories}=reader;
+          reader=instructions||memories.length?{...(instructions?{instructions}:{}),memories}:null;
+        }
         return { kind: "READY",run,context,question: question.data,interpretation,answerLanguage,reader } as const;
       });
       if (loaded.kind === "SAVED") return { kind: "ALREADY_COMMITTED",runId,messageId: loaded.messageId };

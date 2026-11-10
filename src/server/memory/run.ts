@@ -1,6 +1,6 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import { appUsers, conversations, inputSafetyReviews, memoryExtractions, memorySettings, messages, runDocuments, runs, user, MEMORY_LIMITS } from "@/db/schema";
-import type { AdmissionDatabase } from "@/server/runs/usage";
+import type { AdmissionDatabase, AdmissionTransaction } from "@/server/runs/usage";
 import { checkOperations } from "./checks";
 import { ExtractionError, EXTRACTION_LIMITS, type ExtractionProvider } from "./extract";
 import { mentionsSelf } from "./gate";
@@ -9,6 +9,17 @@ import { applyOperations, listMemories } from "./store";
 export type MemoryExtraction = { provider: ExtractionProvider; schedule: (work: () => Promise<void>) => void };
 type Log = (event: Record<string, unknown>) => void;
 const defaultLog: Log = event => console.info(JSON.stringify(event));
+const utcDay = (now: Date) => new Date(now.toISOString().slice(0, 10) + "T00:00:00.000Z");
+
+// The message-level reasons extraction would skip this run. The answer uses it too, so it only
+// acknowledges "remember / forget that…" when something will actually be saved.
+export async function skipReason(db: AdmissionDatabase | AdmissionTransaction, runId: string, userId: string, message: string, dailyLimit: number = MEMORY_LIMITS.extractionsPerDay) {
+  if (!mentionsSelf(message)) return "NOT_PERSONAL" as const;
+  const [files] = await db.select({ n: sql<number>`count(*)::integer` }).from(runDocuments).where(eq(runDocuments.runId, runId));
+  if (files.n > 0) return "FILES" as const;
+  const [used] = await db.select({ n: sql<number>`count(*)::integer` }).from(memoryExtractions).where(and(eq(memoryExtractions.userId, userId), gte(memoryExtractions.createdAt, utcDay(new Date()))));
+  return used.n >= dailyLimit ? "DAILY_LIMIT" as const : null;
+}
 
 // Runs after an answer has been saved, never before: the user never waits for it and nothing is
 // shown either way. It reads only the user's own accepted message, never sources, files or
@@ -33,13 +44,12 @@ export async function extractMemories(db: AdmissionDatabase, runId: string, prov
     if (state.paused) return done("SKIPPED", { reason: "PAUSED" });
     if (!state.enabled) return done("SKIPPED", { reason: "TEMPORARY" });
     const message = state.parts.length === 1 ? state.parts[0].text : "";
-    if (!mentionsSelf(message)) return done("SKIPPED", { reason: "NOT_PERSONAL" });
-    const [files] = await db.select({ n: sql<number>`count(*)::integer` }).from(runDocuments).where(eq(runDocuments.runId, runId));
-    if (files.n > 0) return done("SKIPPED", { reason: "FILES" });
+    const skip = await skipReason(db, runId, state.userId, message, options.dailyLimit);
+    if (skip) return done("SKIPPED", { reason: skip });
     // Counted and claimed under the user's settings lock, so concurrent answers can't pass the
     // daily limit. The primary key makes this the one extraction for the run.
     const claim = await db.transaction(async tx => {
-      const startedAt = new Date(), today = new Date(startedAt.toISOString().slice(0, 10) + "T00:00:00.000Z");
+      const startedAt = new Date(), today = utcDay(startedAt);
       await tx.insert(memorySettings).values({ userId: state.userId, updatedAt: fence }).onConflictDoNothing();
       await tx.select({ userId: memorySettings.userId }).from(memorySettings).where(eq(memorySettings.userId, state.userId)).for("update");
       const [used] = await tx.select({ n: sql<number>`count(*)::integer` }).from(memoryExtractions).where(and(eq(memoryExtractions.userId, state.userId), gte(memoryExtractions.createdAt, today)));
